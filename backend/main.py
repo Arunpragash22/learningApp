@@ -48,7 +48,12 @@ auth_middleware = AuthMiddleware()
 
 @app.middleware("http")
 async def auth_middleware_wrapper(request: Request, call_next):
+    # Skip OPTIONS request (CORS preflight)
+    if request.method == "OPTIONS":
+        return JSONResponse(status_code=200, content={"message": "preflight OK"})
+        
     return await auth_middleware(request, call_next)
+
 
 
 # Logging middleware
