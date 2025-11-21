@@ -21,21 +21,39 @@ export interface LoginResponse {
   success: boolean;
   message: string;
   user: User;
+  access_token: string;
+  token_type: string;
 }
 
 export interface RegisterResponse {
   success: boolean;
   message: string;
   user: User;
+  access_token: string;
+  token_type: string;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+// Helper function to get auth headers with JWT token
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('access_token');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
+};
 
 export const authService = {
   // Register a new user
   async register(userData: RegisterData): Promise<RegisterResponse> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +77,7 @@ export const authService = {
   // Login user
   async login(email: string, password: string): Promise<LoginResponse> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,23 +101,9 @@ export const authService = {
   // Get all users (admin only)
   async getAllUsers(): Promise<User[]> {
     try {
-      const user = localStorage.getItem('user');
-      let token = 'mock-token';
-      let role = 'student';
-      
-      if (user) {
-        const userData = JSON.parse(user);
-        token = userData.token || 'mock-token';
-        role = userData.role || 'student';
-      }
-
-      const response = await fetch(`${API_BASE_URL}/auth/users`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/users`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'x-user-role': role,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {

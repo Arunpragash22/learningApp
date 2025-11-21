@@ -4,6 +4,7 @@ from typing import List
 from ..models.user import UserModel
 from ..middleware.auth import get_current_user, require_instructor
 from ..database.connection import get_database
+from ..utils.jwt_utils import create_access_token
 import hashlib
 
 
@@ -62,9 +63,19 @@ async def register(request_data: RegisterRequest):
         if "updatedAt" in user and hasattr(user["updatedAt"], "isoformat"):
             user["updatedAt"] = user["updatedAt"].isoformat()
         
+        # Create JWT token
+        token_data = {
+            "sub": user.get("id"),  # Subject (user ID)
+            "email": user.get("email"),
+            "role": user.get("role"),
+        }
+        access_token = create_access_token(token_data)
+        
         return {
             "success": True,
             "message": "Registration successful",
+            "access_token": access_token,
+            "token_type": "bearer",
             "user": user
         }
     except HTTPException:
@@ -114,9 +125,19 @@ async def login(request_data: LoginRequest):
         if "updatedAt" in user and hasattr(user["updatedAt"], "isoformat"):
             user["updatedAt"] = user["updatedAt"].isoformat()
 
+        # Create JWT token
+        token_data = {
+            "sub": user.get("id"),  # Subject (user ID)
+            "email": user.get("email"),
+            "role": user.get("role"),
+        }
+        access_token = create_access_token(token_data)
+
         return {
             "success": True,
             "message": "Login successful",
+            "access_token": access_token,
+            "token_type": "bearer",
             "user": user
         }
     except HTTPException:

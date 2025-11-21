@@ -88,6 +88,13 @@ export const AuthProvider: React.FC<{
         // Store user in state and localStorage
         setUser(response.user);
         localStorage.setItem('user', JSON.stringify(response.user));
+        
+        // Store JWT token separately
+        if (response.access_token) {
+          localStorage.setItem('access_token', response.access_token);
+          localStorage.setItem('token_type', response.token_type || 'bearer');
+        }
+        
         toast.success(response.message || 'Login successful');
         return true;
       }
@@ -117,6 +124,14 @@ export const AuthProvider: React.FC<{
       const response = await authService.register(registerData);
       
       if (response.success) {
+        // Store JWT token if auto-login after registration
+        if (response.access_token && response.user) {
+          setUser(response.user);
+          localStorage.setItem('user', JSON.stringify(response.user));
+          localStorage.setItem('access_token', response.access_token);
+          localStorage.setItem('token_type', response.token_type || 'bearer');
+        }
+        
         toast.success(response.message || 'Registration successful! You can now log in.');
         return true;
       }
@@ -134,6 +149,8 @@ export const AuthProvider: React.FC<{
   // Logout function
   const logout = () => {
     localStorage.removeItem('user');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('token_type');
     setUser(null);
     toast.success('You have been logged out');
   };
