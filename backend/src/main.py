@@ -49,12 +49,20 @@ app.add_middleware(
 
 
 # -----------------------------------------------------
-# AUTH MIDDLEWARE
+# AUTH MIDDLEWARE (FIXED WITH SKIP FOR ZOOM WEBHOOK)
 # -----------------------------------------------------
 auth_middleware = AuthMiddleware()
+ZOOM_WEBHOOK_PATH = "/api/zoom/webhook"
+
 
 @app.middleware("http")
 async def auth_middleware_wrapper(request: Request, call_next):
+
+    # 1️⃣ SKIP AUTH for Zoom Webhook
+    if request.url.path.startswith(ZOOM_WEBHOOK_PATH):
+        return await call_next(request)
+
+    # 2️⃣ Allow preflight CORS
     if request.method == "OPTIONS":
         response = JSONResponse({"message": "preflight OK"})
         origin = request.headers.get("origin", "*")
@@ -64,6 +72,7 @@ async def auth_middleware_wrapper(request: Request, call_next):
         response.headers["Access-Control-Allow-Methods"] = "*"
         return response
 
+    # 3️⃣ Apply authentication to all other requests
     return await auth_middleware(request, call_next)
 
 
@@ -98,7 +107,6 @@ async def security_headers_middleware(request: Request, call_next):
         "connect-src 'self' https:; "
         "frame-ancestors 'self' https://*.zoom.us;"
     )
-
     return response
 
 
@@ -123,7 +131,7 @@ async def root():
 
 
 # -----------------------------------------------------
-# ⭐ ROUTER IMPORTS MUST COME HERE (AFTER APP IS CREATED)
+# IMPORT ROUTERS AFTER APP CREATION
 # -----------------------------------------------------
 from src.routers import (
     auth,
@@ -136,14 +144,15 @@ from src.routers import (
     live_question,
 )
 
+
 # -----------------------------------------------------
-# REGISTER ROUTERS
+# REGISTER ROUTERS (Correct Order)
 # -----------------------------------------------------
 app.include_router(auth.router)
 app.include_router(quiz.router)
 app.include_router(clustering.router)
 app.include_router(question.router)
-app.include_router(zoom_webhook.router)
+app.include_router(zoom_webhook.router)      # ⭐ important
 app.include_router(zoom_chatbot.router)
 app.include_router(course.router)
 app.include_router(live_question.router)
@@ -156,7 +165,7 @@ app.include_router(live_question.router)
 async def not_found_handler(request: Request, exc):
     return JSONResponse(
         status_code=404,
-        content={"error": "Route not found", "path": request.url.path}
+        content={"error": "Route not found", "path": request.url.path},
     )
 
 
@@ -167,7 +176,7 @@ async def not_found_handler(request: Request, exc):
 async def error_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
-        content={"error": "Internal server error", "message": str(exc)}
+        content={"error": "Internal server error", "message": str(exc)},
     )
 
 
