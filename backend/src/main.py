@@ -9,6 +9,7 @@ from src.middleware.auth import AuthMiddleware
 from src.database.connection import connect_to_mongo, close_mongo_connection
 
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
