@@ -4,21 +4,28 @@ from fastapi.responses import JSONResponse
 from datetime import datetime
 import os
 from contextlib import asynccontextmanager
-from src.routers import quiz, clustering, question
+
+# Import routers
+from src.routers import auth, quiz, clustering, question, zoom_webhook, zoom_chatbot, course, live_question
+
+# Middleware & DB
 from src.middleware.auth import AuthMiddleware
 from src.database.connection import connect_to_mongo, close_mongo_connection
 
 
-
+# -----------------------------------------------------
+# LIFESPAN (Startup / Shutdown)
+# -----------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     await connect_to_mongo()
     yield
-    # Shutdown
     await close_mongo_connection()
 
 
+# -----------------------------------------------------
+# FASTAPI APP
+# -----------------------------------------------------
 app = FastAPI(
     title="Learning Platform API",
     version="1.0.0",
@@ -26,22 +33,25 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware
+
+# -----------------------------------------------------
+# CORS CONFIG
+# -----------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        # Local dev
         "http://localhost:5173",
         "http://localhost:3000",
-        "http://localhost:5174",
 
-        # Your live frontend
+        # Production
         "https://zoomlearningapp.de",
         "https://www.zoomlearningapp.de",
 
-        # Your Vercel deployments
+        # Vercel builds (important!)
         "https://learning-app-alpha-one.vercel.app",
         "https://learning-lopy2je2b-arunpragashs-projects-baf0c862.vercel.app",
-        "https://learning-app-git-master-arunpragashs-projects-baf0c862.vercel.app",
+        "https://learning-pr8zfgjb7-arunpragashs-projects-baf0c862.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -49,28 +59,28 @@ app.add_middleware(
 )
 
 
-# Authentication middleware
+# -----------------------------------------------------
+# AUTH MIDDLEWARE
+# -----------------------------------------------------
 auth_middleware = AuthMiddleware()
-
 
 @app.middleware("http")
 async def auth_middleware_wrapper(request: Request, call_next):
-    # Allow CORS preflight to pass through with headers
     if request.method == "OPTIONS":
         response = JSONResponse({"message": "preflight OK"})
-        response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
+        origin = request.headers.get("origin", "*")
+        response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Headers"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "*"
         return response
 
-    # Apply your normal authentication
     return await auth_middleware(request, call_next)
 
 
-
-
-# Logging middleware
+# -----------------------------------------------------
+# LOGGING MIDDLEWARE
+# -----------------------------------------------------
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
     print(f"{datetime.now().isoformat()} - {request.method} {request.url.path}")
@@ -78,23 +88,36 @@ async def logging_middleware(request: Request, call_next):
     return response
 
 
-# Security headers middleware (required by Zoom)
+# -----------------------------------------------------
+# SECURITY HEADERS (Zoom Requirement)
+# -----------------------------------------------------
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
     response = await call_next(request)
-    
-    # Add OWASP required headers for Zoom
+
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["Content-Security-Policy"] = "default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https:; frame-ancestors 'self' https://*.zoom.us;"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-    
+
+    # VERY IMPORTANT FOR ZOOM WEBHOOK
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self' https:; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; "
+        "style-src 'self' 'unsafe-inline' https:; "
+        "img-src 'self' data: https:; "
+        "font-src 'self' data: https:; "
+        "connect-src 'self' https:; "
+        "frame-ancestors 'self' https://*.zoom.us;"
+    )
+
     return response
 
 
-# Health check
+# -----------------------------------------------------
+# HEALTH CHECK
+# -----------------------------------------------------
 @app.get("/health")
 async def health_check():
     return {
@@ -104,7 +127,9 @@ async def health_check():
     }
 
 
-# Root route
+# -----------------------------------------------------
+# ROOT
+# -----------------------------------------------------
 @app.get("/")
 async def root():
     return {
@@ -126,19 +151,32 @@ async def root():
     }
 
 
-# API Routes
-from src.routers import auth, zoom_webhook, zoom_chatbot, course, live_question
+# -----------------------------------------------------
+# REGISTER ALL ROUTERS — CORRECT ORDER
+# -----------------------------------------------------
+
+# Authentication
 app.include_router(auth.router)
+
+# Modules
 app.include_router(quiz.router)
 app.include_router(clustering.router)
 app.include_router(question.router)
+
+# Zoom Webhook (VERY IMPORTANT — this must be included!)
 app.include_router(zoom_webhook.router)
+
+# Zoom Chatbot
 app.include_router(zoom_chatbot.router)
+
+# Course and Live Questions
 app.include_router(course.router)
 app.include_router(live_question.router)
 
 
-# 404 handler
+# -----------------------------------------------------
+# 404 HANDLER
+# -----------------------------------------------------
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc):
     return JSONResponse(
@@ -162,31 +200,22 @@ async def not_found_handler(request: Request, exc):
     )
 
 
-# Error handler
+# -----------------------------------------------------
+# ERROR HANDLER
+# -----------------------------------------------------
 @app.exception_handler(Exception)
 async def error_handler(request: Request, exc: Exception):
     print(f"Error: {exc}")
     return JSONResponse(
         status_code=500,
-        content={
-            "error": "Internal server error",
-            "message": str(exc),
-        }
+        content={"error": "Internal server error", "message": str(exc)}
     )
 
 
+# -----------------------------------------------------
+# LOCAL DEV SERVER
+# -----------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-    import sys
-    # Set UTF-8 encoding for Windows console
-    if sys.platform == "win32":
-        import codecs
-        sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
-    
     port = int(os.getenv("PORT", 3001))
-    print(f"\nServer running on http://localhost:{port}")
-    print(f"Health check: http://localhost:{port}/health")
-    print(f"API endpoints available at http://localhost:{port}/api")
-    print(f"\nBackend is ready!\n")
     uvicorn.run(app, host="0.0.0.0", port=port)
-
