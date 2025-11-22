@@ -1,102 +1,129 @@
-from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Request
 import hmac
 import hashlib
-import os
 import base64
+import os
 import json
 from datetime import datetime
 from src.database.connection import get_database
 
+# Prefix gives /api/zoom/... URLs
 router = APIRouter(prefix="/api/zoom", tags=["Zoom Webhook"])
 
-# ------------------------------------------
-# SIGNATURE VERIFICATION
-# ------------------------------------------
-def verify_signature(secret: str, payload: bytes, timestamp: str, signature: str):
-    message = f"v0:{timestamp}:{payload.decode()}"
-    computed_hash = hmac.new(secret.encode(), message.encode(), hashlib.sha256).hexdigest()
-    expected_sig = f"v0={computed_hash}"
-    return hmac.compare_digest(expected_sig, signature)
-
 
 # ------------------------------------------
-# MAIN WEBHOOK
+# URL VALIDATION + EVENT DISPATCH
 # ------------------------------------------
 @router.post("/webhook")
 async def zoom_webhook(request: Request):
+    body_bytes = await request.body()
+    body_text = body_bytes.decode("utf-8")
 
-    raw_body = await request.body()
-    data = await request.json()
+    print("\n===== ZOOM WEBHOOK RECEIVED =====")
+    print(body_text[:400])
 
-    print("\n==== ZOOM WEBHOOK RECEIVED ====")
-    print(raw_body.decode()[:300])
+    data = json.loads(body_text)
+    event = data.get("event", "")
 
-    event = data.get("event")
-
-    # URL validation
+    # -------------------------------------------------
+    # 1) URL VALIDATION (first time when you click Validate)
+    # -------------------------------------------------
     if event == "endpoint.url_validation":
-        plain = data["payload"]["plainToken"]
+        plain_token = data["payload"]["plainToken"]
         secret = os.getenv("ZOOM_WEBHOOK_SECRET", "")
 
-        hashed = hmac.new(secret.encode(), plain.encode(), hashlib.sha256).digest()
-        encrypted = base64.b64encode(hashed).decode()
+        # Hash plainToken with your webhook secret (Zoom docs)
+        hashed = hmac.new(
+            secret.encode("utf-8"),
+            plain_token.encode("utf-8"),
+            hashlib.sha256
+        ).digest()
 
-        return {"plainToken": plain, "encryptedToken": encrypted}
+        encrypted_token = base64.b64encode(hashed).decode("utf-8")
 
-    # Handle participant join
+        print("✅ URL validation handled")
+        return {
+            "plainToken": plain_token,
+            "encryptedToken": encrypted_token
+        }
+
+    # -------------------------------------------------
+    # 2) PARTICIPANT JOINED
+    # -------------------------------------------------
     if event in ["meeting.participant_joined", "participant.joined"]:
-        return await handle_join(data)
+        return await handle_participant_joined(data)
 
-    # Handle participant leave
+    # -------------------------------------------------
+    # 3) PARTICIPANT LEFT
+    # -------------------------------------------------
     if event in ["meeting.participant_left", "participant.left"]:
-        return await handle_leave(data)
+        return await handle_participant_left(data)
 
+    # -------------------------------------------------
+    # 4) OTHER EVENTS – JUST LOG
+    # -------------------------------------------------
+    print(f"ℹ️ Unhandled event type: {event}")
     return {"status": "ignored", "event": event}
 
 
 # ------------------------------------------
-# PARTICIPANT JOIN
+# PARTICIPANT JOINED
 # ------------------------------------------
-async def handle_join(data: dict):
+async def handle_participant_joined(data: dict):
     obj = data["payload"]["object"]
-    p = obj["participant"]
+    participant = obj.get("participant", {})
+
+    meeting_id = obj.get("id")
+    user_id = participant.get("user_id") or participant.get("id")
+    name = participant.get("user_name") or participant.get("name")
+    email = participant.get("email")
 
     db = get_database()
-
     await db.participants.insert_one({
-        "meeting_id": obj["id"],
-        "user_id": p.get("user_id") or p.get("id"),
-        "name": p.get("user_name") or p.get("name"),
-        "email": p.get("email"),
+        "zoom_meeting_id": str(meeting_id),
+        "user_id": str(user_id),
+        "name": name,
+        "email": email,
         "join_time": datetime.utcnow(),
-        "status": "joined"
+        "status": "joined",
+        "raw": participant,
     })
 
-    print("✔ STORED: participant joined")
+    print(f"✅ STORED joined participant: {name} ({user_id})")
     return {"status": "success", "event": "joined"}
 
 
 # ------------------------------------------
 # PARTICIPANT LEFT
 # ------------------------------------------
-async def handle_leave(data: dict):
+async def handle_participant_left(data: dict):
     obj = data["payload"]["object"]
-    p = obj["participant"]
+    participant = obj.get("participant", {})
+
+    meeting_id = obj.get("id")
+    user_id = participant.get("user_id") or participant.get("id")
 
     db = get_database()
-
     await db.participants.update_one(
-        {"meeting_id": obj["id"], "user_id": p.get("user_id") or p.get("id")},
-        {"$set": {"left_time": datetime.utcnow(), "status": "left"}}
+        {
+            "zoom_meeting_id": str(meeting_id),
+            "user_id": str(user_id),
+        },
+        {
+            "$set": {
+                "left_time": datetime.utcnow(),
+                "status": "left",
+            }
+        },
+        upsert=True,  # in case we never saw the join event
     )
 
-    print("✔ UPDATED: participant left")
+    print(f"👋 UPDATED left participant: {user_id}")
     return {"status": "success", "event": "left"}
 
 
 # ------------------------------------------
-# TEST ENDPOINT
+# SIMPLE TEST ENDPOINT
 # ------------------------------------------
 @router.get("/webhook/test")
 async def test_webhook():

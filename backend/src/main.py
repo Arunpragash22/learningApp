@@ -2,15 +2,14 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from datetime import datetime
-import os
 from contextlib import asynccontextmanager
+import os
 
 from src.middleware.auth import AuthMiddleware
 from src.database.connection import connect_to_mongo, close_mongo_connection
 
-
 # -----------------------------------------------------
-# LIFESPAN (Startup / Shutdown)
+# LIFESPAN (startup / shutdown)
 # -----------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,18 +19,18 @@ async def lifespan(app: FastAPI):
 
 
 # -----------------------------------------------------
-# FASTAPI APP
+# APP
 # -----------------------------------------------------
 app = FastAPI(
     title="Learning Platform API",
     version="1.0.0",
     description="Backend API for Learning Platform",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 
 # -----------------------------------------------------
-# CORS CONFIG
+# CORS
 # -----------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
@@ -40,6 +39,7 @@ app.add_middleware(
         "http://localhost:3000",
         "https://zoomlearningapp.de",
         "https://www.zoomlearningapp.de",
+        # any Vercel preview
         "https://*.vercel.app",
     ],
     allow_credentials=True,
@@ -49,20 +49,19 @@ app.add_middleware(
 
 
 # -----------------------------------------------------
-# AUTH MIDDLEWARE (FIXED WITH SKIP FOR ZOOM WEBHOOK)
+# AUTH MIDDLEWARE (skip for webhook)
 # -----------------------------------------------------
 auth_middleware = AuthMiddleware()
-ZOOM_WEBHOOK_PATH = "/api/zoom/webhook"
-
 
 @app.middleware("http")
 async def auth_middleware_wrapper(request: Request, call_next):
+    path = request.url.path
 
-    # 1️⃣ SKIP AUTH for Zoom Webhook
-    if request.url.path.startswith(ZOOM_WEBHOOK_PATH):
+    # ✅ Let Zoom call webhook without JWT / auth
+    if path.startswith("/api/zoom/webhook"):
         return await call_next(request)
 
-    # 2️⃣ Allow preflight CORS
+    # Handle CORS preflight
     if request.method == "OPTIONS":
         response = JSONResponse({"message": "preflight OK"})
         origin = request.headers.get("origin", "*")
@@ -72,12 +71,12 @@ async def auth_middleware_wrapper(request: Request, call_next):
         response.headers["Access-Control-Allow-Methods"] = "*"
         return response
 
-    # 3️⃣ Apply authentication to all other requests
+    # Normal auth for everything else
     return await auth_middleware(request, call_next)
 
 
 # -----------------------------------------------------
-# LOGGING MIDDLEWARE
+# LOGGING
 # -----------------------------------------------------
 @app.middleware("http")
 async def logging_middleware(request: Request, call_next):
@@ -87,7 +86,7 @@ async def logging_middleware(request: Request, call_next):
 
 
 # -----------------------------------------------------
-# SECURITY HEADERS (Zoom Requirement)
+# SECURITY HEADERS (fine for webhook too)
 # -----------------------------------------------------
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
@@ -107,20 +106,18 @@ async def security_headers_middleware(request: Request, call_next):
         "connect-src 'self' https:; "
         "frame-ancestors 'self' https://*.zoom.us;"
     )
+
     return response
 
 
 # -----------------------------------------------------
-# HEALTH CHECK
+# HEALTH + ROOT
 # -----------------------------------------------------
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
 
-# -----------------------------------------------------
-# ROOT
-# -----------------------------------------------------
 @app.get("/")
 async def root():
     return {
@@ -131,7 +128,7 @@ async def root():
 
 
 # -----------------------------------------------------
-# IMPORT ROUTERS AFTER APP CREATION
+# IMPORT & REGISTER ROUTERS
 # -----------------------------------------------------
 from src.routers import (
     auth,
@@ -144,22 +141,18 @@ from src.routers import (
     live_question,
 )
 
-
-# -----------------------------------------------------
-# REGISTER ROUTERS (Correct Order)
-# -----------------------------------------------------
 app.include_router(auth.router)
 app.include_router(quiz.router)
 app.include_router(clustering.router)
 app.include_router(question.router)
-app.include_router(zoom_webhook.router)      # ⭐ important
+app.include_router(zoom_webhook.router)
 app.include_router(zoom_chatbot.router)
 app.include_router(course.router)
 app.include_router(live_question.router)
 
 
 # -----------------------------------------------------
-# 404 HANDLER
+# ERROR HANDLING
 # -----------------------------------------------------
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc):
@@ -169,11 +162,9 @@ async def not_found_handler(request: Request, exc):
     )
 
 
-# -----------------------------------------------------
-# ERROR HANDLER
-# -----------------------------------------------------
 @app.exception_handler(Exception)
 async def error_handler(request: Request, exc: Exception):
+    print("❌ Internal error:", exc)
     return JSONResponse(
         status_code=500,
         content={"error": "Internal server error", "message": str(exc)},
@@ -181,7 +172,7 @@ async def error_handler(request: Request, exc: Exception):
 
 
 # -----------------------------------------------------
-# LOCAL DEV SERVER
+# LOCAL DEV
 # -----------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
