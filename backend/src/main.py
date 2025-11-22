@@ -5,10 +5,6 @@ from datetime import datetime
 import os
 from contextlib import asynccontextmanager
 
-# Import routers
-from src.routers import auth, quiz, clustering, question, zoom_webhook, zoom_chatbot, course, live_question
-
-# Middleware & DB
 from src.middleware.auth import AuthMiddleware
 from src.database.connection import connect_to_mongo, close_mongo_connection
 
@@ -40,18 +36,11 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        # Local dev
         "http://localhost:5173",
         "http://localhost:3000",
-
-        # Production
         "https://zoomlearningapp.de",
         "https://www.zoomlearningapp.de",
-
-        # Vercel builds (important!)
-        "https://learning-app-alpha-one.vercel.app",
-        "https://learning-lopy2je2b-arunpragashs-projects-baf0c862.vercel.app",
-        "https://learning-pr8zfgjb7-arunpragashs-projects-baf0c862.vercel.app",
+        "https://*.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -100,8 +89,6 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-
-    # VERY IMPORTANT FOR ZOOM WEBHOOK
     response.headers["Content-Security-Policy"] = (
         "default-src 'self' https:; "
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; "
@@ -120,11 +107,7 @@ async def security_headers_middleware(request: Request, call_next):
 # -----------------------------------------------------
 @app.get("/health")
 async def health_check():
-    return {
-        "status": "ok",
-        "message": "Server is running",
-        "timestamp": datetime.now().isoformat()
-    }
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
 
 # -----------------------------------------------------
@@ -135,41 +118,33 @@ async def root():
     return {
         "message": "Learning Platform API",
         "version": "1.0.0",
-        "domain": "zoomlearningapp.de",
         "timestamp": datetime.now().isoformat(),
-        "endpoints": {
-            "health": "/health",
-            "auth": "/api/auth",
-            "courses": "/api/courses",
-            "questions": "/api/questions",
-            "liveQuestions": "/api/live-questions",
-            "quiz": "/api/quiz",
-            "clustering": "/api/clustering",
-            "zoomWebhook": "/api/zoom/webhook",
-            "zoomChatbot": "/api/zoom/chatbot"
-        }
     }
 
 
 # -----------------------------------------------------
-# REGISTER ALL ROUTERS — CORRECT ORDER
+# ⭐ ROUTER IMPORTS MUST COME HERE (AFTER APP IS CREATED)
 # -----------------------------------------------------
+from src.routers import (
+    auth,
+    quiz,
+    clustering,
+    question,
+    zoom_webhook,
+    zoom_chatbot,
+    course,
+    live_question,
+)
 
-# Authentication
+# -----------------------------------------------------
+# REGISTER ROUTERS
+# -----------------------------------------------------
 app.include_router(auth.router)
-
-# Modules
 app.include_router(quiz.router)
 app.include_router(clustering.router)
 app.include_router(question.router)
-
-# Zoom Webhook (VERY IMPORTANT — this must be included!)
 app.include_router(zoom_webhook.router)
-
-# Zoom Chatbot
 app.include_router(zoom_chatbot.router)
-
-# Course and Live Questions
 app.include_router(course.router)
 app.include_router(live_question.router)
 
@@ -181,22 +156,7 @@ app.include_router(live_question.router)
 async def not_found_handler(request: Request, exc):
     return JSONResponse(
         status_code=404,
-        content={
-            "error": "Route not found",
-            "path": request.url.path,
-            "method": request.method,
-            "availableEndpoints": {
-                "health": "/health",
-                "auth": "/api/auth",
-                "courses": "/api/courses",
-                "questions": "/api/questions",
-                "liveQuestions": "/api/live-questions",
-                "quiz": "/api/quiz",
-                "clustering": "/api/clustering",
-                "zoomWebhook": "/api/zoom/webhook",
-                "zoomChatbot": "/api/zoom/chatbot"
-            }
-        }
+        content={"error": "Route not found", "path": request.url.path}
     )
 
 
@@ -205,7 +165,6 @@ async def not_found_handler(request: Request, exc):
 # -----------------------------------------------------
 @app.exception_handler(Exception)
 async def error_handler(request: Request, exc: Exception):
-    print(f"Error: {exc}")
     return JSONResponse(
         status_code=500,
         content={"error": "Internal server error", "message": str(exc)}
