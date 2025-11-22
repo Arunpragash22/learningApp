@@ -9,9 +9,9 @@ from src.middleware.auth import AuthMiddleware
 from src.database.connection import connect_to_mongo, close_mongo_connection
 
 
-# ---------------------------------------------
+# --------------------------------------------------------
 # LIFESPAN
-# ---------------------------------------------
+# --------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_to_mongo()
@@ -22,65 +22,80 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-# ---------------------------------------------
-# CORS (Zoom needs totally open CORS)
-# ---------------------------------------------
+# --------------------------------------------------------
+# CORS (open for Zoom + Frontend)
+# --------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        
+    allow_origins=["*"],   # Zoom requires this
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# ---------------------------------------------
-# AUTH MIDDLEWARE (SKIP FOR ZOOM WEBHOOK)
-# ---------------------------------------------
+# --------------------------------------------------------
+# AUTH MIDDLEWARE (SKIP ONLY FOR ZOOM WEBHOOK)
+# --------------------------------------------------------
 auth_middleware = AuthMiddleware()
 
 @app.middleware("http")
 async def auth_middleware_wrapper(request: Request, call_next):
-    
-    # Skip auth for Zoom Webhook
+
     if request.url.path.startswith("/api/zoom/webhook"):
         return await call_next(request)
-    
+
     return await auth_middleware(request, call_next)
 
 
-# ---------------------------------------------
-# SECURITY HEADERS (SKIP FOR ZOOM WEBHOOK)
-# ---------------------------------------------
+# --------------------------------------------------------
+# SECURITY HEADERS (DISABLE COMPLETELY FOR ZOOM WEBHOOK)
+# --------------------------------------------------------
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
 
-    # Skip ALL security headers for Zoom webhook  
-    if request.url.path.startswith("/api/zoom/webhook"):
-        return await call_next(request)
-
-    # Normal routes → apply security headers
     response = await call_next(request)
+
+    # ❗ REMOVE ALL security headers for Zoom webhook
+    if request.url.path.startswith("/api/zoom/webhook"):
+        remove_headers = [
+            "Strict-Transport-Security",
+            "X-Content-Type-Options",
+            "Referrer-Policy",
+            "X-Frame-Options",
+            "Permissions-Policy",
+            "Content-Security-Policy"
+        ]
+        for h in remove_headers:
+            response.headers.pop(h, None)
+        return response
+
+    # Normal security headers for everything else
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-
-    # ❗ DO NOT add CSP for webhook
     response.headers["Content-Security-Policy"] = (
         "default-src 'self' https:; "
         "frame-ancestors 'self' https://*.zoom.us;"
     )
+
     return response
 
 
-# ---------------------------------------------
-# IMPORT ROUTERS
-# ---------------------------------------------
+# --------------------------------------------------------
+# ROUTERS
+# --------------------------------------------------------
 from src.routers import (
-    auth, quiz, clustering, question,
-    zoom_webhook, zoom_chatbot, course, live_question
+    auth,
+    quiz,
+    clustering,
+    question,
+    zoom_webhook,
+    zoom_chatbot,
+    course,
+    live_question,
 )
 
 app.include_router(auth.router)
@@ -93,10 +108,9 @@ app.include_router(course.router)
 app.include_router(live_question.router)
 
 
-# ---------------------------------------------
-# HEALTH ROUTE
-# ---------------------------------------------
+# --------------------------------------------------------
+# HEALTH CHECK
+# --------------------------------------------------------
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "time": datetime.now().isoformat()}
-
