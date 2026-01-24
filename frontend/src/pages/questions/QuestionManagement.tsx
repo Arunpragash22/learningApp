@@ -229,6 +229,7 @@ export const QuestionManagement = () => {
       {showForm ? (
         <QuestionForm
           question={editingQuestion}
+          existingQuestions={questions}
           onSave={handleSaveQuestion}
           onCancel={handleCancel}
         />
