@@ -7,6 +7,7 @@ import { Question } from './QuestionBank';
 interface QuestionFormProps {
   question?: Question | null;
   prefillQuestion?: Question | null;
+  prefillCategory?: string | null;
   onSave: (question: Question) => void;
   onCancel: () => void;
 }
@@ -14,6 +15,7 @@ interface QuestionFormProps {
 export const QuestionForm: React.FC<QuestionFormProps> = ({
   question,
   prefillQuestion = null,
+  prefillCategory = null,
   onSave,
   onCancel
 }) => {
@@ -46,11 +48,11 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
       options: padOptions(prefillQuestion.options || []),
       correctAnswer: prefillQuestion.correctAnswer ?? 0,
       difficulty: prefillQuestion.difficulty || 'medium',
-      category: prefillQuestion.category || '',
+      category: prefillCategory || prefillQuestion.category || '',
       tags: prefillQuestion.tags || [],
       timeLimit: prefillQuestion.timeLimit || 30
     });
-  }, [prefillQuestion, question]);
+  }, [prefillQuestion, prefillCategory, question]);
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...formData.options];
