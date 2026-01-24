@@ -42,6 +42,7 @@ export interface VerifyEmailResponse {
 export interface ForgotPasswordResponse {
   success: boolean;
   message: string;
+  emailSent?: boolean;
 }
 
 export interface ResetPasswordResponse {

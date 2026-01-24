@@ -20,6 +20,7 @@ class EmailService:
         # FROM_EMAIL can be just email or "Name <email>" format
         self.from_email = os.environ.get("FROM_EMAIL", "noreply@zoomlearningapp.de")
         self.frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+        self.email_enabled = RESEND_AVAILABLE and bool(self.resend_api_key)
         
         # Initialize Resend
         if RESEND_AVAILABLE and self.resend_api_key:
@@ -41,12 +42,12 @@ class EmailService:
         try:
             if not RESEND_AVAILABLE:
                 print(f"⚠️ Resend not available. Email would be sent to: {to_email}")
-                return True
+                return False
             
             if not self.resend_api_key:
                 print(f"⚠️ RESEND_API_KEY not configured. Email would be sent to: {to_email}")
                 print(f"   Subject: {subject}")
-                return True  # Return True for development
+                return False
             
             print(f"📧 Sending email to: {to_email}")
             

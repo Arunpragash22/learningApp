@@ -30,11 +30,14 @@ export const ForgotPassword = () => {
     setError('');
     
     try {
-      await authService.forgotPassword(email);
+      const result = await authService.forgotPassword(email);
+      if (result.emailSent === false) {
+        setError('Email service is not configured. Please contact the administrator.');
+        return;
+      }
       setIsSubmitted(true);
     } catch (err: any) {
-      // Still show success to prevent email enumeration
-      setIsSubmitted(true);
+      setError('Failed to send reset link. Please try again later.');
     } finally {
       setIsLoading(false);
     }

@@ -244,12 +244,20 @@ async def resend_verification(request_data: ResendVerificationRequest):
 async def forgot_password(request_data: ForgotPasswordRequest):
     """Send password reset email"""
     try:
+        if not email_service.email_enabled:
+            return {
+                "success": True,
+                "emailSent": False,
+                "message": "Email service is not configured. Please contact the administrator."
+            }
+
         user = await UserModel.find_by_email(request_data.email)
         
         # Always return success to prevent email enumeration
         if not user:
             return {
                 "success": True,
+                "emailSent": True,
                 "message": "If an account exists with this email, a password reset link has been sent."
             }
         
@@ -271,7 +279,7 @@ async def forgot_password(request_data: ForgotPasswordRequest):
         )
         
         # Send password reset email
-        email_service.send_password_reset_email(
+        email_sent = email_service.send_password_reset_email(
             to_email=request_data.email,
             first_name=user.get("firstName", "User"),
             token=reset_token
@@ -279,6 +287,7 @@ async def forgot_password(request_data: ForgotPasswordRequest):
         
         return {
             "success": True,
+            "emailSent": email_sent,
             "message": "If an account exists with this email, a password reset link has been sent."
         }
     except Exception as e:
