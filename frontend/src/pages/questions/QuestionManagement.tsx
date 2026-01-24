@@ -92,23 +92,28 @@ export const QuestionManagement = () => {
   const handleAddQuestion = () => {
     let prefillQuestion: Question | null = null;
     if (questions.length > 0) {
-      const categoryInput = window.prompt(
-        'Enter a category for a related question, or leave empty for random:'
+      const useRandom = window.confirm(
+        'Select a random question? Click OK for Random, Cancel for Related.'
       );
-      if (categoryInput !== null) {
-        const trimmed = categoryInput.trim();
-        if (!trimmed) {
-          const randomIndex = Math.floor(Math.random() * questions.length);
-          prefillQuestion = questions[randomIndex];
-        } else {
-          const related = questions.filter(
-            q => q.category?.toLowerCase() === trimmed.toLowerCase()
-          );
-          if (related.length > 0) {
-            const randomIndex = Math.floor(Math.random() * related.length);
-            prefillQuestion = related[randomIndex];
-          } else {
-            toast.info('No related questions found. Opening empty form.');
+      if (useRandom) {
+        const randomIndex = Math.floor(Math.random() * questions.length);
+        prefillQuestion = questions[randomIndex];
+      } else {
+        const categoryInput = window.prompt(
+          'Enter a category for a related question (e.g., Database Design):'
+        );
+        if (categoryInput !== null) {
+          const trimmed = categoryInput.trim();
+          if (trimmed) {
+            const related = questions.filter(
+              q => q.category?.toLowerCase() === trimmed.toLowerCase()
+            );
+            if (related.length > 0) {
+              const randomIndex = Math.floor(Math.random() * related.length);
+              prefillQuestion = related[randomIndex];
+            } else {
+              toast.info('No related questions found. Opening empty form.');
+            }
           }
         }
       }
