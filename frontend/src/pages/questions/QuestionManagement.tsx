@@ -13,6 +13,7 @@ export const QuestionManagement = () => {
   const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [prefillQuestion, setPrefillQuestion] = useState<Question | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -89,12 +90,37 @@ export const QuestionManagement = () => {
   ];
 
   const handleAddQuestion = () => {
+    let prefillQuestion: Question | null = null;
+    if (questions.length > 0) {
+      const categoryInput = window.prompt(
+        'Enter a category for a related question, or leave empty for random:'
+      );
+      if (categoryInput !== null) {
+        const trimmed = categoryInput.trim();
+        if (!trimmed) {
+          const randomIndex = Math.floor(Math.random() * questions.length);
+          prefillQuestion = questions[randomIndex];
+        } else {
+          const related = questions.filter(
+            q => q.category?.toLowerCase() === trimmed.toLowerCase()
+          );
+          if (related.length > 0) {
+            const randomIndex = Math.floor(Math.random() * related.length);
+            prefillQuestion = related[randomIndex];
+          } else {
+            toast.info('No related questions found. Opening empty form.');
+          }
+        }
+      }
+    }
     setEditingQuestion(null);
+    setPrefillQuestion(prefillQuestion);
     setShowForm(true);
   };
 
   const handleEditQuestion = (question: Question) => {
     setEditingQuestion(question);
+    setPrefillQuestion(null);
     setShowForm(true);
   };
 
@@ -139,6 +165,7 @@ export const QuestionManagement = () => {
       await loadQuestions();
       setShowForm(false);
       setEditingQuestion(null);
+      setPrefillQuestion(null);
     } catch (error) {
       console.error('Error saving question:', error);
       toast.error(editingQuestion ? 'Failed to update question. Please try again.' : 'Failed to create question. Please try again.');
@@ -148,6 +175,7 @@ export const QuestionManagement = () => {
   const handleCancel = () => {
     setShowForm(false);
     setEditingQuestion(null);
+    setPrefillQuestion(null);
   };
 
   // Statistics
@@ -229,7 +257,7 @@ export const QuestionManagement = () => {
       {showForm ? (
         <QuestionForm
           question={editingQuestion}
-          existingQuestions={questions}
+          prefillQuestion={prefillQuestion}
           onSave={handleSaveQuestion}
           onCancel={handleCancel}
         />

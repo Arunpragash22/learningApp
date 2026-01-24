@@ -6,14 +6,14 @@ import { Question } from './QuestionBank';
 
 interface QuestionFormProps {
   question?: Question | null;
-  existingQuestions?: Question[];
+  prefillQuestion?: Question | null;
   onSave: (question: Question) => void;
   onCancel: () => void;
 }
 
 export const QuestionForm: React.FC<QuestionFormProps> = ({
   question,
-  existingQuestions = [],
+  prefillQuestion = null,
   onSave,
   onCancel
 }) => {
@@ -29,7 +29,6 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
 
   const [newTag, setNewTag] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [prefillMessage, setPrefillMessage] = useState('');
 
   const padOptions = (options: string[]) => {
     const trimmed = options.filter(opt => opt.trim());
@@ -40,27 +39,18 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
     return padded.slice(0, 6);
   };
 
-  const applyPrefill = (source: Question) => {
+  React.useEffect(() => {
+    if (!prefillQuestion || question) return;
     setFormData({
-      question: source.question || '',
-      options: padOptions(source.options || []),
-      correctAnswer: source.correctAnswer ?? 0,
-      difficulty: source.difficulty || 'medium',
-      category: source.category || '',
-      tags: source.tags || [],
-      timeLimit: source.timeLimit || 30
+      question: prefillQuestion.question || '',
+      options: padOptions(prefillQuestion.options || []),
+      correctAnswer: prefillQuestion.correctAnswer ?? 0,
+      difficulty: prefillQuestion.difficulty || 'medium',
+      category: prefillQuestion.category || '',
+      tags: prefillQuestion.tags || [],
+      timeLimit: prefillQuestion.timeLimit || 30
     });
-  };
-
-  const pickRandom = (candidates: Question[]) => {
-    if (candidates.length === 0) {
-      setPrefillMessage('No matching questions found to prefill.');
-      return;
-    }
-    const randomIndex = Math.floor(Math.random() * candidates.length);
-    applyPrefill(candidates[randomIndex]);
-    setPrefillMessage('Question prefilled from the question bank.');
-  };
+  }, [prefillQuestion, question]);
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...formData.options];
@@ -164,43 +154,6 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Prefill Options */}
-        <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-          <p className="text-sm font-medium text-gray-700 mb-2">Quick Prefill</p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => pickRandom(existingQuestions)}
-              disabled={existingQuestions.length === 0}
-            >
-              Random Question
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const category = formData.category.trim().toLowerCase();
-                if (!category) {
-                  setPrefillMessage('Enter a category to pick a related question.');
-                  return;
-                }
-                const related = existingQuestions.filter(q =>
-                  q.category?.toLowerCase() === category
-                );
-                pickRandom(related);
-              }}
-              disabled={existingQuestions.length === 0}
-            >
-              Related to Category
-            </Button>
-          </div>
-          {prefillMessage && (
-            <p className="mt-2 text-sm text-gray-600">{prefillMessage}</p>
-          )}
-        </div>
         {/* Question Text */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
