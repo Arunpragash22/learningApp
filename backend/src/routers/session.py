@@ -24,6 +24,8 @@ class SessionCreate(BaseModel):
     time: str          # "10:00 AM - 11:00 AM" or "10:00"
     durationMinutes: int
     timezone: str = "Asia/Colombo"
+    isStandalone: Optional[bool] = False  # True for standalone sessions
+    enrollmentKey: Optional[str] = None  # Enrollment key for standalone sessions
 
 
 class SessionOut(BaseModel):
@@ -45,6 +47,8 @@ class SessionOut(BaseModel):
     zoomMeetingId: Optional[str] = None
     join_url: Optional[str] = None
     start_url: Optional[str] = None
+    isStandalone: Optional[bool] = False
+    enrollmentKey: Optional[str] = None
 
 
 def _session_doc_to_out(doc, include_urls: bool = True) -> SessionOut:
@@ -67,6 +71,8 @@ def _session_doc_to_out(doc, include_urls: bool = True) -> SessionOut:
         zoomMeetingId=str(doc.get("zoomMeetingId")) if doc.get("zoomMeetingId") else None,
         join_url=doc.get("join_url") if include_urls else None,
         start_url=doc.get("start_url") if include_urls else None,
+        isStandalone=doc.get("isStandalone", False),
+        enrollmentKey=doc.get("enrollmentKey"),
     )
 
 
@@ -125,6 +131,9 @@ async def create_session(
             "zoomMeetingId": str(zoom["meeting_id"]),
             "join_url": zoom["join_url"],
             "start_url": zoom["start_url"],
+            "isStandalone": payload.isStandalone,  # Standalone session flag
+            "enrollmentKey": payload.enrollmentKey,  # Enrollment key for standalone sessions
+            "enrolledStudents": [],  # List of student IDs enrolled in this standalone session
             "createdAt": datetime.utcnow(),
         }
 
@@ -139,6 +148,116 @@ async def create_session(
     except Exception as e:
         print("Error creating session:", e)
         raise HTTPException(status_code=500, detail="Failed to create session")
+
+
+class EnrollmentRequest(BaseModel):
+    enrollmentKey: str
+
+
+@router.post("/enroll-by-key")
+async def enroll_by_key(
+    request: EnrollmentRequest,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Enroll a student in a standalone session using an enrollment key.
+    Returns session details after successful enrollment.
+    """
+    try:
+        # Find session with matching enrollment key
+        session = await db.database.sessions.find_one({
+            "enrollmentKey": request.enrollmentKey.strip().upper(),
+            "isStandalone": True
+        })
+        
+        if not session:
+            raise HTTPException(status_code=404, detail="Invalid enrollment key. Please check and try again.")
+        
+        session_id = str(session["_id"])
+        user_id = user.get("id")
+        
+        # Check if student is already enrolled
+        if user_id in session.get("enrolledStudents", []):
+            return {
+                "success": True,
+                "message": "You are already enrolled in this session",
+                "sessionId": session_id,
+                "sessionTitle": session["title"]
+            }
+        
+        # Add student to enrolled students list
+        await db.database.sessions.update_one(
+            {"_id": session["_id"]},
+            {"$addToSet": {"enrolledStudents": user_id}}
+        )
+        
+        return {
+            "success": True,
+            "message": "Successfully enrolled in session",
+            "sessionId": session_id,
+            "sessionTitle": session["title"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("Error enrolling in session:", e)
+        raise HTTPException(status_code=500, detail="Failed to enroll in session")
+
+
+@router.post("/{session_id}/enroll")
+async def enroll_in_specific_session(
+    session_id: str,
+    request: EnrollmentRequest,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Enroll a student in a specific standalone session using an enrollment key.
+    This is used when student clicks "Enter Key" for a specific session.
+    """
+    try:
+        # Find the session and verify enrollment key
+        session = await db.database.sessions.find_one({
+            "_id": ObjectId(session_id),
+            "isStandalone": True
+        })
+        
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found or is not a standalone session")
+        
+        # Verify enrollment key matches
+        if session.get("enrollmentKey", "").upper() != request.enrollmentKey.strip().upper():
+            raise HTTPException(status_code=403, detail="Invalid enrollment key for this session")
+        
+        user_id = user.get("id")
+        
+        # Check if student is already enrolled
+        if user_id in session.get("enrolledStudents", []):
+            return {
+                "success": True,
+                "message": "You are already enrolled in this session",
+                "sessionId": session_id,
+                "sessionTitle": session["title"]
+            }
+        
+        # Add student to enrolled students list
+        await db.database.sessions.update_one(
+            {"_id": session["_id"]},
+            {"$addToSet": {"enrolledStudents": user_id}}
+        )
+        
+        return {
+            "success": True,
+            "message": "Successfully enrolled in session",
+            "sessionId": session_id,
+            "sessionTitle": session["title"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("Error enrolling in specific session:", e)
+        raise HTTPException(status_code=500, detail="Failed to enroll in session")
 
 
 @router.get("", response_model=List[SessionOut])
@@ -169,20 +288,32 @@ async def list_sessions(user: dict = Depends(get_current_user)):
         return [_session_doc_to_out(doc) for doc in sessions]
     
     else:
-        # Students see only sessions from courses they're enrolled in
+        # Students see:
+        # 1. Sessions from courses they're enrolled in
+        # 2. Standalone sessions they've enrolled in via enrollment key
         enrolled_courses = await CourseModel.find_enrolled_courses(user_id)
         enrolled_course_ids = [c["id"] for c in enrolled_courses]
         
-        if not enrolled_course_ids:
-            return []  # No enrolled courses = no sessions
+        all_sessions = []
         
-        cursor = db.database.sessions.find({
-            "courseId": {"$in": enrolled_course_ids}
+        # Get course-based sessions
+        if enrolled_course_ids:
+            cursor = db.database.sessions.find({
+                "courseId": {"$in": enrolled_course_ids}
+            }).sort("date", -1)
+            course_sessions = await cursor.to_list(length=None)
+            all_sessions.extend(course_sessions)
+        
+        # Get standalone sessions student is enrolled in
+        standalone_cursor = db.database.sessions.find({
+            "isStandalone": True,
+            "enrolledStudents": user_id
         }).sort("date", -1)
-        sessions = await cursor.to_list(length=None)
+        standalone_sessions = await standalone_cursor.to_list(length=None)
+        all_sessions.extend(standalone_sessions)
         
         # Include join URLs for enrolled students
-        return [_session_doc_to_out(doc, include_urls=True) for doc in sessions]
+        return [_session_doc_to_out(doc, include_urls=True) for doc in all_sessions]
 
 
 @router.get("/instructor/my-sessions", response_model=List[SessionOut])
