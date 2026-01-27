@@ -16,8 +16,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-// API base URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// API base URL - handle VITE_API_URL that already includes /api
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+const API_BASE_URL = API_URL?.endsWith('/api') ? API_URL.slice(0, -4) : API_URL;
 
 export type ConnectionQuality = 'excellent' | 'good' | 'fair' | 'poor' | 'critical' | 'unknown';
 
