@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { BookOpenIcon, CalendarIcon, MenuIcon, XIcon, HomeIcon, GraduationCapIcon, BellIcon, LogOutIcon, BarChart3Icon, ActivityIcon, TargetIcon, UsersIcon, KeyIcon, FileTextIcon, ChevronDownIcon } from 'lucide-react';
+import { BookOpenIcon, CalendarIcon, MenuIcon, XIcon, HomeIcon, GraduationCapIcon, BellIcon, LogOutIcon, BarChart3Icon, ActivityIcon, TargetIcon, KeyIcon, FileTextIcon, ChevronDownIcon } from 'lucide-react';
 
 export const DashboardLayout = () => {
   const location = useLocation();
@@ -75,11 +75,6 @@ export const DashboardLayout = () => {
         name: 'Questions',
         href: '/dashboard/instructor/questions',
         icon: TargetIcon
-      });
-      baseItems.push({
-        name: 'Users',
-        href: user?.role === 'admin' ? '/dashboard/admin/users' : '/dashboard/instructor/users',
-        icon: UsersIcon
       });
       baseItems.push({
         name: 'Reports',
