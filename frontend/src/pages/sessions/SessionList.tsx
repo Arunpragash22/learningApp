@@ -17,7 +17,10 @@ import {
   FileTextIcon,
   StopCircleIcon,
   Loader2Icon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  KeyIcon,
+  XIcon,
+  LockIcon
 } from 'lucide-react';
 
 import { Card } from '../../components/ui/Card';
@@ -36,8 +39,27 @@ export const SessionList = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [endingSessionId, setEndingSessionId] = useState<string | null>(null);
   const [startingSessionId, setStartingSessionId] = useState<string | null>(null);
+  
+  // Enrollment key states for students
+  const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [enrollmentKey, setEnrollmentKey] = useState('');
+  const [enrollingSession, setEnrollingSession] = useState<Session | null>(null);
+  const [isEnrolling, setIsEnrolling] = useState(false);
+  const [enrolledSessions, setEnrolledSessions] = useState<Set<string>>(new Set());
 
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
+
+  // ---------------------------------------------------
+  // ⭐ Load enrolled sessions from localStorage (for students)
+  // ---------------------------------------------------
+  useEffect(() => {
+    if (!isInstructor) {
+      const storedEnrolled = localStorage.getItem('enrolledSessions');
+      if (storedEnrolled) {
+        setEnrolledSessions(new Set(JSON.parse(storedEnrolled)));
+      }
+    }
+  }, [isInstructor]);
 
   // ---------------------------------------------------
   // ⭐ Load sessions from BACKEND
@@ -53,6 +75,62 @@ export const SessionList = () => {
     const interval = setInterval(loadSessions, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // ---------------------------------------------------
+  // ⭐ ENROLL IN SESSION (Students only - for standalone sessions)
+  // ---------------------------------------------------
+  const handleOpenEnrollModal = (session: Session) => {
+    setEnrollingSession(session);
+    setEnrollmentKey('');
+    setShowEnrollModal(true);
+  };
+
+  const handleEnrollInSession = async () => {
+    if (!enrollingSession || !enrollmentKey.trim()) {
+      toast.error('Please enter an enrollment key');
+      return;
+    }
+
+    setIsEnrolling(true);
+
+    try {
+      // Check if enrollment key matches the session
+      // In a real app, this would be an API call
+      // For now, we'll simulate it
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/sessions/${enrollingSession.id}/enroll`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ enrollmentKey: enrollmentKey.trim() })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Add to enrolled sessions
+        const newEnrolled = new Set(enrolledSessions);
+        newEnrolled.add(enrollingSession.id);
+        setEnrolledSessions(newEnrolled);
+        
+        // Save to localStorage
+        localStorage.setItem('enrolledSessions', JSON.stringify(Array.from(newEnrolled)));
+        
+        toast.success(`Successfully enrolled in "${enrollingSession.title}"!`);
+        setShowEnrollModal(false);
+        setEnrollmentKey('');
+        setEnrollingSession(null);
+      } else {
+        toast.error(data.message || 'Invalid enrollment key');
+      }
+    } catch (error) {
+      console.error('Enrollment error:', error);
+      toast.error('Failed to enroll. Please try again.');
+    } finally {
+      setIsEnrolling(false);
+    }
+  };
 
   // ---------------------------------------------------
   // ⭐ JOIN LIVE BUTTON
@@ -138,6 +216,21 @@ export const SessionList = () => {
     if (!matches) return false;
     if (statusFilter !== 'all' && session.status !== statusFilter) return false;
 
+    // For students: only show enrolled sessions if it's a standalone session
+    // Course-based sessions (isStandalone = false) are visible to all enrolled course students
+    if (!isInstructor) {
+      const isStandaloneSession = session.isStandalone === true;
+      const hasEnrollmentKey = session.enrollmentKey && session.enrollmentKey.length > 0;
+      
+      if (isStandaloneSession && hasEnrollmentKey) {
+        // Only show if student has enrolled
+        if (!enrolledSessions.has(session.id)) {
+          return false;
+        }
+      }
+      // Course-based sessions are shown to all students
+    }
+
     return true;
   });
 
@@ -165,6 +258,15 @@ export const SessionList = () => {
     }
   };
 
+  // Get unenrolled standalone sessions for students
+  const unenrolledStandaloneSessions = !isInstructor 
+    ? sessions.filter(session => {
+        const isStandaloneSession = session.isStandalone === true;
+        const hasEnrollmentKey = session.enrollmentKey && session.enrollmentKey.length > 0;
+        return isStandaloneSession && hasEnrollmentKey && !enrolledSessions.has(session.id);
+      })
+    : [];
+
   return (
     <div className="py-6">
 
@@ -185,6 +287,125 @@ export const SessionList = () => {
           </Button>
         )}
       </div>
+
+      {/* Enrollment Key Modal for Students */}
+      {showEnrollModal && enrollingSession && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Enroll in Session</h2>
+                  <p className="text-sm text-gray-600 mt-1">{enrollingSession.title}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowEnrollModal(false);
+                    setEnrollmentKey('');
+                    setEnrollingSession(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XIcon className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Enter Enrollment Key
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={enrollmentKey}
+                    onChange={(e) => setEnrollmentKey(e.target.value.toUpperCase())}
+                    placeholder="e.g., ABC12XYZ"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-lg tracking-wider uppercase"
+                    maxLength={8}
+                    disabled={isEnrolling}
+                  />
+                  <KeyIcon className="absolute right-3 top-3.5 h-5 w-5 text-gray-400" />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Ask your instructor for the session enrollment key
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowEnrollModal(false);
+                    setEnrollmentKey('');
+                    setEnrollingSession(null);
+                  }}
+                  disabled={isEnrolling}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleEnrollInSession}
+                  disabled={isEnrolling || !enrollmentKey.trim()}
+                  leftIcon={isEnrolling ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <CheckCircleIcon className="h-4 w-4" />}
+                  className="flex-1"
+                >
+                  {isEnrolling ? 'Enrolling...' : 'Enroll'}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Enroll with Key Section for Students */}
+      {!isInstructor && unenrolledStandaloneSessions.length > 0 && (
+        <Card className="mb-6 border-2 border-indigo-200 bg-indigo-50">
+          <div className="p-6">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <KeyIcon className="h-6 w-6 text-indigo-600" />
+              </div>
+              <div className="ml-4 flex-1">
+                <h3 className="text-lg font-semibold text-indigo-900 mb-2">
+                  Standalone Sessions Available
+                </h3>
+                <p className="text-sm text-indigo-700 mb-4">
+                  {unenrolledStandaloneSessions.length} session(s) require an enrollment key to access. 
+                  Ask your instructor for the key to join these sessions.
+                </p>
+                <div className="space-y-2">
+                  {unenrolledStandaloneSessions.slice(0, 3).map(session => (
+                    <div key={session.id} className="flex items-center justify-between bg-white rounded-lg p-3">
+                      <div className="flex items-center gap-3">
+                        <LockIcon className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <p className="font-medium text-gray-900">{session.title}</p>
+                          <p className="text-xs text-gray-500">{session.date} • {session.time}</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        leftIcon={<KeyIcon className="h-3 w-3" />}
+                        onClick={() => handleOpenEnrollModal(session)}
+                      >
+                        Enter Key
+                      </Button>
+                    </div>
+                  ))}
+                  {unenrolledStandaloneSessions.length > 3 && (
+                    <p className="text-sm text-indigo-600 text-center pt-2">
+                      +{unenrolledStandaloneSessions.length - 3} more session(s)
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Search + Filter */}
       <Card className="mb-6">

@@ -16,6 +16,9 @@ export interface Session {
   join_url?: string;
   start_url?: string;
   recordingAvailable?: boolean;
+  isStandalone?: boolean;        // True for standalone sessions, false for course-based
+  enrollmentKey?: string;        // Enrollment key for standalone sessions
+  courseId?: string;             // Link to course for course-based sessions
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
