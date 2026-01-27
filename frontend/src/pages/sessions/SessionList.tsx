@@ -45,21 +45,11 @@ export const SessionList = () => {
   const [enrollmentKey, setEnrollmentKey] = useState('');
   const [enrollingSession, setEnrollingSession] = useState<Session | null>(null);
   const [isEnrolling, setIsEnrolling] = useState(false);
-  const [enrolledSessions, setEnrolledSessions] = useState<Set<string>>(new Set());
 
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
 
-  // ---------------------------------------------------
-  // ⭐ Load enrolled sessions from localStorage (for students)
-  // ---------------------------------------------------
-  useEffect(() => {
-    if (!isInstructor) {
-      const storedEnrolled = localStorage.getItem('enrolledSessions');
-      if (storedEnrolled) {
-        setEnrolledSessions(new Set(JSON.parse(storedEnrolled)));
-      }
-    }
-  }, [isInstructor]);
+  // Note: Backend now handles enrollment tracking via enrolledStudents array
+  // localStorage is no longer needed for tracking enrollments
 
   // ---------------------------------------------------
   // ⭐ Load sessions from BACKEND
@@ -111,23 +101,14 @@ export const SessionList = () => {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Add to enrolled sessions
-        const sessionId = enrollingSession?.id || data.sessionId;
         const sessionTitle = enrollingSession?.title || data.sessionTitle;
-        
-        const newEnrolled = new Set(enrolledSessions);
-        newEnrolled.add(sessionId);
-        setEnrolledSessions(newEnrolled);
-        
-        // Save to localStorage
-        localStorage.setItem('enrolledSessions', JSON.stringify(Array.from(newEnrolled)));
         
         toast.success(`Successfully enrolled in meeting "${sessionTitle}"!`);
         setShowEnrollModal(false);
         setEnrollmentKey('');
         setEnrollingSession(null);
         
-        // Reload sessions to show newly enrolled meeting
+        // Reload sessions from backend - this will now include the newly enrolled meeting
         const all = await sessionService.getAllSessions();
         setSessions(all);
       } else {
@@ -225,21 +206,9 @@ export const SessionList = () => {
     if (!matches) return false;
     if (statusFilter !== 'all' && session.status !== statusFilter) return false;
 
-    // For students: only show enrolled sessions if it's a standalone session
-    // Course-based sessions (isStandalone = false) are visible to all enrolled course students
-    if (!isInstructor) {
-      const isStandaloneSession = session.isStandalone === true;
-      const hasEnrollmentKey = session.enrollmentKey && session.enrollmentKey.length > 0;
-      
-      if (isStandaloneSession && hasEnrollmentKey) {
-        // Only show if student has enrolled
-        if (!enrolledSessions.has(session.id)) {
-          return false;
-        }
-      }
-      // Course-based sessions are shown to all students
-    }
-
+    // Backend already filters sessions based on enrollment
+    // Students only see: course-based sessions they're enrolled in + standalone sessions they've enrolled in
+    // No additional filtering needed here
     return true;
   });
 
@@ -267,14 +236,10 @@ export const SessionList = () => {
     }
   };
 
-  // Get unenrolled standalone sessions for students
-  const unenrolledStandaloneSessions = !isInstructor 
-    ? sessions.filter(session => {
-        const isStandaloneSession = session.isStandalone === true;
-        const hasEnrollmentKey = session.enrollmentKey && session.enrollmentKey.length > 0;
-        return isStandaloneSession && hasEnrollmentKey && !enrolledSessions.has(session.id);
-      })
-    : [];
+  // Note: Backend only returns sessions student is enrolled in
+  // To show "available to enroll" sessions, we would need a separate endpoint
+  // For now, students can use the "Enroll in Meeting" button to enter any valid key
+  const unenrolledStandaloneSessions: any[] = [];
 
   return (
     <div className="py-6">
