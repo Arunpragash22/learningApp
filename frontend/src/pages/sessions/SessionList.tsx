@@ -282,8 +282,8 @@ export const SessionList = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Live Meetings</h1>
-          <p className="text-sm text-gray-500">Join ongoing and upcoming meetings</p>
+          <h1 className="text-2xl font-semibold dark:text-white">Live Meetings</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Join ongoing and upcoming meetings</p>
         </div>
 
         {isInstructor ? (
@@ -316,11 +316,11 @@ export const SessionList = () => {
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">Enroll in Meeting</h2>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Enroll in Meeting</h2>
                   {enrollingSession ? (
-                    <p className="text-sm text-gray-600 mt-1">{enrollingSession.title}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{enrollingSession.title}</p>
                   ) : (
-                    <p className="text-sm text-gray-600 mt-1">Enter your enrollment key to access the meeting</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Enter your enrollment key to access the meeting</p>
                   )}
                 </div>
                 <button
@@ -329,14 +329,14 @@ export const SessionList = () => {
                     setEnrollmentKey('');
                     setEnrollingSession(null);
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                 >
                   <XIcon className="h-5 w-5" />
                 </button>
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Enter Enrollment Key
                 </label>
                 <div className="relative">
@@ -345,13 +345,13 @@ export const SessionList = () => {
                     value={enrollmentKey}
                     onChange={(e) => setEnrollmentKey(e.target.value.toUpperCase())}
                     placeholder="e.g., ABC12XYZ"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-lg tracking-wider uppercase"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-lg tracking-wider uppercase"
                     maxLength={8}
                     disabled={isEnrolling}
                   />
-                  <KeyIcon className="absolute right-3 top-3.5 h-5 w-5 text-gray-400" />
+                  <KeyIcon className="absolute right-3 top-3.5 h-5 w-5 text-gray-400 dark:text-gray-500" />
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                   Ask your instructor for the meeting enrollment key
                 </p>
               </div>
@@ -402,12 +402,12 @@ export const SessionList = () => {
                 </p>
                 <div className="space-y-2">
                   {unenrolledStandaloneSessions.slice(0, 3).map(session => (
-                    <div key={session.id} className="flex items-center justify-between bg-white rounded-lg p-3">
+                    <div key={session.id} className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
                       <div className="flex items-center gap-3">
-                        <LockIcon className="h-4 w-4 text-gray-400" />
+                        <LockIcon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <div>
-                          <p className="font-medium text-gray-900">{session.title}</p>
-                          <p className="text-xs text-gray-500">{session.date} • {session.time}</p>
+                          <p className="font-medium text-gray-900 dark:text-white">{session.title}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{session.date} • {session.time}</p>
                         </div>
                       </div>
                       <Button
@@ -439,16 +439,16 @@ export const SessionList = () => {
           <div className="relative flex-1">
             <input
               type="text"
-              className="w-full p-2 pl-10 border rounded"
+              className="w-full p-2 pl-10 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
               placeholder="Search meetings…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <SearchIcon className="absolute left-3 top-2 h-5 w-5 text-gray-400" />
+            <SearchIcon className="absolute left-3 top-2 h-5 w-5 text-gray-400 dark:text-gray-500" />
           </div>
 
           <button
-            className="px-4 py-2 border rounded bg-white"
+            className="px-4 py-2 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             onClick={() => setFilterActive((v) => !v)}
           >
             <CalendarIcon className="inline h-5 w-5 mr-2" />
@@ -457,12 +457,12 @@ export const SessionList = () => {
         </div>
 
         {filterActive && (
-          <div className="p-4 border-t">
-            <label className="block text-sm mb-1">Status</label>
+          <div className="p-4 border-t dark:border-gray-700">
+            <label className="block text-sm mb-1 dark:text-gray-300">Status</label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="border p-2 rounded w-full"
+              className="border p-2 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
               <option value="all">All</option>
               <option value="live">Live</option>
@@ -476,7 +476,7 @@ export const SessionList = () => {
       {/* Meeting Results */}
       {filtered.length === 0 ? (
         <Card className="p-12 text-center">
-          <h3 className="text-gray-400">No meetings found</h3>
+          <h3 className="text-gray-400 dark:text-gray-500">No meetings found</h3>
         </Card>
       ) : (
         <div className="space-y-4">
@@ -488,26 +488,26 @@ export const SessionList = () => {
                 {/* Info */}
                 <div>
                   <div className="flex items-center gap-3">
-                    <h3 className="text-xl font-semibold">{session.title}</h3>
+                    <h3 className="text-xl font-semibold dark:text-white">{session.title}</h3>
                     {getStatusBadge(session.status)}
                   </div>
 
-                  <p className="text-sm text-gray-600 flex items-center gap-2 mt-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
                     <BookOpenIcon className="h-4 w-4" />
                     {session.course} ({session.courseCode})
                   </p>
 
-                  <p className="text-sm text-gray-600 flex items-center gap-2 mt-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
                     <UsersIcon className="h-4 w-4" />
                     {session.instructor}
                   </p>
 
-                  <p className="text-sm text-gray-600 flex items-center gap-2 mt-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
                     <CalendarIcon className="h-4 w-4" />
                     {session.date}
                   </p>
 
-                  <p className="text-sm text-gray-600 flex items-center gap-2 mt-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
                     <ClockIcon className="h-4 w-4" />
                     {session.time} ({session.duration})
                   </p>
