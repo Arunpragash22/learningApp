@@ -311,6 +311,18 @@ export const StudentDashboard = () => {
     reportInterval: 5000, // Report to server every 5 seconds
     onQualityChange: handleConnectionQualityChange
   });
+  
+  // Notify when monitoring starts
+  useEffect(() => {
+    if (isLatencyMonitoring && connectedSessionId) {
+      console.log('📶 Network monitoring ACTIVE:', {
+        sessionId: connectedSessionId,
+        studentId: user?.id,
+        studentName: studentDisplayName
+      });
+      toast.success(`📶 Network monitoring active for session ${connectedSessionId}`);
+    }
+  }, [isLatencyMonitoring]); // Only trigger when monitoring status changes
 
   // ===========================================================
   // ⭐ LOAD REAL SESSIONS FROM BACKEND
@@ -348,6 +360,15 @@ export const StudentDashboard = () => {
     const sessionKey = session.zoomMeetingId || session.id;
     const wsBase = import.meta.env.VITE_WS_URL;
     
+    console.log('🎯 Joining session:', {
+      sessionTitle: session.title,
+      sessionKey: sessionKey,
+      zoomMeetingId: session.zoomMeetingId,
+      sessionId: session.id,
+      studentId: studentId,
+      studentName: studentName
+    });
+    
     // Include student name and email as query parameters for report generation
     const encodedName = encodeURIComponent(studentName);
     const encodedEmail = encodeURIComponent(studentEmail);
@@ -366,6 +387,7 @@ export const StudentDashboard = () => {
     
     ws.onopen = () => {
       console.log(`✅ Connected to session ${sessionKey} WebSocket`);
+      console.log(`📶 Network monitoring will start automatically`);
       setConnectedSessionId(sessionKey);
       localStorage.setItem('connectedSessionId', sessionKey); // Persist connection state
       
@@ -384,7 +406,9 @@ export const StudentDashboard = () => {
       // Play a subtle sound to confirm connection
       playNotificationSound();
       
-      alert(`✅ Joined session "${session.title}"! You will receive quiz notifications.`);
+      // Show success notification
+      toast.success(`✅ Joined "${session.title}" - You'll receive quiz notifications`);
+      toast.info(`📶 Network monitoring started for session ${sessionKey}`);
     };
     
     ws.onclose = () => {
