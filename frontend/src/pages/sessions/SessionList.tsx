@@ -117,7 +117,7 @@ export const SessionList = () => {
         // Save to localStorage
         localStorage.setItem('enrolledSessions', JSON.stringify(Array.from(newEnrolled)));
         
-        toast.success(`Successfully enrolled in "${enrollingSession.title}"!`);
+        toast.success(`Successfully enrolled in meeting "${enrollingSession.title}"!`);
         setShowEnrollModal(false);
         setEnrollmentKey('');
         setEnrollingSession(null);
@@ -273,8 +273,8 @@ export const SessionList = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Live Sessions</h1>
-          <p className="text-sm text-gray-500">Join ongoing and upcoming sessions</p>
+          <h1 className="text-2xl font-semibold">Live Meetings</h1>
+          <p className="text-sm text-gray-500">Join ongoing and upcoming meetings</p>
         </div>
 
         {isInstructor && (
@@ -283,7 +283,7 @@ export const SessionList = () => {
             leftIcon={<PlusIcon className="h-4 w-4" />}
             onClick={() => navigate('/dashboard/sessions/create')}
           >
-            Create Session
+            Create Meeting
           </Button>
         )}
       </div>
@@ -295,7 +295,7 @@ export const SessionList = () => {
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">Enroll in Session</h2>
+                  <h2 className="text-xl font-bold text-gray-900">Enroll in Meeting</h2>
                   <p className="text-sm text-gray-600 mt-1">{enrollingSession.title}</p>
                 </div>
                 <button
@@ -327,7 +327,7 @@ export const SessionList = () => {
                   <KeyIcon className="absolute right-3 top-3.5 h-5 w-5 text-gray-400" />
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  Ask your instructor for the session enrollment key
+                  Ask your instructor for the meeting enrollment key
                 </p>
               </div>
 
@@ -369,11 +369,11 @@ export const SessionList = () => {
               </div>
               <div className="ml-4 flex-1">
                 <h3 className="text-lg font-semibold text-indigo-900 mb-2">
-                  Standalone Sessions Available
+                  Standalone Meetings Available
                 </h3>
                 <p className="text-sm text-indigo-700 mb-4">
-                  {unenrolledStandaloneSessions.length} session(s) require an enrollment key to access. 
-                  Ask your instructor for the key to join these sessions.
+                  {unenrolledStandaloneSessions.length} meeting(s) require an enrollment key to access. 
+                  Ask your instructor for the key to join these meetings.
                 </p>
                 <div className="space-y-2">
                   {unenrolledStandaloneSessions.slice(0, 3).map(session => (
@@ -397,7 +397,7 @@ export const SessionList = () => {
                   ))}
                   {unenrolledStandaloneSessions.length > 3 && (
                     <p className="text-sm text-indigo-600 text-center pt-2">
-                      +{unenrolledStandaloneSessions.length - 3} more session(s)
+                      +{unenrolledStandaloneSessions.length - 3} more meeting(s)
                     </p>
                   )}
                 </div>
@@ -415,7 +415,7 @@ export const SessionList = () => {
             <input
               type="text"
               className="w-full p-2 pl-10 border rounded"
-              placeholder="Search sessions…"
+              placeholder="Search meetings…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -448,10 +448,10 @@ export const SessionList = () => {
         )}
       </Card>
 
-      {/* Session Results */}
+      {/* Meeting Results */}
       {filtered.length === 0 ? (
         <Card className="p-12 text-center">
-          <h3 className="text-gray-400">No sessions found</h3>
+          <h3 className="text-gray-400">No meetings found</h3>
         </Card>
       ) : (
         <div className="space-y-4">
@@ -501,7 +501,7 @@ export const SessionList = () => {
                     </Button>
                   )}
 
-                  {/* START SESSION (Instructor only - for upcoming sessions) */}
+                  {/* START MEETING (Instructor only - for upcoming meetings) */}
                   {isInstructor && session.status === 'upcoming' && (
                     <Button
                       variant="primary"
@@ -513,7 +513,7 @@ export const SessionList = () => {
                       onClick={() => handleStartSession(session.id)}
                       disabled={startingSessionId === session.id}
                     >
-                      {startingSessionId === session.id ? 'Starting...' : 'Start Session'}
+                      {startingSessionId === session.id ? 'Starting...' : 'Start Meeting'}
                     </Button>
                   )}
 
@@ -528,7 +528,7 @@ export const SessionList = () => {
                     </Button>
                   )}
 
-                  {/* END SESSION (Instructor only - for live sessions) */}
+                  {/* END MEETING (Instructor only - for live meetings) */}
                   {isInstructor && session.status === 'live' && (
                     <Button
                       variant="danger"
@@ -540,7 +540,7 @@ export const SessionList = () => {
                       onClick={() => handleEndSession(session.id, session.title)}
                       disabled={endingSessionId === session.id}
                     >
-                      {endingSessionId === session.id ? 'Ending...' : 'End Session'}
+                      {endingSessionId === session.id ? 'Ending...' : 'End Meeting'}
                     </Button>
                   )}
 

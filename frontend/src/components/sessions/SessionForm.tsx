@@ -140,7 +140,7 @@ export const SessionForm: React.FC<SessionFormProps> = ({
       <Card>
         <CardHeader>
           <h2 className="text-xl font-semibold text-gray-900">
-            {mode === 'course' ? 'Add Session to Course' : 'Session Information'}
+            {mode === 'course' ? 'Add Meeting to Course' : 'Meeting Information'}
           </h2>
           {mode === 'course' && courseData && (
             <p className="text-sm text-gray-500 mt-1">
@@ -167,7 +167,7 @@ export const SessionForm: React.FC<SessionFormProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Session Title *
+              Meeting Title *
             </label>
             <Input
               value={formData.title}

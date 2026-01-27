@@ -40,7 +40,7 @@ export const DashboardLayout = () => {
         icon: BookOpenIcon
       },
       {
-        name: 'Sessions',
+        name: 'Meetings',
         href: '/dashboard/sessions',
         icon: CalendarIcon
       }
@@ -48,11 +48,6 @@ export const DashboardLayout = () => {
 
     // Add role-specific items
     if (user?.role === 'student') {
-      baseItems.push({
-        name: 'Enroll',
-        href: '/dashboard/student/enrollment',
-        icon: KeyIcon
-      });
       baseItems.push({
         name: 'My Engagement',
         href: '/dashboard/student/engagement',

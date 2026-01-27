@@ -30,9 +30,9 @@ export const SessionCreate = () => {
         <Card className="p-6">
           <div className="text-center">
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
-            <p className="text-gray-600 mb-4">Only instructors can create sessions.</p>
+            <p className="text-gray-600 mb-4">Only instructors can create meetings.</p>
             <Button variant="primary" onClick={() => navigate("/dashboard/sessions")}>
-              Go to Sessions
+              Go to Meetings
             </Button>
           </div>
         </Card>
@@ -137,7 +137,7 @@ export const SessionCreate = () => {
                     <KeyIcon className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-white">Session Created!</h2>
+                    <h2 className="text-xl font-bold text-white">Meeting Created!</h2>
                     <p className="text-sm text-green-100">Share this key with students</p>
                   </div>
                 </div>
@@ -153,7 +153,7 @@ export const SessionCreate = () => {
             {/* Content */}
             <div className="p-6">
               <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-1">Session Title:</p>
+                <p className="text-sm text-gray-600 mb-1">Meeting Title:</p>
                 <p className="text-lg font-semibold text-gray-900">{createdSessionTitle}</p>
               </div>
 
@@ -217,12 +217,12 @@ export const SessionCreate = () => {
           onClick={() => navigate("/dashboard/sessions")}
           className="mb-4"
         >
-          Back to Sessions
+          Back to Meetings
         </Button>
 
-        <h1 className="text-2xl font-semibold text-gray-900">Create Standalone Session</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">Create Standalone Meeting</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Create a standalone session with its own enrollment key. Students will need this key to join.
+          Create a standalone meeting with its own enrollment key. Students will need this key to join.
         </p>
       </div>
 
