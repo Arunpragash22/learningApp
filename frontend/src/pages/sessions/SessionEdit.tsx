@@ -26,7 +26,7 @@ export const SessionEdit = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/session/${sessionId}`, {
+        const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("access_token")}`,
           },
@@ -106,7 +106,7 @@ export const SessionEdit = () => {
     setSaving(true);
 
     try {
-      const res = await fetch(`${API_BASE}/api/session/update/${sessionId}`, {
+      const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

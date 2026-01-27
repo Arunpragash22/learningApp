@@ -150,6 +150,72 @@ async def create_session(
         raise HTTPException(status_code=500, detail="Failed to create session")
 
 
+class SessionUpdate(BaseModel):
+    title: Optional[str] = None
+    course: Optional[str] = None
+    courseCode: Optional[str] = None
+    date: Optional[str] = None
+    time: Optional[str] = None
+    durationMinutes: Optional[int] = None
+    description: Optional[str] = None
+
+
+@router.put("/{session_id}", response_model=SessionOut)
+async def update_session(
+    session_id: str,
+    payload: SessionUpdate,
+    user: dict = Depends(require_instructor),
+):
+    """
+    Update an existing session.
+    Only the instructor who created the session can update it.
+    """
+    try:
+        # Find the session
+        session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Verify ownership
+        if session.get("instructorId") != user["id"]:
+            raise HTTPException(status_code=403, detail="You can only edit your own sessions")
+        
+        # Prepare update data
+        update_data = {}
+        if payload.title is not None:
+            update_data["title"] = payload.title
+        if payload.course is not None:
+            update_data["course"] = payload.course
+        if payload.courseCode is not None:
+            update_data["courseCode"] = payload.courseCode
+        if payload.date is not None:
+            update_data["date"] = payload.date
+        if payload.time is not None:
+            update_data["time"] = payload.time
+        if payload.durationMinutes is not None:
+            update_data["duration"] = f"{payload.durationMinutes} minutes"
+        if payload.description is not None:
+            update_data["description"] = payload.description
+        
+        update_data["updatedAt"] = datetime.utcnow()
+        
+        # Update the session
+        await db.database.sessions.update_one(
+            {"_id": ObjectId(session_id)},
+            {"$set": update_data}
+        )
+        
+        # Fetch and return updated session
+        updated_session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
+        return _session_doc_to_out(updated_session)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("Error updating session:", e)
+        raise HTTPException(status_code=500, detail="Failed to update session")
+
+
 class EnrollmentRequest(BaseModel):
     enrollmentKey: str
 
