@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/ui/Button";
@@ -32,7 +33,7 @@ export const InstructorDashboard = () => {
     stats: latencyStats,
     shouldAdjustEngagement
   } = useLatencyMonitor({
-    sessionId: selectedSession?.id || 'instructor-view', // Use real session or placeholder for display
+    sessionId: selectedSession ? (selectedSession.zoomMeetingId || selectedSession.id) : 'instructor-view', // Use zoomMeetingId for consistency with students
     studentId: user?.id,
     studentName: `${user?.firstName} ${user?.lastName}`,
     userRole: 'instructor', // Instructor data is NOT stored in database (filtered by backend)
@@ -65,16 +66,35 @@ export const InstructorDashboard = () => {
   }, []);
 
   // ================================
-  // ⭐ JOIN ZOOM MEETING (INSTRUCTOR)
+  // ⭐ START/JOIN ZOOM MEETING (INSTRUCTOR)
+  // Opens Zoom directly and starts network monitoring
   // ================================
   const handleJoinSession = (session: Session) => {
     if (!session.start_url) {
-      alert("❌ Zoom host start URL missing");
+      toast.error("❌ Zoom host start URL missing");
       return;
     }
+    
+    // Open Zoom meeting directly
     window.open(session.start_url, '_blank');
-    // Auto-select this session for triggering questions
+    
+    // Auto-select this session for triggering questions and network monitoring
     setSelectedSession(session);
+    
+    // Show notifications
+    toast.success(`🚀 Opening Zoom meeting: ${session.title}`);
+    toast.info(`📶 Network monitoring started for this session`);
+    
+    console.log('🎯 Instructor started meeting:', {
+      sessionTitle: session.title,
+      sessionId: session.id,
+      zoomMeetingId: session.zoomMeetingId,
+      status: session.status
+    });
+    
+    // Network monitoring will automatically start via StudentNetworkMonitor component
+    // which uses selectedSession.zoomMeetingId || selectedSession.id
+    // Student network parameters will be retrieved as soon as students join
   };
 
   // ================================
@@ -363,7 +383,7 @@ export const InstructorDashboard = () => {
                               leftIcon={<PlayIcon className="h-4 w-4" />}
                               onClick={() => handleJoinSession(session)}
                             >
-                              {session.status === 'live' ? 'Join' : 'Start'}
+                              Start Meeting
                             </Button>
                           </div>
                         </div>
@@ -431,7 +451,7 @@ export const InstructorDashboard = () => {
                               leftIcon={<PlayIcon className="h-4 w-4" />}
                               onClick={() => handleJoinSession(session)}
                             >
-                              {session.status === 'live' ? 'Join' : 'Start'}
+                              Start Meeting
                             </Button>
                           </div>
                         </div>
