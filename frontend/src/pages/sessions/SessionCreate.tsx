@@ -19,8 +19,8 @@ export const SessionCreate = () => {
   const [createdSessionTitle, setCreatedSessionTitle] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // ✅ use the SAME variable you already use everywhere else
-  const API_BASE = import.meta.env.VITE_API_URL;   // e.g. https://learningapp-production.up.railway.app
+  // Use consistent backend URL variable
+  const API_BASE = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL;
 
   const isInstructor = user?.role === "instructor" || user?.role === "admin";
 
@@ -68,8 +68,12 @@ export const SessionCreate = () => {
         courseId: null,                     // No course link for standalone
         date: data.date,                    // "2025-11-25"
         time: data.startTime,               // use startTime ONLY (backend expects 1 time)
+        startTime: data.startTime,          // Store start time separately
+        endTime: data.endTime,              // Store end time separately
         durationMinutes: durationMinutes,
         timezone: "Asia/Colombo",
+        description: data.description || '',
+        materials: data.materials || [],
         isStandalone: true,                 // Mark as standalone session
         enrollmentKey: sessionEnrollmentKey // Enrollment key for this session
       };

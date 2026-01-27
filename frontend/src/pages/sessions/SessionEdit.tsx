@@ -40,15 +40,16 @@ export const SessionEdit = () => {
         }
 
         setInitialData({
-          title: data.title,
-          course: data.course,
-          courseCode: data.courseCode,
-          date: data.date,
-          startTime: data.startTime,
-          endTime: data.endTime,
-          duration: data.duration,
-          description: data.description,
-          materials: data.materials || [],
+          title: data.title || '',
+          course: data.course || '',
+          courseCode: data.courseCode || '',
+          courseId: data.courseId,
+          date: data.date || '',
+          startTime: data.startTime || '',
+          endTime: data.endTime || '',
+          duration: data.duration || '',
+          description: data.description || '',
+          materials: Array.isArray(data.materials) ? data.materials : [],
         });
       } catch (err) {
         console.error(err);
@@ -106,13 +107,31 @@ export const SessionEdit = () => {
     setSaving(true);
 
     try {
+      // Convert duration string to minutes (e.g., "90 min" -> 90)
+      const durationMatch = data.duration.match(/\d+/);
+      const durationMinutes = durationMatch ? parseInt(durationMatch[0]) : 90;
+
+      // Prepare the update payload
+      const updatePayload = {
+        title: data.title,
+        course: data.course,
+        courseCode: data.courseCode,
+        date: data.date,
+        time: data.startTime, // Backend uses 'time' field
+        startTime: data.startTime,
+        endTime: data.endTime,
+        durationMinutes: durationMinutes,
+        description: data.description,
+        materials: data.materials,
+      };
+
       const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("access_token")}`,
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(updatePayload),
       });
 
       const result = await res.json();

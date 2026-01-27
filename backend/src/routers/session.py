@@ -22,8 +22,12 @@ class SessionCreate(BaseModel):
     courseId: Optional[str] = None  # Link to Course document for access control
     date: str          # "2025-11-25"
     time: str          # "10:00 AM - 11:00 AM" or "10:00"
+    startTime: Optional[str] = None  # Start time in HH:MM format
+    endTime: Optional[str] = None    # End time in HH:MM format
     durationMinutes: int
     timezone: str = "Asia/Colombo"
+    description: Optional[str] = None
+    materials: Optional[List[str]] = []
     isStandalone: Optional[bool] = False  # True for standalone sessions
     enrollmentKey: Optional[str] = None  # Enrollment key for standalone sessions
 
@@ -38,6 +42,8 @@ class SessionOut(BaseModel):
     instructorId: Optional[str] = None  # Link to instructor user
     date: str
     time: str
+    startTime: Optional[str] = None  # Start time in HH:MM format
+    endTime: Optional[str] = None    # End time in HH:MM format
     duration: str
     status: str
     participants: Optional[int] = 0
@@ -49,6 +55,8 @@ class SessionOut(BaseModel):
     start_url: Optional[str] = None
     isStandalone: Optional[bool] = False
     enrollmentKey: Optional[str] = None
+    description: Optional[str] = None
+    materials: Optional[List[str]] = []
 
 
 def _session_doc_to_out(doc, include_urls: bool = True) -> SessionOut:
@@ -62,6 +70,8 @@ def _session_doc_to_out(doc, include_urls: bool = True) -> SessionOut:
         instructorId=doc.get("instructorId"),
         date=doc["date"],
         time=doc["time"],
+        startTime=doc.get("startTime"),
+        endTime=doc.get("endTime"),
         duration=doc["duration"],
         status=doc.get("status", "upcoming"),
         participants=doc.get("participants", 0),
@@ -73,6 +83,8 @@ def _session_doc_to_out(doc, include_urls: bool = True) -> SessionOut:
         start_url=doc.get("start_url") if include_urls else None,
         isStandalone=doc.get("isStandalone", False),
         enrollmentKey=doc.get("enrollmentKey"),
+        description=doc.get("description"),
+        materials=doc.get("materials", []),
     )
 
 
@@ -122,7 +134,11 @@ async def create_session(
             "instructorId": user["id"],  # Link to instructor user
             "date": payload.date,
             "time": payload.time,
+            "startTime": payload.startTime,
+            "endTime": payload.endTime,
             "duration": f"{payload.durationMinutes} minutes",
+            "description": payload.description,
+            "materials": payload.materials or [],
             "status": "upcoming",
             "participants": 0,
             "expectedParticipants": 0,
@@ -156,8 +172,11 @@ class SessionUpdate(BaseModel):
     courseCode: Optional[str] = None
     date: Optional[str] = None
     time: Optional[str] = None
+    startTime: Optional[str] = None
+    endTime: Optional[str] = None
     durationMinutes: Optional[int] = None
     description: Optional[str] = None
+    materials: Optional[List[str]] = None
 
 
 @router.put("/{session_id}", response_model=SessionOut)
@@ -192,10 +211,16 @@ async def update_session(
             update_data["date"] = payload.date
         if payload.time is not None:
             update_data["time"] = payload.time
+        if payload.startTime is not None:
+            update_data["startTime"] = payload.startTime
+        if payload.endTime is not None:
+            update_data["endTime"] = payload.endTime
         if payload.durationMinutes is not None:
             update_data["duration"] = f"{payload.durationMinutes} minutes"
         if payload.description is not None:
             update_data["description"] = payload.description
+        if payload.materials is not None:
+            update_data["materials"] = payload.materials
         
         update_data["updatedAt"] = datetime.utcnow()
         
