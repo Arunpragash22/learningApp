@@ -377,14 +377,17 @@ export const InstructorDashboard = () => {
                                 Trigger Quiz
                               </Button>
                             )}
-                            <Button
-                              variant={session.status === 'live' ? 'primary' : 'outline'}
-                              size="sm"
-                              leftIcon={<PlayIcon className="h-4 w-4" />}
-                              onClick={() => handleJoinSession(session)}
-                            >
-                              Start Meeting
-                            </Button>
+                            {/* Start Meeting button - Only show when meeting is NOT live */}
+                            {session.status !== 'live' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                leftIcon={<PlayIcon className="h-4 w-4" />}
+                                onClick={() => handleJoinSession(session)}
+                              >
+                                Start Meeting
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </li>
@@ -445,14 +448,17 @@ export const InstructorDashboard = () => {
                                 Trigger Quiz
                               </Button>
                             )}
-                            <Button
-                              variant={session.status === 'live' ? 'primary' : 'outline'}
-                              size="sm"
-                              leftIcon={<PlayIcon className="h-4 w-4" />}
-                              onClick={() => handleJoinSession(session)}
-                            >
-                              Start Meeting
-                            </Button>
+                            {/* Start Meeting button - Only show when meeting is NOT live */}
+                            {session.status !== 'live' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                leftIcon={<PlayIcon className="h-4 w-4" />}
+                                onClick={() => handleJoinSession(session)}
+                              >
+                                Start Meeting
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </li>
