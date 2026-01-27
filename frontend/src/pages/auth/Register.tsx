@@ -262,7 +262,7 @@ export const Register = () => {
                       : 'border-gray-200 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-400'
                     }
                   `}
-                  placeholder="John"
+                  placeholder="Enter your first name"
                 />
               </div>
               {errors.firstName && (
@@ -296,7 +296,7 @@ export const Register = () => {
                       : 'border-gray-200 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-400'
                     }
                   `}
-                  placeholder="Doe"
+                  placeholder="Enter your last name"
                 />
               </div>
               {errors.lastName && (
@@ -332,7 +332,7 @@ export const Register = () => {
                     : 'border-gray-200 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-400'
                   }
                 `}
-                placeholder="you@example.com"
+                placeholder="your@example.com"
               />
             </div>
             {errors.email && (
