@@ -521,7 +521,19 @@ export const SessionList = () => {
                           </Button>
                         )}
 
-                        {session.status === 'live' && (
+                        {/* JOIN BUTTON - For students (upcoming and live) */}
+                        {!isInstructor && (session.status === 'upcoming' || session.status === 'live') && (
+                          <Button
+                            variant={session.status === 'live' ? 'primary' : 'outline'}
+                            leftIcon={<PlayIcon className="h-4 w-4" />}
+                            onClick={() => handleJoinSession(session)}
+                          >
+                            {session.status === 'live' ? 'Join Live' : 'Join Meeting'}
+                          </Button>
+                        )}
+
+                        {/* JOIN LIVE - For instructors (live only) */}
+                        {isInstructor && session.status === 'live' && (
                           <Button
                             variant="primary"
                             leftIcon={<PlayIcon className="h-4 w-4" />}
@@ -645,8 +657,19 @@ export const SessionList = () => {
                     </Button>
                   )}
 
-                  {/* JOIN LIVE */}
-                  {session.status === 'live' && (
+                  {/* JOIN BUTTON - For students (upcoming and live) */}
+                  {!isInstructor && (session.status === 'upcoming' || session.status === 'live') && (
+                    <Button
+                      variant={session.status === 'live' ? 'primary' : 'outline'}
+                      leftIcon={<PlayIcon className="h-4 w-4" />}
+                      onClick={() => handleJoinSession(session)}
+                    >
+                      {session.status === 'live' ? 'Join Live' : 'Join Meeting'}
+                    </Button>
+                  )}
+
+                  {/* JOIN LIVE - For instructors (live only) */}
+                  {isInstructor && session.status === 'live' && (
                     <Button
                       variant="primary"
                       leftIcon={<PlayIcon className="h-4 w-4" />}
