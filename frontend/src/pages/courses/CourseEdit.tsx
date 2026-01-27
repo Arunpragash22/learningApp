@@ -32,7 +32,9 @@ export const CourseEdit = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const API_BASE = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
+  // VITE_API_URL already includes /api, so we check for that
+  const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
+  const API_BASE = API_URL?.endsWith('/api') ? API_URL.slice(0, -4) : API_URL;
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
 
   // Load existing course data
