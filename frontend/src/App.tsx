@@ -17,6 +17,7 @@ import { QuestionManagement } from './pages/questions/QuestionManagement';
 import { CourseList } from './pages/courses/CourseList';
 import { CourseDetail } from './pages/courses/CourseDetail';
 import { CourseCreate } from './pages/courses/CourseCreate';
+import { CourseEdit } from './pages/courses/CourseEdit';
 import { CourseManagement } from './pages/courses/CourseManagement';
 import { StudentEnrollment } from './pages/courses/StudentEnrollment';
 import { SessionList } from './pages/sessions/SessionList';
@@ -71,6 +72,7 @@ export function App() {
           {/* Common routes available to all roles */}
           <Route path="courses" element={<CourseList />} />
           <Route path="courses/create" element={<CourseCreate />} />
+          <Route path="courses/:courseId/edit" element={<CourseEdit />} />
           <Route path="courses/:courseId" element={<CourseDetail />} />
           <Route path="sessions/create" element={<SessionCreate />} />
           <Route path="sessions/:sessionId/edit" element={<SessionEdit />} />
