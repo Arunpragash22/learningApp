@@ -63,9 +63,9 @@ export const SessionCreate = () => {
       
       const payload = {
         title: data.title,
-        course: data.course,
-        courseCode: data.courseCode,
-        courseId: data.courseId || null,    // Link to course for access control
+        course: data.title,                 // Use title as course name for standalone
+        courseCode: "STANDALONE",           // Generic code for standalone sessions
+        courseId: null,                     // No course link for standalone
         date: data.date,                    // "2025-11-25"
         time: data.startTime,               // use startTime ONLY (backend expects 1 time)
         durationMinutes: durationMinutes,
