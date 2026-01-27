@@ -4,6 +4,7 @@ Handles sending Web Push notifications using pywebpush
 """
 import os
 import json
+from urllib.parse import urlparse
 from pywebpush import webpush, WebPushException
 from ..database.connection import db
 
@@ -54,12 +55,23 @@ class PushNotificationService:
                         "keys": sub["keys"]
                     }
                     
+                    # Extract origin from endpoint URL for aud claim
+                    endpoint_url = sub["endpoint"]
+                    parsed_url = urlparse(endpoint_url)
+                    origin = f"{parsed_url.scheme}://{parsed_url.netloc}"
+                    
+                    # Create vapid_claims with aud claim
+                    vapid_claims_with_aud = {
+                        **self.vapid_claims,
+                        "aud": origin
+                    }
+                    
                     # Send the push notification
                     webpush(
                         subscription_info=subscription_info,
                         data=json.dumps(payload),
                         vapid_private_key=self.vapid_private_key,
-                        vapid_claims=self.vapid_claims
+                        vapid_claims=vapid_claims_with_aud
                     )
                     
                     success_count += 1
