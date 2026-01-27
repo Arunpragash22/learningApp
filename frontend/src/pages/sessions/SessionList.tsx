@@ -86,7 +86,7 @@ export const SessionList = () => {
   };
 
   const handleEnrollInSession = async () => {
-    if (!enrollingSession || !enrollmentKey.trim()) {
+    if (!enrollmentKey.trim()) {
       toast.error('Please enter an enrollment key');
       return;
     }
@@ -94,10 +94,12 @@ export const SessionList = () => {
     setIsEnrolling(true);
 
     try {
-      // Check if enrollment key matches the session
-      // In a real app, this would be an API call
-      // For now, we'll simulate it
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/sessions/${enrollingSession.id}/enroll`, {
+      // If enrolling from header button (no specific session), use general enroll endpoint
+      const enrollUrl = enrollingSession 
+        ? `${import.meta.env.VITE_API_URL}/api/sessions/${enrollingSession.id}/enroll`
+        : `${import.meta.env.VITE_API_URL}/api/sessions/enroll-by-key`;
+
+      const response = await fetch(enrollUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -110,17 +112,24 @@ export const SessionList = () => {
 
       if (response.ok && data.success) {
         // Add to enrolled sessions
+        const sessionId = enrollingSession?.id || data.sessionId;
+        const sessionTitle = enrollingSession?.title || data.sessionTitle;
+        
         const newEnrolled = new Set(enrolledSessions);
-        newEnrolled.add(enrollingSession.id);
+        newEnrolled.add(sessionId);
         setEnrolledSessions(newEnrolled);
         
         // Save to localStorage
         localStorage.setItem('enrolledSessions', JSON.stringify(Array.from(newEnrolled)));
         
-        toast.success(`Successfully enrolled in meeting "${enrollingSession.title}"!`);
+        toast.success(`Successfully enrolled in meeting "${sessionTitle}"!`);
         setShowEnrollModal(false);
         setEnrollmentKey('');
         setEnrollingSession(null);
+        
+        // Reload sessions to show newly enrolled meeting
+        const all = await sessionService.getAllSessions();
+        setSessions(all);
       } else {
         toast.error(data.message || 'Invalid enrollment key');
       }
@@ -277,7 +286,7 @@ export const SessionList = () => {
           <p className="text-sm text-gray-500">Join ongoing and upcoming meetings</p>
         </div>
 
-        {isInstructor && (
+        {isInstructor ? (
           <Button
             variant="primary"
             leftIcon={<PlusIcon className="h-4 w-4" />}
@@ -285,18 +294,34 @@ export const SessionList = () => {
           >
             Create Meeting
           </Button>
+        ) : (
+          <Button
+            variant="primary"
+            leftIcon={<KeyIcon className="h-4 w-4" />}
+            onClick={() => {
+              setEnrollingSession(null);
+              setEnrollmentKey('');
+              setShowEnrollModal(true);
+            }}
+          >
+            Enroll in Meeting
+          </Button>
         )}
       </div>
 
       {/* Enrollment Key Modal for Students */}
-      {showEnrollModal && enrollingSession && (
+      {showEnrollModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">Enroll in Meeting</h2>
-                  <p className="text-sm text-gray-600 mt-1">{enrollingSession.title}</p>
+                  {enrollingSession ? (
+                    <p className="text-sm text-gray-600 mt-1">{enrollingSession.title}</p>
+                  ) : (
+                    <p className="text-sm text-gray-600 mt-1">Enter your enrollment key to access the meeting</p>
+                  )}
                 </div>
                 <button
                   onClick={() => {
