@@ -155,7 +155,9 @@ export const SessionList = () => {
         alert("❌ Zoom host start URL missing");
         return;
       }
-      window.location.href = session.start_url;
+      // For instructors, open Zoom in new tab and navigate to session page for monitoring
+      window.open(session.start_url, '_blank');
+      navigate(`/dashboard/sessions/${session.id}`);
       return;
     }
 
@@ -164,7 +166,10 @@ export const SessionList = () => {
       return;
     }
 
-    window.location.href = session.join_url;
+    // For students: Open Zoom in new tab, then navigate to LiveSession page
+    // LiveSession page handles latency monitoring via useLatencyMonitor hook
+    window.open(session.join_url, '_blank');
+    navigate(`/dashboard/sessions/${session.id}`);
   };
 
   // ---------------------------------------------------
