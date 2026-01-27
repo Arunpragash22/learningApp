@@ -1,21 +1,47 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { EngagementIndicator } from '../../components/engagement/EngagementIndicator';
+import { toast } from 'sonner';
 import { 
   BookOpenIcon, UsersIcon, CalendarIcon, ClockIcon, 
   FileTextIcon, VideoIcon, DownloadIcon, TrendingUpIcon,
-  ActivityIcon, BarChart3Icon, PlayIcon, CheckCircleIcon
+  ActivityIcon, BarChart3Icon, PlayIcon, CheckCircleIcon,
+  PlusIcon, XIcon
 } from 'lucide-react';
+
+interface CourseSession {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  status: 'upcoming' | 'live' | 'completed';
+  engagement?: number;
+}
 
 export const CourseDetail = () => {
   const { courseId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'overview' | 'sessions' | 'materials' | 'analytics'>('overview');
+  const [showCreateSession, setShowCreateSession] = useState(false);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [newSession, setNewSession] = useState({
+    title: '',
+    date: '',
+    startTime: '',
+    endTime: '',
+    duration: '90 min',
+    description: ''
+  });
+  const [sessionErrors, setSessionErrors] = useState<Record<string, string>>({});
+
+  const API_BASE = import.meta.env.VITE_API_URL;
 
   // Mock course data with detailed analytics
   const course = {
@@ -41,12 +67,12 @@ export const CourseDetail = () => {
       { id: 4, title: 'Assignment 1: Linear Regression', type: 'pdf', size: '1.2 MB', downloads: 40 }
     ],
     upcomingSessions: [
-      { id: '1', title: 'Neural Networks', date: '2023-10-15', time: '14:00-15:30', status: 'upcoming' },
-      { id: '2', title: 'Reinforcement Learning', date: '2023-10-22', time: '14:00-15:30', status: 'upcoming' }
+      { id: '1', title: 'Neural Networks', date: '2023-10-15', time: '14:00-15:30', status: 'upcoming' as const },
+      { id: '2', title: 'Reinforcement Learning', date: '2023-10-22', time: '14:00-15:30', status: 'upcoming' as const }
     ],
     pastSessions: [
-      { id: '3', title: 'Deep Learning Basics', date: '2023-10-08', time: '14:00-15:30', status: 'completed', engagement: 88 },
-      { id: '4', title: 'CNN Architectures', date: '2023-10-01', time: '14:00-15:30', status: 'completed', engagement: 82 }
+      { id: '3', title: 'Deep Learning Basics', date: '2023-10-08', time: '14:00-15:30', status: 'completed' as const, engagement: 88 },
+      { id: '4', title: 'CNN Architectures', date: '2023-10-01', time: '14:00-15:30', status: 'completed' as const, engagement: 82 }
     ],
     analytics: {
       totalQuestions: 45,
@@ -56,12 +82,122 @@ export const CourseDetail = () => {
     }
   };
 
+  const [courseSessions, setCourseSessions] = useState<{
+    upcoming: CourseSession[];
+    past: CourseSession[];
+  }>({
+    upcoming: course.upcomingSessions,
+    past: course.pastSessions
+  });
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: BookOpenIcon },
     { id: 'sessions', label: 'Sessions', icon: CalendarIcon },
     { id: 'materials', label: 'Materials', icon: FileTextIcon },
     { id: 'analytics', label: 'Analytics', icon: BarChart3Icon }
   ];
+
+  const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
+
+  const validateSession = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!newSession.title.trim()) {
+      errors.title = 'Session title is required';
+    }
+    if (!newSession.date) {
+      errors.date = 'Date is required';
+    }
+    if (!newSession.startTime) {
+      errors.startTime = 'Start time is required';
+    }
+    if (!newSession.endTime) {
+      errors.endTime = 'End time is required';
+    }
+    if (newSession.startTime && newSession.endTime && newSession.startTime >= newSession.endTime) {
+      errors.endTime = 'End time must be after start time';
+    }
+
+    setSessionErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleCreateSession = async () => {
+    if (!validateSession()) return;
+
+    setIsCreatingSession(true);
+
+    try {
+      const durationMatch = newSession.duration.match(/\d+/);
+      const durationMinutes = durationMatch ? parseInt(durationMatch[0]) : 90;
+
+      const payload = {
+        title: newSession.title,
+        course: course.title,
+        courseCode: course.code,
+        courseId: courseId,
+        date: newSession.date,
+        time: newSession.startTime,
+        durationMinutes: durationMinutes,
+        timezone: "Asia/Colombo",
+        isStandalone: false,  // Course session - no enrollment key needed
+        description: newSession.description
+      };
+
+      console.log("📤 Creating course session:", payload);
+
+      const res = await fetch(`${API_BASE}/api/sessions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const result = await res.json().catch(() => ({ detail: "Unknown error" }));
+        console.error("❌ Backend error:", result);
+        toast.error(result.detail || "Failed to create session");
+        return;
+      }
+
+      const result = await res.json();
+      console.log("✅ Session created:", result);
+
+      // Add to upcoming sessions list
+      const newSessionData: CourseSession = {
+        id: result.id || Date.now().toString(),
+        title: newSession.title,
+        date: newSession.date,
+        time: `${newSession.startTime}-${newSession.endTime}`,
+        status: 'upcoming'
+      };
+
+      setCourseSessions(prev => ({
+        ...prev,
+        upcoming: [...prev.upcoming, newSessionData]
+      }));
+
+      // Reset form
+      setNewSession({
+        title: '',
+        date: '',
+        startTime: '',
+        endTime: '',
+        duration: '90 min',
+        description: ''
+      });
+      setShowCreateSession(false);
+      toast.success("Session created successfully! Students enrolled in this course can access it directly.");
+
+    } catch (err: any) {
+      console.error("❌ Error creating session:", err);
+      toast.error(err.message || "Failed to create session");
+    } finally {
+      setIsCreatingSession(false);
+    }
+  };
 
   return (
     <div className="py-6">
@@ -82,16 +218,16 @@ export const CourseDetail = () => {
             <p className="mt-2 text-sm text-gray-500">Instructor: {course.instructor}</p>
           </div>
           <div className="flex space-x-3">
-            {course.upcomingSessions.length > 0 && (
+            {courseSessions.upcoming.length > 0 && (
               <Button
                 variant="primary"
                 leftIcon={<PlayIcon className="h-4 w-4" />}
-                onClick={() => navigate(`/dashboard/sessions/${course.upcomingSessions[0].id}`)}
+                onClick={() => navigate(`/dashboard/sessions/${courseSessions.upcoming[0].id}`)}
               >
                 Join Next Session
               </Button>
             )}
-            {(user?.role === 'instructor' || user?.role === 'admin') && (
+            {isInstructor && (
               <Button
                 variant="outline"
                 leftIcon={<BarChart3Icon className="h-4 w-4" />}
@@ -258,12 +394,162 @@ export const CourseDetail = () => {
 
         {activeTab === 'sessions' && (
           <div className="space-y-6">
+            {/* Create Session Button - Instructor Only */}
+            {isInstructor && (
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Course Sessions</h3>
+                  <p className="text-sm text-gray-500">
+                    Sessions created here are accessible to all enrolled students without a separate enrollment key.
+                  </p>
+                </div>
+                <Button
+                  variant="primary"
+                  leftIcon={<PlusIcon className="h-4 w-4" />}
+                  onClick={() => setShowCreateSession(true)}
+                >
+                  Add Session
+                </Button>
+              </div>
+            )}
+
+            {/* Create Session Form */}
+            {showCreateSession && isInstructor && (
+              <Card className="border-2 border-indigo-200">
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-semibold text-gray-900">Create New Session</h4>
+                    <button
+                      onClick={() => setShowCreateSession(false)}
+                      className="p-1 rounded-full hover:bg-gray-100"
+                    >
+                      <XIcon className="h-5 w-5 text-gray-500" />
+                    </button>
+                  </div>
+
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-green-800">
+                      <strong>✓ No enrollment key needed:</strong> Students enrolled in "{course.title}" can access this session directly.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Session Title *
+                      </label>
+                      <Input
+                        value={newSession.title}
+                        onChange={(e) => setNewSession({ ...newSession, title: e.target.value })}
+                        placeholder="e.g., Introduction to Neural Networks"
+                        error={sessionErrors.title}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Date *
+                      </label>
+                      <div className="relative">
+                        <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <Input
+                          type="date"
+                          value={newSession.date}
+                          onChange={(e) => setNewSession({ ...newSession, date: e.target.value })}
+                          className="pl-10"
+                          error={sessionErrors.date}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Start Time *
+                      </label>
+                      <div className="relative">
+                        <ClockIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <Input
+                          type="time"
+                          value={newSession.startTime}
+                          onChange={(e) => setNewSession({ ...newSession, startTime: e.target.value })}
+                          className="pl-10"
+                          error={sessionErrors.startTime}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        End Time *
+                      </label>
+                      <div className="relative">
+                        <ClockIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <Input
+                          type="time"
+                          value={newSession.endTime}
+                          onChange={(e) => setNewSession({ ...newSession, endTime: e.target.value })}
+                          className="pl-10"
+                          error={sessionErrors.endTime}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Duration
+                      </label>
+                      <Select
+                        value={newSession.duration}
+                        onChange={(e) => setNewSession({ ...newSession, duration: e.target.value })}
+                        options={[
+                          { value: '30 min', label: '30 minutes' },
+                          { value: '60 min', label: '1 hour' },
+                          { value: '90 min', label: '1.5 hours' },
+                          { value: '120 min', label: '2 hours' },
+                          { value: '180 min', label: '3 hours' }
+                        ]}
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Description (optional)
+                      </label>
+                      <textarea
+                        value={newSession.description}
+                        onChange={(e) => setNewSession({ ...newSession, description: e.target.value })}
+                        placeholder="Brief description of what will be covered..."
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowCreateSession(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      onClick={handleCreateSession}
+                      disabled={isCreatingSession}
+                    >
+                      {isCreatingSession ? 'Creating...' : 'Create Session'}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             {/* Upcoming Sessions */}
-            {course.upcomingSessions.length > 0 && (
+            {courseSessions.upcoming.length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Sessions</h3>
                 <div className="space-y-3">
-                  {course.upcomingSessions.map(session => (
+                  {courseSessions.upcoming.map(session => (
                     <Card key={session.id} className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -295,11 +581,11 @@ export const CourseDetail = () => {
             )}
 
             {/* Past Sessions */}
-            {course.pastSessions.length > 0 && (
+            {courseSessions.past.length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Past Sessions</h3>
                 <div className="space-y-3">
-                  {course.pastSessions.map(session => (
+                  {courseSessions.past.map(session => (
                     <Card key={session.id} className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -332,6 +618,28 @@ export const CourseDetail = () => {
                   ))}
           </div>
         </div>
+            )}
+
+            {/* Empty State */}
+            {courseSessions.upcoming.length === 0 && courseSessions.past.length === 0 && (
+              <Card className="p-8 text-center">
+                <CalendarIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Sessions Yet</h3>
+                <p className="text-gray-500 mb-4">
+                  {isInstructor
+                    ? 'Create your first session for this course.'
+                    : 'No sessions have been scheduled for this course yet.'}
+                </p>
+                {isInstructor && (
+                  <Button
+                    variant="primary"
+                    leftIcon={<PlusIcon className="h-4 w-4" />}
+                    onClick={() => setShowCreateSession(true)}
+                  >
+                    Create First Session
+                  </Button>
+                )}
+              </Card>
             )}
           </div>
         )}
