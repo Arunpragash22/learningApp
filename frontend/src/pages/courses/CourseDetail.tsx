@@ -12,7 +12,7 @@ import {
   BookOpenIcon, UsersIcon, CalendarIcon, ClockIcon, 
   FileTextIcon, VideoIcon, DownloadIcon, TrendingUpIcon,
   ActivityIcon, BarChart3Icon, PlayIcon, CheckCircleIcon,
-  PlusIcon, XIcon
+  PlusIcon, XIcon, EditIcon
 } from 'lucide-react';
 
 interface CourseSession {
@@ -155,10 +155,13 @@ export const CourseDetail = () => {
         courseId: courseId,
         date: newSession.date,
         time: newSession.startTime,
+        startTime: newSession.startTime,
+        endTime: newSession.endTime,
         durationMinutes: durationMinutes,
         timezone: "Asia/Colombo",
-        isStandalone: false,  // Course session - no enrollment key needed
-        description: newSession.description
+        description: newSession.description,
+        materials: [],
+        isStandalone: false  // Course session - no enrollment key needed
       };
 
       console.log("📤 Creating course session:", payload);
@@ -585,11 +588,20 @@ export const CourseDetail = () => {
                             </div>
                           </div>
                         </div>
-                        <Link to={`/dashboard/sessions/${session.id}`}>
-                          <Button variant="primary" leftIcon={<PlayIcon className="h-4 w-4" />}>
-                            Join
-                          </Button>
-                        </Link>
+                        <div className="flex items-center space-x-2">
+                          {isInstructor && (
+                            <Link to={`/dashboard/sessions/${session.id}/edit`}>
+                              <Button variant="outline" leftIcon={<EditIcon className="h-4 w-4" />}>
+                                Edit
+                              </Button>
+                            </Link>
+                          )}
+                          <Link to={`/dashboard/sessions/${session.id}`}>
+                            <Button variant="primary" leftIcon={<PlayIcon className="h-4 w-4" />}>
+                              Join
+                            </Button>
+                          </Link>
+                        </div>
                       </div>
                     </Card>
                   ))}
@@ -627,9 +639,18 @@ export const CourseDetail = () => {
                             )}
                           </div>
                         </div>
-                        <Link to={`/dashboard/sessions/${session.id}`}>
-                          <Button variant="outline">View Recording</Button>
-                        </Link>
+                        <div className="flex items-center space-x-2">
+                          {isInstructor && (
+                            <Link to={`/dashboard/sessions/${session.id}/edit`}>
+                              <Button variant="outline" leftIcon={<EditIcon className="h-4 w-4" />}>
+                                Edit
+                              </Button>
+                            </Link>
+                          )}
+                          <Link to={`/dashboard/sessions/${session.id}`}>
+                            <Button variant="outline">View Recording</Button>
+                          </Link>
+                        </div>
                       </div>
                     </Card>
                   ))}
