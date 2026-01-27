@@ -262,7 +262,7 @@ export const Register = () => {
                       : 'border-gray-200 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-400'
                     }
                   `}
-                  placeholder="Enter your first name"
+                  placeholder="First name"
                 />
               </div>
               {errors.firstName && (
@@ -296,7 +296,7 @@ export const Register = () => {
                       : 'border-gray-200 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-400'
                     }
                   `}
-                  placeholder="Enter your last name"
+                  placeholder="Last name"
                 />
               </div>
               {errors.lastName && (

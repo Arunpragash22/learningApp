@@ -288,79 +288,161 @@ export const InstructorDashboard = () => {
         </div>
       </div>
 
-      {/* ================= REAL UPCOMING SESSION LIST ================= */}
+      {/* ================= REAL UPCOMING SESSION LIST - TWO SECTIONS ================= */}
       <div className="mt-8">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-medium text-gray-900">Your Sessions</h2>
+          <h2 className="text-lg font-medium text-gray-900">Your Meetings</h2>
           <Link to="/dashboard/sessions">
             <Button variant="outline" size="sm">View All</Button>
           </Link>
         </div>
         
-        <div className="mt-2 bg-white shadow overflow-hidden sm:rounded-md">
-          {sessions.length === 0 ? (
-            <div className="px-4 py-8 text-center text-gray-500">
-              <p>No upcoming sessions</p>
-              <Link to="/dashboard/sessions/create">
-                <Button variant="primary" className="mt-4">Create Your First Session</Button>
-              </Link>
-            </div>
-          ) : (
-            <ul className="divide-y divide-gray-200">
-              {sessions.map((session) => (
-                <li key={session.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-indigo-600 truncate">
-                          {session.title}
-                        </p>
-                        {session.status === 'live' && (
-                          <Badge variant="danger" className="bg-red-600 text-white">LIVE</Badge>
-                        )}
-                      </div>
-                      <p className="mt-1 text-sm text-gray-500 flex items-center gap-3">
-                        <span className="flex items-center gap-1">
-                          <CalendarIcon className="h-4 w-4" />
-                          {session.date}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <ClockIcon className="h-4 w-4" />
-                          {session.time}
-                        </span>
-                      </p>
-                      <p className="mt-1 text-xs text-gray-400">
-                        {session.course} ({session.courseCode})
-                      </p>
-                    </div>
-                    
-                    <div className="ml-4 flex gap-2">
-                      {/* 🎯 Trigger Quiz Button - Only joined students receive */}
-                      {session.status === 'live' && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          leftIcon={<TargetIcon className="h-4 w-4" />}
-                          onClick={() => handleTriggerQuestion(session)}
-                        >
-                          Trigger Quiz
-                        </Button>
-                      )}
-                      <Button
-                        variant={session.status === 'live' ? 'primary' : 'outline'}
-                        size="sm"
-                        leftIcon={<PlayIcon className="h-4 w-4" />}
-                        onClick={() => handleJoinSession(session)}
-                      >
-                        {session.status === 'live' ? 'Join' : 'Start'}
-                      </Button>
-                    </div>
+        {sessions.length === 0 ? (
+          <div className="bg-white shadow overflow-hidden sm:rounded-md px-4 py-8 text-center text-gray-500">
+            <p>No upcoming meetings</p>
+            <Link to="/dashboard/sessions/create">
+              <Button variant="primary" className="mt-4">Create Your First Meeting</Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* STANDALONE MEETINGS SECTION */}
+            {sessions.filter(s => s.isStandalone === true).length > 0 && (
+              <div>
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="text-lg">🔑</span>
+                  <div>
+                    <h3 className="text-md font-semibold text-gray-900">Standalone Meetings</h3>
+                    <p className="text-xs text-gray-500">Meetings with enrollment keys</p>
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                </div>
+                <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                  <ul className="divide-y divide-gray-200">
+                    {sessions.filter(s => s.isStandalone === true).map((session) => (
+                      <li key={session.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-indigo-600 truncate">
+                                {session.title}
+                              </p>
+                              {session.status === 'live' && (
+                                <Badge variant="danger" className="bg-red-600 text-white">LIVE</Badge>
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm text-gray-500 flex items-center gap-3">
+                              <span className="flex items-center gap-1">
+                                <CalendarIcon className="h-4 w-4" />
+                                {session.date}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <ClockIcon className="h-4 w-4" />
+                                {session.time}
+                              </span>
+                            </p>
+                            <p className="mt-1 text-xs text-gray-400">
+                              {session.course} ({session.courseCode})
+                            </p>
+                          </div>
+                          
+                          <div className="ml-4 flex gap-2">
+                            {/* 🎯 Trigger Quiz Button - Only joined students receive */}
+                            {session.status === 'live' && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                leftIcon={<TargetIcon className="h-4 w-4" />}
+                                onClick={() => handleTriggerQuestion(session)}
+                              >
+                                Trigger Quiz
+                              </Button>
+                            )}
+                            <Button
+                              variant={session.status === 'live' ? 'primary' : 'outline'}
+                              size="sm"
+                              leftIcon={<PlayIcon className="h-4 w-4" />}
+                              onClick={() => handleJoinSession(session)}
+                            >
+                              {session.status === 'live' ? 'Join' : 'Start'}
+                            </Button>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* COURSE MEETINGS SECTION */}
+            {sessions.filter(s => !s.isStandalone).length > 0 && (
+              <div>
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="text-lg">📚</span>
+                  <div>
+                    <h3 className="text-md font-semibold text-gray-900">Course Meetings</h3>
+                    <p className="text-xs text-gray-500">Meetings from your courses</p>
+                  </div>
+                </div>
+                <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                  <ul className="divide-y divide-gray-200">
+                    {sessions.filter(s => !s.isStandalone).map((session) => (
+                      <li key={session.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-indigo-600 truncate">
+                                {session.title}
+                              </p>
+                              {session.status === 'live' && (
+                                <Badge variant="danger" className="bg-red-600 text-white">LIVE</Badge>
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm text-gray-500 flex items-center gap-3">
+                              <span className="flex items-center gap-1">
+                                <CalendarIcon className="h-4 w-4" />
+                                {session.date}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <ClockIcon className="h-4 w-4" />
+                                {session.time}
+                              </span>
+                            </p>
+                            <p className="mt-1 text-xs text-gray-400">
+                              {session.course} ({session.courseCode})
+                            </p>
+                          </div>
+                          
+                          <div className="ml-4 flex gap-2">
+                            {/* 🎯 Trigger Quiz Button - Only joined students receive */}
+                            {session.status === 'live' && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                leftIcon={<TargetIcon className="h-4 w-4" />}
+                                onClick={() => handleTriggerQuestion(session)}
+                              >
+                                Trigger Quiz
+                              </Button>
+                            )}
+                            <Button
+                              variant={session.status === 'live' ? 'primary' : 'outline'}
+                              size="sm"
+                              leftIcon={<PlayIcon className="h-4 w-4" />}
+                              onClick={() => handleJoinSession(session)}
+                            >
+                              {session.status === 'live' ? 'Join' : 'Start'}
+                            </Button>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ================= CONNECTION QUALITY DETAILED PANEL ================= */}

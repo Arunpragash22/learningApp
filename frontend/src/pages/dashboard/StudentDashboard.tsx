@@ -610,20 +610,21 @@ export const StudentDashboard = () => {
         </div>
       </div>
 
-      {/* Upcoming + Recent */}
+      {/* Meetings Sections + Recent Activity */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* REAL Upcoming Sessions */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 flex justify-between items-center">
-            <h3 className="text-lg font-medium text-gray-900">Your Sessions</h3>
+        {/* MEETINGS SECTIONS - LEFT COLUMN */}
+        <div className="space-y-4">
+          {/* Header with View All Link */}
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-medium text-gray-900">Your Meetings</h3>
             <Link to="/dashboard/sessions">
               <span className="text-sm hover:opacity-80" style={{ color: '#3B82F6' }}>View All</span>
             </Link>
           </div>
-          
+
           {/* 📶 Show connection status banner when connected */}
           {connectedSessionId && (
-            <div className="mx-4 mb-4 p-3 rounded-lg" style={{ backgroundColor: '#eff6ff', borderColor: '#3B82F6', borderWidth: '1px' }}>
+            <div className="p-3 rounded-lg bg-white shadow" style={{ borderColor: '#3B82F6', borderWidth: '1px' }}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: '#3B82F6' }}></div>
@@ -645,49 +646,119 @@ export const StudentDashboard = () => {
           )}
 
           {sessions.length === 0 ? (
-            <div className="px-4 py-8 text-center text-gray-500">
-              <p className="text-sm">No upcoming sessions</p>
+            <div className="bg-white shadow rounded-lg px-4 py-8 text-center text-gray-500">
+              <p className="text-sm">No upcoming meetings</p>
             </div>
           ) : (
-            sessions.map((session) => {
-              const sessionKey = session.zoomMeetingId || session.id;
-              const isConnectedToThis = connectedSessionId === sessionKey;
-              
-              return (
-                <div key={session.id} className="px-4 py-4 border-t hover:bg-gray-50" style={isConnectedToThis ? { backgroundColor: '#eff6ff' } : {}}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium" style={{ color: '#3B82F6' }}>
-                          {session.title}
-                        </p>
-                        {session.status === 'live' && (
-                          <Badge variant="danger" className="bg-red-600 text-white text-xs">LIVE</Badge>
-                        )}
-                        {isConnectedToThis && (
-                          <Badge variant="success" className="text-white text-xs" style={{ backgroundColor: '#3B82F6' }}>CONNECTED</Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {session.course} • {session.instructor}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1 flex items-center gap-2">
-                        <CalendarIcon className="h-3 w-3" />
-                        {session.date} • {session.time}
-                      </p>
-                    </div>
-                    <Button
-                      variant={isConnectedToThis ? 'secondary' : session.status === 'live' ? 'primary' : 'outline'}
-                      size="sm"
-                      leftIcon={isConnectedToThis ? <WifiIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
-                      onClick={() => handleJoinSession(session)}
-                    >
-                      {isConnectedToThis ? 'Joined' : session.status === 'live' ? 'Join' : 'Join'}
-                    </Button>
+            <>
+              {/* STANDALONE MEETINGS SECTION */}
+              {sessions.filter(s => s.isStandalone === true).length > 0 && (
+                <div className="bg-white shadow rounded-lg">
+                  <div className="px-4 py-3 border-b">
+                    <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                      <span className="text-indigo-600">🔑</span>
+                      Standalone Meetings
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Meetings you've enrolled in with a key
+                    </p>
                   </div>
+                  {sessions.filter(s => s.isStandalone === true).map((session) => {
+                    const sessionKey = session.zoomMeetingId || session.id;
+                    const isConnectedToThis = connectedSessionId === sessionKey;
+                    
+                    return (
+                      <div key={session.id} className="px-4 py-4 border-t hover:bg-gray-50" style={isConnectedToThis ? { backgroundColor: '#eff6ff' } : {}}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium" style={{ color: '#3B82F6' }}>
+                                {session.title}
+                              </p>
+                              {session.status === 'live' && (
+                                <Badge variant="danger" className="bg-red-600 text-white text-xs">LIVE</Badge>
+                              )}
+                              {isConnectedToThis && (
+                                <Badge variant="success" className="text-white text-xs" style={{ backgroundColor: '#3B82F6' }}>CONNECTED</Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {session.course} • {session.instructor}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                              <CalendarIcon className="h-3 w-3" />
+                              {session.date} • {session.time}
+                            </p>
+                          </div>
+                          <Button
+                            variant={isConnectedToThis ? 'secondary' : session.status === 'live' ? 'primary' : 'outline'}
+                            size="sm"
+                            leftIcon={isConnectedToThis ? <WifiIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
+                            onClick={() => handleJoinSession(session)}
+                          >
+                            {isConnectedToThis ? 'Joined' : session.status === 'live' ? 'Join' : 'Join'}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })
+              )}
+
+              {/* COURSE MEETINGS SECTION */}
+              {sessions.filter(s => !s.isStandalone).length > 0 && (
+                <div className="bg-white shadow rounded-lg">
+                  <div className="px-4 py-3 border-b">
+                    <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                      <span className="text-blue-600">📚</span>
+                      Course Meetings
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Meetings from your enrolled courses
+                    </p>
+                  </div>
+                  {sessions.filter(s => !s.isStandalone).map((session) => {
+                    const sessionKey = session.zoomMeetingId || session.id;
+                    const isConnectedToThis = connectedSessionId === sessionKey;
+                    
+                    return (
+                      <div key={session.id} className="px-4 py-4 border-t hover:bg-gray-50" style={isConnectedToThis ? { backgroundColor: '#eff6ff' } : {}}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium" style={{ color: '#3B82F6' }}>
+                                {session.title}
+                              </p>
+                              {session.status === 'live' && (
+                                <Badge variant="danger" className="bg-red-600 text-white text-xs">LIVE</Badge>
+                              )}
+                              {isConnectedToThis && (
+                                <Badge variant="success" className="text-white text-xs" style={{ backgroundColor: '#3B82F6' }}>CONNECTED</Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {session.course} • {session.instructor}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                              <CalendarIcon className="h-3 w-3" />
+                              {session.date} • {session.time}
+                            </p>
+                          </div>
+                          <Button
+                            variant={isConnectedToThis ? 'secondary' : session.status === 'live' ? 'primary' : 'outline'}
+                            size="sm"
+                            leftIcon={isConnectedToThis ? <WifiIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
+                            onClick={() => handleJoinSession(session)}
+                          >
+                            {isConnectedToThis ? 'Joined' : session.status === 'live' ? 'Join' : 'Join'}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
         </div>
 
