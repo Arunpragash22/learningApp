@@ -192,15 +192,22 @@ export async function initPushNotifications(): Promise<boolean> {
       return false;
     }
 
-    // 3. Subscribe to push notifications
-    const subscription = await subscribeToPush(registration);
+    // 3. Check if subscription already exists, otherwise create new one
+    let subscription = await registration.pushManager.getSubscription();
     
     if (!subscription) {
-      console.log('❌ Push subscription failed');
-      return false;
+      // Create new subscription
+      subscription = await subscribeToPush(registration);
+      
+      if (!subscription) {
+        console.log('❌ Push subscription failed');
+        return false;
+      }
+    } else {
+      console.log('✅ Existing push subscription found');
     }
 
-    // 4. Send subscription to backend
+    // 4. Send subscription to backend (upsert - will update if exists)
     const saved = await sendSubscriptionToBackend(subscription);
     
     if (!saved) {
@@ -209,6 +216,7 @@ export async function initPushNotifications(): Promise<boolean> {
     }
 
     console.log('✅ Push notifications initialized successfully!');
+    console.log('📱 Subscription endpoint:', subscription.endpoint.substring(0, 50) + '...');
     return true;
     
   } catch (error) {

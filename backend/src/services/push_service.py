@@ -116,8 +116,16 @@ class PushNotificationService:
                 print("No push subscriptions found")
                 return 0
             
-            # Get unique student IDs
+            # Get unique student IDs (one notification per student, even if they have multiple devices)
             student_ids = list(set([sub["studentId"] for sub in subscriptions]))
+            
+            # Log subscription statistics
+            total_subscriptions = len(subscriptions)
+            unique_students = len(student_ids)
+            print(f"📊 Push notification stats:")
+            print(f"   - Total subscriptions: {total_subscriptions}")
+            print(f"   - Unique students: {unique_students}")
+            print(f"   - Average devices per student: {total_subscriptions / unique_students if unique_students > 0 else 0:.2f}")
             
             success_count = 0
             
@@ -126,7 +134,7 @@ class PushNotificationService:
                 if sent:
                     success_count += 1
             
-            print(f"📤 Sent push notifications to {success_count}/{len(student_ids)} students")
+            print(f"📤 Sent push notifications to {success_count}/{unique_students} students")
             return success_count
             
         except Exception as e:
