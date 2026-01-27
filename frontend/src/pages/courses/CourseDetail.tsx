@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -28,6 +28,7 @@ export const CourseDetail = () => {
   const { courseId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<'overview' | 'sessions' | 'materials' | 'analytics'>('overview');
   const [showCreateSession, setShowCreateSession] = useState(false);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
@@ -42,6 +43,22 @@ export const CourseDetail = () => {
   const [sessionErrors, setSessionErrors] = useState<Record<string, string>>({});
 
   const API_BASE = import.meta.env.VITE_API_URL;
+
+  // Handle URL parameters to auto-open session creation
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const action = searchParams.get('action');
+    
+    if (tab === 'sessions') {
+      setActiveTab('sessions');
+      if (action === 'create') {
+        setShowCreateSession(true);
+        // Clear the action parameter from URL
+        searchParams.delete('action');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  }, [searchParams, setSearchParams]);
 
   // Mock course data with detailed analytics
   const course = {
