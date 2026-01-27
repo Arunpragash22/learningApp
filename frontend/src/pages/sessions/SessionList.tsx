@@ -170,16 +170,25 @@ export const SessionList = () => {
   };
 
   // ---------------------------------------------------
-  // ⭐ START SESSION (Instructor only)
+  // ⭐ START SESSION (Instructor only) - Opens Zoom directly
   // ---------------------------------------------------
-  const handleStartSession = async (sessionId: string) => {
-    setStartingSessionId(sessionId);
-    const result = await sessionService.startSession(sessionId);
+  const handleStartSession = async (session: Session) => {
+    setStartingSessionId(session.id);
+    const result = await sessionService.startSession(session.id);
     if (result.success) {
       toast.success('Session started successfully!');
+      
       // Reload sessions to update status
       const all = await sessionService.getAllSessions();
       setSessions(all);
+      
+      // 🎯 Open Zoom directly after starting session
+      if (session.start_url) {
+        window.open(session.start_url, '_blank');
+        toast.info('🚀 Opening Zoom meeting...');
+      } else {
+        toast.warning('⚠️ Zoom start URL not available');
+      }
     } else {
       toast.error(result.message || 'Failed to start session');
     }
@@ -540,7 +549,7 @@ export const SessionList = () => {
                                 ? <Loader2Icon className="h-4 w-4 animate-spin" /> 
                                 : <PlayIcon className="h-4 w-4" />
                             }
-                            onClick={() => handleStartSession(session.id)}
+                            onClick={() => handleStartSession(session)}
                             disabled={startingSessionId === session.id}
                           >
                             {startingSessionId === session.id ? 'Starting...' : 'Start Meeting'}
@@ -682,7 +691,7 @@ export const SessionList = () => {
                           ? <Loader2Icon className="h-4 w-4 animate-spin" /> 
                           : <PlayIcon className="h-4 w-4" />
                       }
-                      onClick={() => handleStartSession(session.id)}
+                      onClick={() => handleStartSession(session)}
                       disabled={startingSessionId === session.id}
                     >
                       {startingSessionId === session.id ? 'Starting...' : 'Start Meeting'}
