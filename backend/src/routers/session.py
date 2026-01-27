@@ -423,20 +423,30 @@ async def get_session(session_id: str, user: dict = Depends(get_current_user)):
         user_id = user.get("id")
         
         # Access control
-        if user_role == "instructor":
-            if doc.get("instructorId") != user_id:
-                raise HTTPException(status_code=403, detail="You can only view your own sessions")
+        if user_role == "instructor" or user_role == "admin":
+            # Instructors and admins can view any session (needed for editing)
+            pass
         elif user_role == "student":
-            course_id = doc.get("courseId")
-            if course_id:
-                is_enrolled = await CourseModel.is_student_enrolled(course_id, user_id)
-                if not is_enrolled:
-                    raise HTTPException(status_code=403, detail="You are not enrolled in this course")
+            # Students can only view sessions they're enrolled in
+            is_standalone = doc.get("isStandalone", False)
+            if is_standalone:
+                # For standalone sessions, check if student is enrolled
+                enrolled_students = doc.get("enrolledStudents", [])
+                if user_id not in enrolled_students:
+                    raise HTTPException(status_code=403, detail="You are not enrolled in this session")
+            else:
+                # For course-based sessions, check course enrollment
+                course_id = doc.get("courseId")
+                if course_id:
+                    is_enrolled = await CourseModel.is_student_enrolled(course_id, user_id)
+                    if not is_enrolled:
+                        raise HTTPException(status_code=403, detail="You are not enrolled in this course")
         
         return _session_doc_to_out(doc)
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
+        print(f"Error fetching session: {e}")
         raise HTTPException(status_code=404, detail="Session not found")
 
 
