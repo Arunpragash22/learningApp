@@ -1,24 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { BookOpenIcon, CalendarIcon, MenuIcon, XIcon, HomeIcon, GraduationCapIcon, BellIcon, LogOutIcon, BarChart3Icon, ActivityIcon, ChevronLeftIcon, ChevronRightIcon, TargetIcon, UsersIcon, KeyIcon, FileTextIcon } from 'lucide-react';
+import { BookOpenIcon, CalendarIcon, MenuIcon, XIcon, HomeIcon, GraduationCapIcon, BellIcon, LogOutIcon, BarChart3Icon, ActivityIcon, TargetIcon, UsersIcon, KeyIcon, FileTextIcon, ChevronDownIcon } from 'lucide-react';
 
 export const DashboardLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isAuthenticated, isLoading } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    // Get saved state from localStorage or default to false
-    const saved = localStorage.getItem('sidebarCollapsed');
-    return saved ? JSON.parse(saved) : false;
-  });
-
-  // Save sidebar state to localStorage
-  useEffect(() => {
-    localStorage.setItem('sidebarCollapsed', JSON.stringify(sidebarCollapsed));
-  }, [sidebarCollapsed]);
 
   // Get dashboard route based on user role
   const getDashboardRoute = () => {
@@ -68,7 +58,6 @@ export const DashboardLayout = () => {
         href: '/dashboard/student/engagement',
         icon: ActivityIcon
       });
-      // Student Reports - shows ONLY their own data
       baseItems.push({
         name: 'My Reports',
         href: '/dashboard/student/reports',
@@ -92,7 +81,6 @@ export const DashboardLayout = () => {
         href: user?.role === 'admin' ? '/dashboard/admin/users' : '/dashboard/instructor/users',
         icon: UsersIcon
       });
-      // Instructor Reports - shows ALL student data
       baseItems.push({
         name: 'Reports',
         href: '/dashboard/instructor/reports',
@@ -108,11 +96,7 @@ export const DashboardLayout = () => {
     navigate('/login');
   };
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
-
-  // Check if current path matches the item (including role-based dashboard)
+  // Check if current path matches the item
   const isActive = (href: string) => {
     if (href === getDashboardRoute()) {
       return location.pathname === href || location.pathname === `${href}/home`;
@@ -123,13 +107,13 @@ export const DashboardLayout = () => {
   // Check if profile is active
   const isProfileActive = location.pathname === '/dashboard/profile';
 
-  // Redirect to login if not authenticated (AFTER all hooks)
+  // Redirect to login if not authenticated
   if (!isLoading && !isAuthenticated) {
     navigate('/login');
     return null;
   }
 
-  // Show loading state while checking authentication (AFTER all hooks)
+  // Show loading state
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50">
@@ -140,244 +124,105 @@ export const DashboardLayout = () => {
       </div>
     );
   }
-  return <div className="h-screen flex overflow-hidden bg-[#eff6ff]">
-      {/* Mobile sidebar */}
-      <div className={`md:hidden ${sidebarOpen ? 'fixed inset-0 flex z-40' : 'hidden'}`}>
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75 transition-opacity" onClick={() => setSidebarOpen(false)} />
-        <div className="relative flex-1 flex flex-col max-w-xs w-full bg-gradient-to-br from-[#3B82F6] via-[#2563eb] to-[#1d4ed8] transition-all duration-300 shadow-2xl">
-          <div className="absolute top-0 right-0 -mr-12 pt-2">
-            <button className="ml-1 flex items-center justify-center h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white transition-colors" onClick={() => setSidebarOpen(false)}>
-              <XIcon className="h-6 w-6 text-white" aria-hidden="true" />
-            </button>
-          </div>
-          <div className="flex-1 h-0 pt-6 pb-4 overflow-y-auto">
-            {/* Logo/Brand Section */}
-            <div className="flex-shrink-0 flex items-center px-6 mb-8">
-              <div className="flex items-center space-x-3">
+
+  return (
+    <div className="min-h-screen bg-[#eff6ff]">
+      {/* Top Navigation Bar */}
+      <nav className="bg-gradient-to-r from-[#3B82F6] via-[#2563eb] to-[#1d4ed8] shadow-lg fixed top-0 left-0 right-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo/Brand */}
+            <div className="flex items-center">
+              <Link to={getDashboardRoute()} className="flex items-center space-x-3">
                 <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-                  <GraduationCapIcon className="h-7 w-7 text-white" />
+                  <GraduationCapIcon className="h-6 w-6 text-white" />
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-white">Learning Platform</h2>
-                  <p className="text-xs text-[#dbeafe]">Smart Education</p>
+                <div className="hidden sm:block">
+                  <h1 className="text-lg font-bold text-white">Learning Platform</h1>
                 </div>
-              </div>
+              </Link>
             </div>
-            
-            {/* Navigation */}
-            <nav className="px-3 space-y-1">
-              {navigationItems.map(item => (
+
+            {/* Desktop Navigation Links */}
+            <div className="hidden lg:flex items-center space-x-1">
+              {navigationItems.map((item) => (
                 <Link
                   key={item.name}
                   to={item.href}
-                  onClick={() => setSidebarOpen(false)}
                   className={`
-                    group flex items-center px-4 py-3 text-base font-medium rounded-xl transition-all duration-200
+                    flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200
                     ${
                       isActive(item.href)
-                        ? 'bg-white/20 text-white shadow-lg backdrop-blur-sm border border-white/30'
-                        : 'text-[#dbeafe] hover:bg-white/10 hover:text-white'
+                        ? 'bg-white/20 text-white shadow-md backdrop-blur-sm'
+                        : 'text-white/80 hover:bg-white/10 hover:text-white'
                     }
                   `}
                 >
-                  <item.icon className={`mr-3 h-5 w-5 flex-shrink-0 ${isActive(item.href) ? 'text-white' : 'text-[#bfdbfe]'}`} aria-hidden="true" />
-                  <span className="font-medium">{item.name}</span>
-                  {isActive(item.href) && (
-                    <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
-                  )}
+                  <item.icon className="h-4 w-4 mr-2" />
+                  <span>{item.name}</span>
                 </Link>
               ))}
-            </nav>
-          </div>
-          
-          {/* User Profile Section - Mobile */}
-          <Link
-            to="/dashboard/profile"
-            onClick={() => setSidebarOpen(false)}
-            className={`flex-shrink-0 border-t border-white/20 p-4 backdrop-blur-sm transition-colors ${
-              isProfileActive ? 'bg-white/15' : 'bg-white/5 hover:bg-white/10'
-            }`}
-          >
-            <div className="flex items-center w-full">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-white/30 to-white/10 flex items-center justify-center text-white font-bold text-sm shadow-lg border border-white/20">
-                {userInitials}
-              </div>
-              <div className="ml-3 flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">
-                  {user?.firstName} {user?.lastName}
-                </p>
-                <div className="flex items-center space-x-1 mt-0.5">
-                  <div className="w-1.5 h-1.5 bg-[#93c5fd] rounded-full"></div>
-                  <p className="text-xs font-medium text-[#bfdbfe] capitalize truncate">
-                    {user?.role || 'User'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Link>
-        </div>
-      </div>
-      {/* Static sidebar for desktop */}
-      <div className={`hidden md:flex md:flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-72'}`}>
-        <div className="flex flex-col w-full relative">
-          <div className="flex flex-col h-0 flex-1 bg-gradient-to-br from-[#3B82F6] via-[#2563eb] to-[#1d4ed8] shadow-2xl">
-            <div className="flex-1 flex flex-col pt-6 pb-4 overflow-y-auto">
-              {/* Logo/Brand Section */}
-              <div className={`flex-shrink-0 flex items-center mb-8 transition-all duration-300 ${sidebarCollapsed ? 'px-3 justify-center' : 'px-6'}`}>
-                <div className="flex items-center space-x-3">
-                  <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-sm shadow-lg">
-                    <GraduationCapIcon className="h-7 w-7 text-white" />
-                  </div>
-                  {!sidebarCollapsed && (
-                    <div className="transition-opacity duration-300">
-                      <h2 className="text-xl font-bold text-white">Learning Platform</h2>
-                      <p className="text-xs text-indigo-200 font-medium">Smart Education</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Navigation */}
-              <nav className={`flex-1 space-y-1.5 transition-all duration-300 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
-                {navigationItems.map(item => (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={`
-                      group flex items-center rounded-xl transition-all duration-200
-                      ${
-                        isActive(item.href)
-                          ? 'bg-white/20 text-white shadow-lg backdrop-blur-sm border border-white/30'
-                          : 'text-[#dbeafe] hover:bg-white/10 hover:text-white hover:shadow-md'
-                      }
-                      ${sidebarCollapsed ? 'px-3 py-3 justify-center' : 'px-4 py-3'}
-                    `}
-                    title={sidebarCollapsed ? item.name : undefined}
-                  >
-                    <item.icon
-                      className={`flex-shrink-0 transition-colors ${
-                        isActive(item.href) ? 'text-white' : 'text-[#bfdbfe] group-hover:text-white'
-                      } ${sidebarCollapsed ? 'h-6 w-6' : 'mr-3 h-5 w-5'}`}
-                      aria-hidden="true"
-                    />
-                    {!sidebarCollapsed && (
-                      <>
-                        <span className="font-semibold text-sm">{item.name}</span>
-                        {isActive(item.href) && (
-                          <div className="ml-auto w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                        )}
-                      </>
-                    )}
-                  </Link>
-                ))}
-              </nav>
             </div>
 
-            {/* User Profile Section */}
-            <Link
-              to="/dashboard/profile"
-              className={`flex-shrink-0 border-t border-white/20 backdrop-blur-sm transition-colors cursor-pointer ${
-                isProfileActive ? 'bg-white/15' : 'bg-white/5 hover:bg-white/10'
-              } ${sidebarCollapsed ? 'p-3' : 'p-4'}`}
-              title={sidebarCollapsed ? 'Profile' : undefined}
-            >
-              <div className={`flex items-center transition-all duration-300 ${sidebarCollapsed ? 'justify-center' : ''}`}>
-                <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-white/30 to-white/10 flex items-center justify-center text-white font-bold text-sm shadow-lg border border-white/20 flex-shrink-0">
-                  {userInitials}
-                </div>
-                {!sidebarCollapsed && (
-                  <div className="ml-3 flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">
-                      {user?.firstName} {user?.lastName}
-                    </p>
-                    <div className="flex items-center space-x-1 mt-0.5">
-                      <div className="w-1.5 h-1.5 bg-[#93c5fd] rounded-full"></div>
-                      <p className="text-xs font-medium text-[#bfdbfe] capitalize truncate">
-                        {user?.role || 'User'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Link>
-
-            {/* Toggle Button */}
-            <button
-              onClick={toggleSidebar}
-              className="absolute -right-3 top-1/2 transform -translate-y-1/2 z-10 p-1.5 bg-white rounded-full shadow-lg border-2 border-[#3B82F6] hover:bg-[#eff6ff] transition-colors"
-              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              {sidebarCollapsed ? (
-                <ChevronRightIcon className="h-4 w-4 text-[#3B82F6]" />
-              ) : (
-                <ChevronLeftIcon className="h-4 w-4 text-[#3B82F6]" />
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-      <div className="flex flex-col w-0 flex-1 overflow-hidden">
-        {/* Top navigation bar */}
-        <div className="relative z-10 flex-shrink-0 flex h-16 bg-white shadow">
-          <button className="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 md:hidden" onClick={() => setSidebarOpen(true)}>
-            <MenuIcon className="h-6 w-6" aria-hidden="true" />
-          </button>
-            <div className="flex-1 px-2 sm:px-4 flex justify-between items-center">
-                <div className="flex items-center">
-                  <span className="text-base sm:text-lg font-semibold text-gray-900 hidden sm:block">
-                    {user?.role === 'student' && 'Student Dashboard'}
-                    {user?.role === 'instructor' && 'Instructor Dashboard'}
-                    {user?.role === 'admin' && 'Admin Dashboard'}
-                  </span>
-                  <span className="text-sm font-semibold text-gray-900 sm:hidden">
-                    {user?.role === 'student' && 'Student'}
-                    {user?.role === 'instructor' && 'Instructor'}
-                    {user?.role === 'admin' && 'Admin'}
-                  </span>
-                </div>
-                <div className="ml-2 sm:ml-4 flex items-center md:ml-6 space-x-1 sm:space-x-2">
-              {/* Notifications Button */}
-              <button 
-                className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" 
+            {/* Right Side - User Menu & Notifications */}
+            <div className="flex items-center space-x-2">
+              {/* Notifications */}
+              <button
+                className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/50 transition-colors"
                 aria-label="View notifications"
               >
                 <BellIcon className="h-5 w-5" />
               </button>
-              
-              {/* User Menu Dropdown */}
+
+              {/* User Menu */}
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="flex items-center space-x-2 p-2 rounded-lg bg-white/10 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/50 transition-colors"
                 >
-                  <div className="h-8 w-8 rounded-full bg-[#3B82F6] flex items-center justify-center text-white font-semibold text-sm">
+                  <div className="h-8 w-8 rounded-full bg-white/30 flex items-center justify-center text-white font-semibold text-sm border border-white/40">
                     {userInitials}
                   </div>
-                  <span className="hidden md:block text-sm font-medium text-gray-700">
-                    {user?.firstName} {user?.lastName}
+                  <span className="hidden md:block text-sm font-medium text-white">
+                    {user?.firstName}
                   </span>
+                  <ChevronDownIcon className="hidden md:block h-4 w-4 text-white/70" />
                 </button>
 
-                {/* Dropdown Menu */}
+                {/* User Dropdown */}
                 {userMenuOpen && (
                   <>
                     <div
                       className="fixed inset-0 z-10"
                       onClick={() => setUserMenuOpen(false)}
                     ></div>
-                    <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20">
+                    <div className="absolute right-0 mt-2 w-56 rounded-xl shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20 overflow-hidden">
                       <div className="py-1">
-                        <div className="px-4 py-3 border-b border-gray-200">
-                          <p className="text-sm font-medium text-gray-900">
+                        {/* User Info */}
+                        <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                          <p className="text-sm font-semibold text-gray-900">
                             {user?.firstName} {user?.lastName}
                           </p>
                           <p className="text-xs text-gray-500 capitalize mt-1">
                             {user?.role || 'User'}
                           </p>
                         </div>
+
+                        {/* Profile Link */}
+                        <Link
+                          to="/dashboard/profile"
+                          onClick={() => setUserMenuOpen(false)}
+                          className={`block px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors ${
+                            isProfileActive ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                          }`}
+                        >
+                          View Profile
+                        </Link>
+
+                        {/* Logout */}
                         <button
                           onClick={handleLogout}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                          className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2 transition-colors"
                         >
                           <LogOutIcon className="h-4 w-4" />
                           <span>Logout</span>
@@ -388,24 +233,87 @@ export const DashboardLayout = () => {
                 )}
               </div>
 
-              {/* Logout Button (Mobile - always visible) */}
+              {/* Mobile Menu Button */}
               <button
-                onClick={handleLogout}
-                className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                aria-label="Logout"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2 rounded-lg bg-white/10 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/50 transition-colors"
               >
-                <LogOutIcon className="h-5 w-5" />
+                {mobileMenuOpen ? (
+                  <XIcon className="h-6 w-6" />
+                ) : (
+                  <MenuIcon className="h-6 w-6" />
+                )}
               </button>
             </div>
           </div>
         </div>
-        <main className="flex-1 relative overflow-y-auto focus:outline-none">
-          <div className="py-6 h-full">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 h-full">
-              <Outlet />
+
+        {/* Mobile Navigation Menu */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-t border-white/20">
+            <div className="px-4 py-3 space-y-1 bg-gradient-to-r from-[#3B82F6] via-[#2563eb] to-[#1d4ed8]">
+              {navigationItems.map((item) => (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`
+                    flex items-center px-3 py-3 rounded-lg text-base font-medium transition-all duration-200
+                    ${
+                      isActive(item.href)
+                        ? 'bg-white/20 text-white shadow-md'
+                        : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    }
+                  `}
+                >
+                  <item.icon className="h-5 w-5 mr-3" />
+                  <span>{item.name}</span>
+                  {isActive(item.href) && (
+                    <div className="ml-auto w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                  )}
+                </Link>
+              ))}
+
+              {/* Mobile Profile Link */}
+              <Link
+                to="/dashboard/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`
+                  flex items-center px-3 py-3 rounded-lg text-base font-medium transition-all duration-200 mt-2 border-t border-white/20 pt-4
+                  ${
+                    isProfileActive
+                      ? 'bg-white/20 text-white shadow-md'
+                      : 'text-white/80 hover:bg-white/10 hover:text-white'
+                  }
+                `}
+              >
+                <div className="h-8 w-8 rounded-full bg-white/30 flex items-center justify-center text-white font-semibold text-sm mr-3">
+                  {userInitials}
+                </div>
+                <span>Profile</span>
+              </Link>
+
+              {/* Mobile Logout */}
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center px-3 py-3 rounded-lg text-base font-medium text-red-200 hover:bg-red-500/20 hover:text-red-100 transition-all duration-200"
+              >
+                <LogOutIcon className="h-5 w-5 mr-3" />
+                <span>Logout</span>
+              </button>
             </div>
           </div>
-        </main>
-      </div>
-    </div>;
+        )}
+      </nav>
+
+      {/* Main Content */}
+      <main className="pt-16 min-h-screen">
+        <div className="py-6">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <Outlet />
+          </div>
+        </div>
+      </main>
+    </div>
+  );
 };
