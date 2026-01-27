@@ -325,6 +325,83 @@ export const StudentDashboard = () => {
   }, [isLatencyMonitoring]); // Only trigger when monitoring status changes
 
   // ===========================================================
+  // 🎯 AUTO-CONNECT TO LIVE SESSION (WebSocket only, no Zoom)
+  // ===========================================================
+  const autoJoinSession = (session: Session) => {
+    const studentId = user?.id || `STUDENT_${Date.now()}`;
+    const studentName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown Student';
+    const studentEmail = user?.email || '';
+    const sessionKey = session.zoomMeetingId || session.id;
+    const wsBase = import.meta.env.VITE_WS_URL;
+    
+    console.log('🎯 Auto-connecting to live session:', {
+      sessionTitle: session.title,
+      sessionKey: sessionKey,
+      studentId: studentId
+    });
+    
+    // Close any previous session WebSocket
+    if (sessionWs) {
+      sessionWs.close();
+    }
+    
+    // Include student name and email as query parameters
+    const encodedName = encodeURIComponent(studentName);
+    const encodedEmail = encodeURIComponent(studentEmail);
+    const sessionWsUrl = `${wsBase}/ws/session/${sessionKey}/${studentId}?student_name=${encodedName}&student_email=${encodedEmail}`;
+    
+    // Create WebSocket connection
+    const ws = new WebSocket(sessionWsUrl);
+    
+    ws.onopen = () => {
+      console.log(`✅ Auto-connected to session ${sessionKey} WebSocket`);
+      setConnectedSessionId(sessionKey);
+      localStorage.setItem('connectedSessionId', sessionKey);
+      
+      setSessionQuizStats({
+        questionsReceived: 0,
+        questionsAnswered: 0,
+        correctAnswers: 0,
+      });
+      
+      toast.success(`📶 Auto-connected to live session: ${session.title}`);
+      toast.info(`Network monitoring started automatically`);
+    };
+    
+    ws.onclose = () => {
+      console.log(`🔌 Session ${sessionKey} WebSocket closed`);
+      if (connectedSessionId === sessionKey) {
+        setConnectedSessionId(null);
+        localStorage.removeItem('connectedSessionId');
+      }
+    };
+    
+    ws.onerror = (err) => {
+      console.error("Session WS ERROR:", err);
+    };
+    
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === "quiz") {
+          setIncomingQuiz(data);
+          setSessionQuizStats(prev => ({
+            ...prev,
+            questionsReceived: prev.questionsReceived + 1
+          }));
+          playNotificationSound();
+          toast.info(`📝 New quiz question received!`);
+        }
+      } catch (err) {
+        console.error("WS message parse error:", err);
+      }
+    };
+    
+    setSessionWs(ws);
+  };
+
+  // ===========================================================
   // ⭐ LOAD REAL SESSIONS FROM BACKEND
   // ===========================================================
   useEffect(() => {
@@ -333,12 +410,24 @@ export const StudentDashboard = () => {
       // Show only upcoming and live sessions
       const filtered = allSessions.filter(s => s.status === 'upcoming' || s.status === 'live');
       setSessions(filtered.slice(0, 5)); // Show max 5
+      
+      // 🎯 AUTO-CONNECT to live sessions if not already connected
+      if (!connectedSessionId && user?.id) {
+        const liveSessions = filtered.filter(s => s.status === 'live');
+        
+        if (liveSessions.length > 0) {
+          // Auto-join the first live session
+          const liveSession = liveSessions[0];
+          console.log('🎯 Found live session, auto-connecting:', liveSession.title);
+          autoJoinSession(liveSession);
+        }
+      }
     };
     loadSessions();
     
     const interval = setInterval(loadSessions, 30000); // Refresh every 30s
     return () => clearInterval(interval);
-  }, []);
+  }, [connectedSessionId, user?.id]); // Re-check when connection or user changes
 
   // ===========================================================
   // 🎯 JOIN ZOOM MEETING + CONNECT TO SESSION WEBSOCKET
