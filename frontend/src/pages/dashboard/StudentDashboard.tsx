@@ -270,7 +270,9 @@ export const StudentDashboard = () => {
   
   // 🎯 Session WebSocket state - only joined sessions receive quizzes
   const [sessionWs, setSessionWs] = useState<WebSocket | null>(null);
-  const [connectedSessionId, setConnectedSessionId] = useState<string | null>(null);
+  const [connectedSessionId, setConnectedSessionId] = useState<string | null>(
+    localStorage.getItem('connectedSessionId')
+  );
   
   // 📊 Session quiz tracking - resets each session
   const [sessionQuizStats, setSessionQuizStats] = useState({
@@ -365,6 +367,7 @@ export const StudentDashboard = () => {
     ws.onopen = () => {
       console.log(`✅ Connected to session ${sessionKey} WebSocket`);
       setConnectedSessionId(sessionKey);
+      localStorage.setItem('connectedSessionId', sessionKey); // Persist connection state
       
       // 📊 Reset session quiz stats for new session
       setSessionQuizStats({
@@ -388,6 +391,7 @@ export const StudentDashboard = () => {
       console.log(`🔌 Session ${sessionKey} WebSocket closed`);
       if (connectedSessionId === sessionKey) {
         setConnectedSessionId(null);
+        localStorage.removeItem('connectedSessionId'); // Clear persisted connection state
       }
     };
     

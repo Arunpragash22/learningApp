@@ -45,6 +45,11 @@ export const SessionList = () => {
   const [enrollmentKey, setEnrollmentKey] = useState('');
   const [enrollingSession, setEnrollingSession] = useState<Session | null>(null);
   const [isEnrolling, setIsEnrolling] = useState(false);
+  
+  // Track which session the user is currently connected to
+  const [connectedSessionId, setConnectedSessionId] = useState<string | null>(
+    localStorage.getItem('connectedSessionId')
+  );
 
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
 
@@ -58,6 +63,20 @@ export const SessionList = () => {
     const loadSessions = async () => {
       const all = await sessionService.getAllSessions();  // FIXED
       setSessions(all);
+      
+      // Check if connected session is still live/upcoming
+      const storedSessionId = localStorage.getItem('connectedSessionId');
+      if (storedSessionId) {
+        const connectedSession = all.find(s => 
+          (s.zoomMeetingId === storedSessionId || s.id === storedSessionId)
+        );
+        
+        // Clear connection if session ended or doesn't exist
+        if (!connectedSession || connectedSession.status === 'completed') {
+          localStorage.removeItem('connectedSessionId');
+          setConnectedSessionId(null);
+        }
+      }
     };
 
     loadSessions();
@@ -126,6 +145,11 @@ export const SessionList = () => {
   // ⭐ JOIN LIVE BUTTON
   // ---------------------------------------------------
   const handleJoinSession = (session: Session) => {
+    // Store the session ID in localStorage to track that user is in this meeting
+    const sessionKey = session.zoomMeetingId || session.id;
+    localStorage.setItem('connectedSessionId', sessionKey);
+    setConnectedSessionId(sessionKey);
+    
     if (isInstructor) {
       if (!session.start_url) {
         alert("❌ Zoom host start URL missing");
@@ -522,15 +546,21 @@ export const SessionList = () => {
                         )}
 
                         {/* JOIN BUTTON - For students (upcoming and live) */}
-                        {!isInstructor && (session.status === 'upcoming' || session.status === 'live') && (
-                          <Button
-                            variant={session.status === 'live' ? 'primary' : 'outline'}
-                            leftIcon={<PlayIcon className="h-4 w-4" />}
-                            onClick={() => handleJoinSession(session)}
-                          >
-                            {session.status === 'live' ? 'Join Live' : 'Join Meeting'}
-                          </Button>
-                        )}
+                        {!isInstructor && (session.status === 'upcoming' || session.status === 'live') && (() => {
+                          const sessionKey = session.zoomMeetingId || session.id;
+                          const isInThisMeeting = connectedSessionId === sessionKey;
+                          
+                          return (
+                            <Button
+                              variant={isInThisMeeting ? 'success' : session.status === 'live' ? 'primary' : 'outline'}
+                              leftIcon={isInThisMeeting ? <CheckCircleIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
+                              onClick={() => handleJoinSession(session)}
+                              disabled={isInThisMeeting}
+                            >
+                              {isInThisMeeting ? 'In Meeting' : session.status === 'live' ? 'Join Live' : 'Join Meeting'}
+                            </Button>
+                          );
+                        })()}
 
                         {/* JOIN LIVE - For instructors (live only) */}
                         {isInstructor && session.status === 'live' && (
@@ -658,15 +688,21 @@ export const SessionList = () => {
                   )}
 
                   {/* JOIN BUTTON - For students (upcoming and live) */}
-                  {!isInstructor && (session.status === 'upcoming' || session.status === 'live') && (
-                    <Button
-                      variant={session.status === 'live' ? 'primary' : 'outline'}
-                      leftIcon={<PlayIcon className="h-4 w-4" />}
-                      onClick={() => handleJoinSession(session)}
-                    >
-                      {session.status === 'live' ? 'Join Live' : 'Join Meeting'}
-                    </Button>
-                  )}
+                  {!isInstructor && (session.status === 'upcoming' || session.status === 'live') && (() => {
+                    const sessionKey = session.zoomMeetingId || session.id;
+                    const isInThisMeeting = connectedSessionId === sessionKey;
+                    
+                    return (
+                      <Button
+                        variant={isInThisMeeting ? 'success' : session.status === 'live' ? 'primary' : 'outline'}
+                        leftIcon={isInThisMeeting ? <CheckCircleIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
+                        onClick={() => handleJoinSession(session)}
+                        disabled={isInThisMeeting}
+                      >
+                        {isInThisMeeting ? 'In Meeting' : session.status === 'live' ? 'Join Live' : 'Join Meeting'}
+                      </Button>
+                    );
+                  })()}
 
                   {/* JOIN LIVE - For instructors (live only) */}
                   {isInstructor && session.status === 'live' && (
