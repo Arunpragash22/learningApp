@@ -73,10 +73,10 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitl
                   in Real-Time
                 </span>
               </h1>
-              <p className="text-lg text-white/80 max-w-md leading-relaxed">
+              {/*<p className="text-lg text-white/80 max-w-md leading-relaxed">
                 Transform passive video conferencing into dynamic, personalized 
                 educational experiences with real-time AI insights.
-              </p>
+              </p>*/}
             </div>
             
             {/* Features */}
