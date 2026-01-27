@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
-import { CalendarIcon, ClockIcon, FileTextIcon, PlusIcon, XIcon, UploadIcon } from 'lucide-react';
+import { CalendarIcon, ClockIcon, FileTextIcon, PlusIcon, XIcon, UploadIcon, BookOpenIcon } from 'lucide-react';
 
 export interface SessionMaterial {
   id: string;
