@@ -101,7 +101,7 @@ export const InstructorDashboard = () => {
     try {
       const apiUrl = import.meta.env.VITE_API_URL;
 
-      console.log(`🎯 Triggering question to session: ${meetingId} (${targetSession.title})`);
+      console.log(` Triggering question to session: ${meetingId} (${targetSession.title})`);
       
       const res = await axios.post(
         `${apiUrl}/api/live/trigger/${meetingId}`
@@ -112,7 +112,7 @@ export const InstructorDashboard = () => {
       if (res.data.success) {
         const sentCount = res.data.websocketSent || 0;
         const participants = res.data.participants || [];
-        alert(`🎯 Question sent to ${sentCount} students in "${targetSession.title}"!\n\nParticipants: ${participants.map((p: any) => p.studentId || p.studentName).join(', ') || 'None connected yet'}`);
+        alert(` Question sent to ${sentCount} students in "${targetSession.title}"!\n\nParticipants: ${participants.map((p: any) => p.studentId || p.studentName).join(', ') || 'None connected yet'}`);
       } else {
         alert(`⚠️ ${res.data.message || 'Failed to send question'}`);
       }
@@ -310,7 +310,7 @@ export const InstructorDashboard = () => {
             {sessions.filter(s => s.isStandalone === true).length > 0 && (
               <div>
                 <div className="mb-3 flex items-center gap-2">
-                  <span className="text-lg">🔑</span>
+                  <span className="text-lg"></span>
                   <div>
                     <h3 className="text-md font-semibold text-gray-900">Standalone Meetings</h3>
                     <p className="text-xs text-gray-500">Meetings with enrollment keys</p>
@@ -378,7 +378,7 @@ export const InstructorDashboard = () => {
             {sessions.filter(s => !s.isStandalone).length > 0 && (
               <div>
                 <div className="mb-3 flex items-center gap-2">
-                  <span className="text-lg">📚</span>
+                  <span className="text-lg"></span>
                   <div>
                     <h3 className="text-md font-semibold text-gray-900">Course Meetings</h3>
                     <p className="text-xs text-gray-500">Meetings from your courses</p>

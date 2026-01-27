@@ -656,7 +656,7 @@ export const StudentDashboard = () => {
                 <div className="bg-white shadow rounded-lg">
                   <div className="px-4 py-3 border-b">
                     <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                      <span className="text-indigo-600">🔑</span>
+                      <span className="text-indigo-600"></span>
                       Standalone Meetings
                     </h4>
                     <p className="text-xs text-gray-500 mt-0.5">
@@ -710,7 +710,7 @@ export const StudentDashboard = () => {
                 <div className="bg-white shadow rounded-lg">
                   <div className="px-4 py-3 border-b">
                     <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                      <span className="text-blue-600">📚</span>
+                      <span className="text-blue-600"></span>
                       Course Meetings
                     </h4>
                     <p className="text-xs text-gray-500 mt-0.5">
