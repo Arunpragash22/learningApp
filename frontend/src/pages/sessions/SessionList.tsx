@@ -220,6 +220,10 @@ export const SessionList = () => {
     return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 
+  // Separate meetings into standalone and course-based
+  const standaloneMeetings = filtered.filter(session => session.isStandalone === true);
+  const courseMeetings = filtered.filter(session => !session.isStandalone);
+
   // ---------------------------------------------------
   // Badges
   // ---------------------------------------------------
@@ -438,14 +442,148 @@ export const SessionList = () => {
         )}
       </Card>
 
-      {/* Meeting Results */}
+      {/* Meeting Results - Divided into Sections */}
       {filtered.length === 0 ? (
         <Card className="p-12 text-center">
           <h3 className="text-gray-400 dark:text-gray-500">No meetings found</h3>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {filtered.map((session) => (
+        <div className="space-y-8">
+          
+          {/* Standalone Meetings Section */}
+          {standaloneMeetings.length > 0 && (
+            <div>
+              <div className="mb-4">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <KeyIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                  Standalone Meetings
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Meetings you've enrolled in with an enrollment key
+                </p>
+              </div>
+              <div className="space-y-4">
+                {standaloneMeetings.map((session) => (
+                  <Card key={session.id} className="p-6">
+                    <div className="flex justify-between">
+                      {/* Info */}
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-xl font-semibold dark:text-white">{session.title}</h3>
+                          {getStatusBadge(session.status)}
+                        </div>
+
+                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
+                          <BookOpenIcon className="h-4 w-4" />
+                          {session.course} ({session.courseCode})
+                        </p>
+
+                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
+                          <UsersIcon className="h-4 w-4" />
+                          {session.instructor}
+                        </p>
+
+                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
+                          <CalendarIcon className="h-4 w-4" />
+                          {session.date}
+                        </p>
+
+                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
+                          <ClockIcon className="h-4 w-4" />
+                          {session.time} ({session.duration})
+                        </p>
+                      </div>
+
+                      {/* Buttons */}
+                      <div className="flex flex-col gap-3">
+                        {isInstructor && (
+                          <Button
+                            variant="outline"
+                            leftIcon={<EditIcon className="h-4 w-4" />}
+                            onClick={() => navigate(`/dashboard/sessions/${session.id}/edit`)}
+                          >
+                            Edit
+                          </Button>
+                        )}
+
+                        {isInstructor && session.status === 'upcoming' && (
+                          <Button
+                            variant="primary"
+                            leftIcon={
+                              startingSessionId === session.id 
+                                ? <Loader2Icon className="h-4 w-4 animate-spin" /> 
+                                : <PlayIcon className="h-4 w-4" />
+                            }
+                            onClick={() => handleStartSession(session.id)}
+                            disabled={startingSessionId === session.id}
+                          >
+                            {startingSessionId === session.id ? 'Starting...' : 'Start Meeting'}
+                          </Button>
+                        )}
+
+                        {session.status === 'live' && (
+                          <Button
+                            variant="primary"
+                            leftIcon={<PlayIcon className="h-4 w-4" />}
+                            onClick={() => handleJoinSession(session)}
+                          >
+                            Join Live
+                          </Button>
+                        )}
+
+                        {isInstructor && session.status === 'live' && (
+                          <Button
+                            variant="danger"
+                            leftIcon={
+                              endingSessionId === session.id 
+                                ? <Loader2Icon className="h-4 w-4 animate-spin" /> 
+                                : <StopCircleIcon className="h-4 w-4" />
+                            }
+                            onClick={() => handleEndSession(session.id, session.title)}
+                            disabled={endingSessionId === session.id}
+                          >
+                            {endingSessionId === session.id ? 'Ending...' : 'End Meeting'}
+                          </Button>
+                        )}
+
+                        {isInstructor && (
+                          <Button
+                            variant="outline"
+                            leftIcon={<FileTextIcon className="h-4 w-4" />}
+                            onClick={() => navigate(`/dashboard/sessions/${session.id}/report`)}
+                          >
+                            View Report
+                          </Button>
+                        )}
+
+                        {isInstructor && session.status === 'completed' && (
+                          <div className="flex items-center gap-2 text-blue-600 text-sm">
+                            <CheckCircleIcon className="h-4 w-4" />
+                            <span>Report Available</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Course-Based Meetings Section */}
+          {courseMeetings.length > 0 && (
+            <div>
+              <div className="mb-4">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <BookOpenIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  Course Meetings
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Meetings from your enrolled courses
+                </p>
+              </div>
+              <div className="space-y-4">
+                {courseMeetings.map((session) => (
             <Card key={session.id} className="p-6">
 
               <div className="flex justify-between">
@@ -557,6 +695,9 @@ export const SessionList = () => {
 
             </Card>
           ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
