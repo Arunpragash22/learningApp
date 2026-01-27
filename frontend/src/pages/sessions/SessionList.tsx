@@ -81,7 +81,7 @@ export const SessionList = () => {
 
     loadSessions();
 
-    const interval = setInterval(loadSessions, 30000);
+    const interval = setInterval(loadSessions, 3000); // Refresh every 3 seconds for near real-time updates
     return () => clearInterval(interval);
   }, []);
 

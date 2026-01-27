@@ -38,8 +38,8 @@ export const InstructorDashboard = () => {
     studentName: `${user?.firstName} ${user?.lastName}`,
     userRole: 'instructor', // Instructor data is NOT stored in database (filtered by backend)
     enabled: true, // Always monitor so instructor can SEE their network quality
-    pingInterval: 5000,
-    reportInterval: 15000,
+    pingInterval: 3000, // Ping every 3 seconds for near real-time updates
+    reportInterval: 5000, // Report to server every 5 seconds for near real-time updates
     onQualityChange: handleConnectionQualityChange
   });
 
@@ -61,7 +61,7 @@ export const InstructorDashboard = () => {
     };
     loadSessions();
     
-    const interval = setInterval(loadSessions, 30000); // Refresh every 30s
+    const interval = setInterval(loadSessions, 3000); // Refresh every 3 seconds for near real-time updates
     return () => clearInterval(interval);
   }, []);
 
@@ -537,7 +537,7 @@ export const InstructorDashboard = () => {
           <StudentNetworkMonitor
             sessionId={selectedSession.zoomMeetingId || selectedSession.id}
             autoRefresh={true}
-            refreshInterval={5000}
+            refreshInterval={2000}
             className=""
           />
         ) : sessions.length > 0 ? (

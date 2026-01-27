@@ -149,7 +149,7 @@ const DEMO_STUDENTS: StudentLatency[] = [
 export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
   sessionId,
   autoRefresh = true,
-  refreshInterval = 3000, // Refresh every 3 seconds for real-time updates
+  refreshInterval = 2000, // Refresh every 2 seconds for near real-time updates
   className = '',
   compact = false,
   showDemoData = false

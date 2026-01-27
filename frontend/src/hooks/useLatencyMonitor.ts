@@ -58,8 +58,8 @@ export function useLatencyMonitor(options: LatencyMonitorOptions) {
     studentName,
     userRole = 'student', // Default to student if not specified
     enabled = true,
-    pingInterval = 3000, // Ping every 3 seconds
-    reportInterval = 10000, // Report to server every 10 seconds
+    pingInterval = 3000, // Ping every 3 seconds for near real-time updates
+    reportInterval = 5000, // Report to server every 5 seconds for near real-time updates
     maxSamples = 30,
     onQualityChange
   } = options;

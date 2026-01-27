@@ -103,10 +103,10 @@ export const InstructorAnalytics = () => {
 
       return () => clearInterval(interval);
     } else if (selectedTimeRange === 'session') {
-      // Update every 5 seconds for session view
+      // Update every 3 seconds for near real-time updates
       const interval = setInterval(() => {
         setLastUpdate(new Date());
-      }, 5000);
+      }, 3000);
 
       return () => clearInterval(interval);
     }
