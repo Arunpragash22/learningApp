@@ -159,13 +159,6 @@ export const CourseList = () => {
           {isInstructor && (
             <>
               <Button
-                variant="outline"
-                onClick={() => navigate('/dashboard/instructor/courses')}
-                leftIcon={<SettingsIcon className="h-4 w-4" />}
-              >
-                Manage
-              </Button>
-              <Button
                 onClick={() => navigate('/dashboard/courses/create')}
                 leftIcon={<PlusIcon className="h-4 w-4" />}
               >
@@ -413,10 +406,10 @@ export const CourseList = () => {
                         Create Session
                       </Link>
                       <Link
-                        to={`/dashboard/instructor/courses`}
+                        to={`/dashboard/courses/${course.id}/edit`}
                         className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 transition-colors"
                       >
-                        Manage
+                        Edit
                       </Link>
                     </div>
                   )}
