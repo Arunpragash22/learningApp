@@ -274,12 +274,16 @@ export function useLatencyMonitor(options: LatencyMonitorOptions) {
     };
 
     // Initial ping and immediate report so instructor sees student name immediately
+    // This ensures network parameters are captured immediately when students join
     doPing().then(() => {
-      // Report immediately after first ping (with slight delay to ensure data is collected)
+      // Report immediately after first ping (no delay for instant capture)
+      reportToServer();
+      console.log(`📶 Initial latency report sent immediately for student: ${studentName || studentId}`);
+      
+      // Also send a second report after 500ms to ensure data is visible
       setTimeout(() => {
         reportToServer();
-        console.log(`📶 Initial latency report sent for student: ${studentName || studentId}`);
-      }, 1000);
+      }, 500);
     });
 
     // Set up intervals

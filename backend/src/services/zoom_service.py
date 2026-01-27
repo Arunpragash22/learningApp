@@ -2,6 +2,7 @@
 import os
 from datetime import datetime
 import httpx
+from typing import List, Dict, Optional
 
 ZOOM_ACCOUNT_ID = os.getenv("ZOOM_ACCOUNT_ID")
 ZOOM_CLIENT_ID = os.getenv("ZOOM_CLIENT_ID")
@@ -30,6 +31,63 @@ async def get_zoom_access_token() -> str:
 
         data = resp.json()
         return data["access_token"]
+
+
+async def list_zoom_meetings(
+    page_size: int = 30,
+    page_number: int = 1,
+    type: str = "scheduled"  # scheduled, live, upcoming
+) -> List[Dict]:
+    """
+    List Zoom meetings for the authenticated user.
+    Returns list of meetings with their details.
+    """
+    token = await get_zoom_access_token()
+    
+    params = {
+        "page_size": page_size,
+        "page_number": page_number,
+        "type": type  # scheduled, live, upcoming
+    }
+    
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            "https://api.zoom.us/v2/users/me/meetings",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            params=params,
+        )
+        
+        if resp.status_code != 200:
+            raise ZoomServiceError(f"Failed to list Zoom meetings: {resp.text}")
+        
+        data = resp.json()
+        return data.get("meetings", [])
+
+
+async def get_zoom_meeting(meeting_id: str) -> Optional[Dict]:
+    """
+    Get details of a specific Zoom meeting by ID.
+    """
+    token = await get_zoom_access_token()
+    
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"https://api.zoom.us/v2/meetings/{meeting_id}",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+        )
+        
+        if resp.status_code == 404:
+            return None
+        if resp.status_code != 200:
+            raise ZoomServiceError(f"Failed to get Zoom meeting: {resp.text}")
+        
+        return resp.json()
 
 
 async def create_zoom_meeting(

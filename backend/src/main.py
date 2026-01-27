@@ -230,12 +230,41 @@ async def websocket_session(
             "timestamp": datetime.now().isoformat()
         })
         
-        # Keep connection alive
+        # Keep connection alive and handle reconnection
         while True:
-            data = await websocket.receive_text()
-            # Handle ping/pong for keepalive
-            if data == "ping":
-                await websocket.send_text("pong")
+            try:
+                data = await websocket.receive_text()
+                
+                # Handle ping/pong for keepalive
+                if data == "ping":
+                    await websocket.send_text("pong")
+                elif data.startswith("{"):
+                    # Handle JSON messages (e.g., reconnection)
+                    import json
+                    try:
+                        msg = json.loads(data)
+                        if msg.get("type") == "reconnect":
+                            # Re-register student in session room
+                            result = await ws_manager.join_session_room(
+                                websocket=websocket,
+                                session_id=session_id,
+                                student_id=student_id,
+                                student_name=msg.get("studentName", student_name),
+                                student_email=msg.get("studentEmail", student_email)
+                            )
+                            await websocket.send_json({
+                                "type": "reconnected",
+                                "sessionId": session_id,
+                                "studentId": student_id,
+                                "message": "Successfully reconnected to session",
+                                "participantCount": result.get("participantCount", 0),
+                                "timestamp": datetime.now().isoformat()
+                            })
+                    except:
+                        pass
+            except Exception as e:
+                print(f"Error in WebSocket message handling: {e}")
+                break
 
     except WebSocketDisconnect:
         # Mark student as left when they disconnect

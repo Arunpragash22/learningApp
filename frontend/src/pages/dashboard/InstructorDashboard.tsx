@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/ui/Button";
-import { BarChart3Icon, TargetIcon, PlayIcon, CalendarIcon, ClockIcon, WifiIcon, ActivityIcon, UsersIcon } from "lucide-react";
+import { BarChart3Icon, TargetIcon, PlayIcon, CalendarIcon, ClockIcon, WifiIcon, ActivityIcon, UsersIcon, RefreshCw as RefreshCwIcon } from "lucide-react";
 import { sessionService, Session } from "../../services/sessionService";
 import { Badge } from "../../components/ui/Badge";
 import { useLatencyMonitor, ConnectionQuality } from "../../hooks/useLatencyMonitor";
@@ -61,9 +61,66 @@ export const InstructorDashboard = () => {
     };
     loadSessions();
     
-    const interval = setInterval(loadSessions, 3000); // Refresh every 3 seconds for near real-time updates
+    const interval = setInterval(loadSessions, 2000); // Refresh every 2 seconds for real-time updates
     return () => clearInterval(interval);
   }, []);
+
+  // ================================
+  // ⭐ REAL-TIME PARTICIPANT STATUS VIA WEBSOCKET
+  // Listen for join/leave events and update session list immediately
+  // ================================
+  useEffect(() => {
+    if (!selectedSession) return;
+
+    const sessionKey = selectedSession.zoomMeetingId || selectedSession.id;
+    if (!sessionKey) return;
+
+    // Connect to WebSocket to receive real-time participant updates
+    const wsBase = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL?.replace('/api', '') || 'ws://localhost:8000';
+    const wsUrl = `${wsBase}/ws/session/${sessionKey}/instructor_${user?.id || 'monitor'}`;
+    
+    const ws = new WebSocket(wsUrl);
+    
+    ws.onopen = () => {
+      console.log('✅ Instructor connected to session WebSocket for real-time updates');
+    };
+    
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === "participant_joined" || data.type === "participant_left") {
+          console.log(`👥 Real-time update: ${data.studentName || data.studentId} ${data.type === 'participant_joined' ? 'joined' : 'left'}`);
+          
+          // Immediately refresh sessions to show updated participant count
+          sessionService.getAllSessions().then(allSessions => {
+            const filtered = allSessions.filter(s => s.status === 'upcoming' || s.status === 'live');
+            setSessions(filtered.slice(0, 5));
+            
+            // Update selected session if it's the one being monitored
+            const updatedSession = filtered.find(s => s.id === selectedSession.id);
+            if (updatedSession) {
+              setSelectedSession(updatedSession);
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Instructor WS message error:", e);
+      }
+    };
+    
+    ws.onerror = (err) => {
+      console.error("Instructor WS error:", err);
+    };
+    
+    ws.onclose = () => {
+      console.log('🔌 Instructor WebSocket closed');
+    };
+    
+    return () => {
+      ws.close();
+    };
+  }, [selectedSession, user?.id]);
 
   // ================================
   // ⭐ START/JOIN ZOOM MEETING (INSTRUCTOR)
@@ -172,6 +229,40 @@ export const InstructorDashboard = () => {
               {selectedSession ? 'Trigger Quiz' : 'Select Session'}
             </Button>
           </div>
+
+          {/* 🔄 Sync Zoom Meetings Button */}
+          <Button
+            variant="outline"
+            leftIcon={<RefreshCwIcon className="h-4 w-4" />}
+            onClick={async () => {
+              try {
+                const apiUrl = import.meta.env.VITE_API_URL;
+                const res = await fetch(`${apiUrl}/api/sessions/sync-zoom-meetings`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${localStorage.getItem("access_token")}`
+                  }
+                });
+                
+                if (res.ok) {
+                  const data = await res.json();
+                  toast.success(`✅ Synced ${data.syncedCount} meetings from Zoom`);
+                  // Refresh sessions list
+                  const allSessions = await sessionService.getAllSessions();
+                  const filtered = allSessions.filter(s => s.status === 'upcoming' || s.status === 'live');
+                  setSessions(filtered.slice(0, 5));
+                } else {
+                  toast.error('Failed to sync Zoom meetings');
+                }
+              } catch (error) {
+                console.error('Sync error:', error);
+                toast.error('Error syncing Zoom meetings');
+              }
+            }}
+          >
+            Sync Zoom
+          </Button>
 
           <Link to="/dashboard/instructor/analytics">
             <Button variant="primary" leftIcon={<BarChart3Icon className="h-4 w-4" />}>

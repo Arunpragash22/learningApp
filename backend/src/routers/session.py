@@ -7,7 +7,7 @@ from datetime import datetime
 
 from src.database.connection import db
 from src.middleware.auth import get_current_user, require_instructor
-from src.services.zoom_service import create_zoom_meeting, ZoomServiceError
+from src.services.zoom_service import create_zoom_meeting, list_zoom_meetings, get_zoom_meeting, ZoomServiceError
 from src.models.course import CourseModel
 from src.models.session_report_model import SessionReportModel
 from src.services.email_service import email_service
@@ -643,3 +643,112 @@ async def start_session(
     except Exception as e:
         print(f"Error starting session: {e}")
         raise HTTPException(status_code=500, detail="Failed to start session")
+
+
+@router.post("/sync-zoom-meetings")
+async def sync_zoom_meetings(
+    user: dict = Depends(require_instructor)
+):
+    """
+    Auto-sync previously scheduled Zoom meetings with the platform.
+    Fetches scheduled meetings from Zoom API and creates/updates session records.
+    """
+    try:
+        # Fetch scheduled meetings from Zoom
+        zoom_meetings = await list_zoom_meetings(page_size=100, type="scheduled")
+        
+        synced_count = 0
+        created_count = 0
+        updated_count = 0
+        
+        for zoom_meeting in zoom_meetings:
+            zoom_meeting_id = str(zoom_meeting.get("id"))
+            topic = zoom_meeting.get("topic", "Untitled Meeting")
+            start_time = zoom_meeting.get("start_time")
+            duration = zoom_meeting.get("duration", 60)
+            join_url = zoom_meeting.get("join_url")
+            start_url = zoom_meeting.get("start_url")
+            
+            # Check if session already exists with this Zoom meeting ID
+            existing_session = await db.database.sessions.find_one({
+                "zoomMeetingId": zoom_meeting_id,
+                "instructorId": user["id"]
+            })
+            
+            if existing_session:
+                # Update existing session with latest Zoom data
+                await db.database.sessions.update_one(
+                    {"_id": existing_session["_id"]},
+                    {
+                        "$set": {
+                            "title": topic,
+                            "join_url": join_url,
+                            "start_url": start_url,
+                            "duration": f"{duration} minutes",
+                            "updatedAt": datetime.utcnow()
+                        }
+                    }
+                )
+                updated_count += 1
+            else:
+                # Create new session from Zoom meeting
+                # Parse start_time to extract date and time
+                try:
+                    if start_time:
+                        dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+                        date_str = dt.strftime("%Y-%m-%d")
+                        time_str = dt.strftime("%I:%M %p")
+                    else:
+                        date_str = datetime.utcnow().strftime("%Y-%m-%d")
+                        time_str = datetime.utcnow().strftime("%I:%M %p")
+                except:
+                    date_str = datetime.utcnow().strftime("%Y-%m-%d")
+                    time_str = datetime.utcnow().strftime("%I:%M %p")
+                
+                new_session = {
+                    "title": topic,
+                    "course": "Synced from Zoom",
+                    "courseCode": "ZOOM_SYNC",
+                    "courseId": None,
+                    "instructor": f"{user.get('firstName', '')} {user.get('lastName', '')}".strip() or user.get("email", "Unknown Instructor"),
+                    "instructorId": user["id"],
+                    "date": date_str,
+                    "time": time_str,
+                    "startTime": dt.strftime("%H:%M") if start_time else None,
+                    "endTime": None,
+                    "duration": f"{duration} minutes",
+                    "status": "upcoming",
+                    "participants": 0,
+                    "expectedParticipants": 0,
+                    "engagement": 0,
+                    "recordingAvailable": False,
+                    "zoomMeetingId": zoom_meeting_id,
+                    "join_url": join_url,
+                    "start_url": start_url,
+                    "isStandalone": True,  # Mark as standalone since it's synced
+                    "enrollmentKey": None,
+                    "enrolledStudents": [],
+                    "createdAt": datetime.utcnow(),
+                    "syncedFromZoom": True
+                }
+                
+                await db.database.sessions.insert_one(new_session)
+                created_count += 1
+            
+            synced_count += 1
+        
+        return {
+            "success": True,
+            "message": f"Synced {synced_count} meetings from Zoom",
+            "syncedCount": synced_count,
+            "createdCount": created_count,
+            "updatedCount": updated_count
+        }
+        
+    except ZoomServiceError as ze:
+        raise HTTPException(status_code=400, detail=str(ze))
+    except Exception as e:
+        print(f"Error syncing Zoom meetings: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to sync Zoom meetings: {str(e)}")

@@ -502,14 +502,46 @@ export const StudentDashboard = () => {
     
     ws.onclose = () => {
       console.log(`🔌 Session ${sessionKey} WebSocket closed`);
+      
+      // Auto-reconnect logic for maintaining real-time consistency
       if (connectedSessionId === sessionKey) {
+        console.log('🔄 Attempting to reconnect WebSocket...');
+        
+        // Attempt reconnection after 1 second
+        setTimeout(() => {
+          if (connectedSessionId === sessionKey) { // Only reconnect if still supposed to be connected
+            console.log('🔄 Reconnecting to session WebSocket...');
+            const reconnectWs = new WebSocket(sessionWsUrl);
+            
+            reconnectWs.onopen = () => {
+              console.log(`✅ Reconnected to session ${sessionKey} WebSocket`);
+              setSessionWs(reconnectWs);
+              
+              // Re-register with server
+              reconnectWs.send(JSON.stringify({
+                type: "reconnect",
+                sessionId: sessionKey,
+                studentId: studentId,
+                studentName: studentName,
+                studentEmail: studentEmail
+              }));
+            };
+            
+            reconnectWs.onmessage = ws.onmessage; // Reuse same message handler
+            reconnectWs.onerror = ws.onerror;
+            reconnectWs.onclose = ws.onclose; // Will trigger reconnection again if needed
+          }
+        }, 1000);
+      } else {
+        // Not supposed to be connected, clear state
         setConnectedSessionId(null);
-        localStorage.removeItem('connectedSessionId'); // Clear persisted connection state
+        localStorage.removeItem('connectedSessionId');
       }
     };
     
     ws.onerror = (err) => {
       console.error("Session WS ERROR:", err);
+      // Error will trigger onclose, which handles reconnection
     };
     
     ws.onmessage = (event) => {
@@ -544,6 +576,11 @@ export const StudentDashboard = () => {
           setIncomingQuiz(data);
         } else if (data.type === "session_joined") {
           console.log("✅ Session join confirmed:", data);
+        } else if (data.type === "participant_joined" || data.type === "participant_left") {
+          // Real-time participant status update - refresh session list to show updated participant count
+          console.log(`👥 Participant ${data.type === 'participant_joined' ? 'joined' : 'left'}:`, data.studentName || data.studentId);
+          // Optionally refresh sessions to show updated participant counts
+          // This will be handled by the auto-refresh interval already in place
         }
       } catch (e) {
         console.error("Session WS JSON ERROR:", e);
