@@ -147,11 +147,12 @@ export const LiveSession = () => {
     studentId: user?.id,
     studentName: `${user?.firstName} ${user?.lastName}`,
     studentEmail: user?.email,
-    autoConnect: !isInstructor && !!sessionId && !!user?.id,
+    autoConnect: false, // 🎯 Disabled - must be explicitly enabled when student clicks "Join Now"
     onQuizReceived: handleQuizReceived
   });
 
   // 🔔 Real-time Notifications for Students (fallback/legacy)
+  // Disabled auto-connect - only connect when student joins
   const {
     isConnected: isNotificationConnected,
     currentNotification,
@@ -164,7 +165,7 @@ export const LiveSession = () => {
     studentId: user?.id,
     studentName: `${user?.firstName} ${user?.lastName}`,
     studentEmail: user?.email,
-    autoConnect: !isInstructor && !!sessionId // Auto-connect for students only
+    autoConnect: false // 🎯 Disabled - must be explicitly enabled when student joins
   });
 
   // 📶 WebRTC-aware Connection Latency Monitoring
@@ -175,18 +176,22 @@ export const LiveSession = () => {
     }
   }, []);
 
+  // 📶 Network monitoring state - only enabled when student actually joins Zoom meeting
+  const [networkMonitoringEnabled, setNetworkMonitoringEnabled] = useState(false);
+  
   const {
     isMonitoring: isLatencyMonitoring,
     currentRtt,
     quality: connectionQuality,
     stats: latencyStats,
-    shouldAdjustEngagement
+    shouldAdjustEngagement,
+    stopMonitoring
   } = useLatencyMonitor({
     sessionId: sessionId || null,
     studentId: user?.id,
     studentName: `${user?.firstName} ${user?.lastName}`,
     userRole: user?.role || 'student', // Only student data is stored in database
-    enabled: !!sessionId && !!user?.id, // Enable for both students and instructors
+    enabled: networkMonitoringEnabled && !!sessionId && !!user?.id, // Enable ONLY when explicitly enabled
     pingInterval: 3000, // Ping every 3 seconds for near real-time updates
     reportInterval: 5000, // Report to server every 5 seconds for near real-time updates
     onQualityChange: handleConnectionQualityChange
@@ -367,43 +372,10 @@ export const LiveSession = () => {
     }
   }, [sessionId]);
 
-  // 🎯 Auto-join session for students when they enter the page
-  // This records participation in the database (for fallback/tracking)
-  // The Socket.IO connection (useSessionSocket) handles real-time quiz delivery
-  useEffect(() => {
-    if (isInstructor || !sessionId || !user?.id) {
-      return;
-    }
-
-    const joinSessionOnEntry = async () => {
-      setIsJoiningSession(true);
-      try {
-        const studentName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Unknown Student';
-        const result = await quizService.joinSession(sessionId, studentName, user?.email);
-        
-        if (result.success) {
-          console.log('✅ Successfully joined session (HTTP):', result);
-          setHasJoinedSession(true);
-          // Don't show toast here - Socket.IO will show when fully connected
-        } else {
-          console.error('Failed to join session (HTTP):', result.message);
-        }
-      } catch (error) {
-        console.error('Error joining session (HTTP):', error);
-      } finally {
-        setIsJoiningSession(false);
-      }
-    };
-
-    joinSessionOnEntry();
-
-    // Cleanup: leave session when student navigates away
-    return () => {
-      if (sessionId && user?.id) {
-        quizService.leaveSession(sessionId).catch(console.error);
-      }
-    };
-  }, [sessionId, user?.id, isInstructor, user?.firstName, user?.lastName, user?.email]);
+  // 🎯 REMOVED: Auto-join session on page load
+  // Network monitoring and session joining must start ONLY when student clicks "Join Now"
+  // Students must explicitly join meetings - no automatic connections
+  // ===========================================================
 
   // 🎯 Show connection status for students
   useEffect(() => {
@@ -416,68 +388,10 @@ export const LiveSession = () => {
     }
   }, [hasJoinedSessionRoom, isSessionConnected, participantCount, sessionSocketError, isInstructor, sessionId, user?.id]);
 
-  // Personalized question polling for students
-  useEffect(() => {
-    if (isInstructor || !sessionId || !user?.id) {
-      return;
-    }
-
-    let isMounted = true;
-    let pollInterval: NodeJS.Timeout | null = null;
-
-    const pollForAssignedQuestion = async () => {
-      if (!isMounted) return;
-
-      try {
-        const assignment = await quizService.getAssignedQuestion(sessionId, user.id);
-        
-        // Handle case where student hasn't joined session
-        if (assignment.notParticipant) {
-          console.warn('Student not a participant - cannot receive questions');
-          // Don't stop polling - student might have rejoined
-          return;
-        }
-        
-        if (assignment.active && assignment.question && !assignment.completed) {
-          // Student has been assigned a question
-          console.log('Student received assigned question:', assignment.question);
-          setActiveQuestion(assignment.question as Question);
-          setShowQuestions(false);
-          setAnswerSubmitted(false);
-          setShowPerformance(false);
-          setQuizPerformance(null);
-          questionStartTime.current = Date.now();
-          
-          // Stop polling once question is received
-          if (pollInterval) {
-            clearInterval(pollInterval);
-            pollInterval = null;
-          }
-        } else if (assignment.completed) {
-          // Question was already answered
-          if (pollInterval) {
-            clearInterval(pollInterval);
-            pollInterval = null;
-          }
-        }
-      } catch (error) {
-        console.error('Error polling for assigned question:', error);
-      }
-    };
-
-    // Poll every 2 seconds for assigned questions
-    pollInterval = setInterval(pollForAssignedQuestion, 2000);
-    
-    // Initial poll
-    pollForAssignedQuestion();
-
-    return () => {
-      isMounted = false;
-      if (pollInterval) {
-        clearInterval(pollInterval);
-      }
-    };
-  }, [sessionId, user?.id, isInstructor]);
+  // 🎯 REMOVED: Personalized question polling for students
+  // Questions are now delivered via WebSocket events (real-time, no polling needed)
+  // This eliminates unnecessary API calls and reduces latency
+  // Questions will be received through useSessionSocket hook when student joins
 
   // Update engagement clusters when question is triggered
   useEffect(() => {
@@ -494,11 +408,11 @@ export const LiveSession = () => {
     }
   }, [activeQuestion, sessionId, isInstructor]);
 
-  // Poll for quiz performance (instructor view)
+  // 🎯 OPTIMIZED: Performance fetching - on-demand instead of polling
+  // Fetch performance when instructor opens performance view (not continuous polling)
   useEffect(() => {
-    if (activeQuestion && isInstructor && !showPerformance && sessionId) {
-      console.log('Starting performance polling for question:', activeQuestion.id, 'session:', sessionId);
-      const interval = setInterval(async () => {
+    if (activeQuestion && isInstructor && showPerformance && sessionId) {
+      const fetchPerformance = async () => {
         try {
           const performance = await quizService.getQuizPerformance(activeQuestion.id, sessionId);
           console.log('Performance data received:', performance);
@@ -518,14 +432,12 @@ export const LiveSession = () => {
             setClusters(updatedClusters);
           }
         } catch (error) {
-          console.error('Error in performance polling:', error);
+          console.error('Error fetching performance:', error);
         }
-      }, 2000); // Poll every 2 seconds
-
-      return () => {
-        console.log('Stopping performance polling');
-        clearInterval(interval);
       };
+      
+      // Fetch once when performance view is opened
+      fetchPerformance();
     }
   }, [activeQuestion, isInstructor, showPerformance, sessionId]);
 

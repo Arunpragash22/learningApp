@@ -296,113 +296,45 @@ export const StudentDashboard = () => {
         : user.firstName || user.lastName || user.email?.split('@')[0] || 'Student')
     : 'Student';
 
+  // 📶 Network monitoring state - only enabled when student actually joins Zoom meeting
+  const [networkMonitoringEnabled, setNetworkMonitoringEnabled] = useState(false);
+  
   const {
     isMonitoring: isLatencyMonitoring,
     currentRtt,
     quality: connectionQuality,
     stats: latencyStats,
+    stopMonitoring,
   } = useLatencyMonitor({
     sessionId: connectedSessionId, // Only monitor when connected to a session
     studentId: user?.id,
     studentName: studentDisplayName, // Use proper display name
     userRole: 'student', // Only student data is stored in database
-    enabled: !!connectedSessionId && !!user?.id, // Enable only when in a session
+    enabled: networkMonitoringEnabled && !!connectedSessionId && !!user?.id, // Enable ONLY when explicitly enabled AND in a session
     pingInterval: 3000, // Ping every 3 seconds for faster updates
     reportInterval: 5000, // Report to server every 5 seconds
     onQualityChange: handleConnectionQualityChange
   });
   
-  // Notify when monitoring starts
+  // Notify when monitoring starts (only when explicitly enabled)
   useEffect(() => {
-    if (isLatencyMonitoring && connectedSessionId) {
+    if (isLatencyMonitoring && connectedSessionId && networkMonitoringEnabled) {
       console.log('📶 Network monitoring ACTIVE:', {
         sessionId: connectedSessionId,
         studentId: user?.id,
         studentName: studentDisplayName
       });
-      toast.success(`📶 Network monitoring active for session ${connectedSessionId}`);
     }
-  }, [isLatencyMonitoring]); // Only trigger when monitoring status changes
+  }, [isLatencyMonitoring, networkMonitoringEnabled]); // Only trigger when monitoring status changes
 
   // ===========================================================
-  // 🎯 AUTO-CONNECT TO LIVE SESSION (WebSocket only, no Zoom)
+  // 🎯 REMOVED: AUTO-CONNECT TO LIVE SESSION
+  // Network monitoring must start ONLY when student clicks "Join Now"
+  // Students must explicitly join meetings - no automatic connections
   // ===========================================================
-  const autoJoinSession = (session: Session) => {
-    const studentId = user?.id || `STUDENT_${Date.now()}`;
-    const studentName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown Student';
-    const studentEmail = user?.email || '';
-    const sessionKey = session.zoomMeetingId || session.id;
-    const wsBase = import.meta.env.VITE_WS_URL;
-    
-    console.log('🎯 Auto-connecting to live session:', {
-      sessionTitle: session.title,
-      sessionKey: sessionKey,
-      studentId: studentId
-    });
-    
-    // Close any previous session WebSocket
-    if (sessionWs) {
-      sessionWs.close();
-    }
-    
-    // Include student name and email as query parameters
-    const encodedName = encodeURIComponent(studentName);
-    const encodedEmail = encodeURIComponent(studentEmail);
-    const sessionWsUrl = `${wsBase}/ws/session/${sessionKey}/${studentId}?student_name=${encodedName}&student_email=${encodedEmail}`;
-    
-    // Create WebSocket connection
-    const ws = new WebSocket(sessionWsUrl);
-    
-    ws.onopen = () => {
-      console.log(`✅ Auto-connected to session ${sessionKey} WebSocket`);
-      setConnectedSessionId(sessionKey);
-      localStorage.setItem('connectedSessionId', sessionKey);
-      
-      setSessionQuizStats({
-        questionsReceived: 0,
-        questionsAnswered: 0,
-        correctAnswers: 0,
-      });
-      
-      toast.success(`📶 Auto-connected to live session: ${session.title}`);
-      toast.info(`Network monitoring started automatically`);
-    };
-    
-    ws.onclose = () => {
-      console.log(`🔌 Session ${sessionKey} WebSocket closed`);
-      if (connectedSessionId === sessionKey) {
-        setConnectedSessionId(null);
-        localStorage.removeItem('connectedSessionId');
-      }
-    };
-    
-    ws.onerror = (err) => {
-      console.error("Session WS ERROR:", err);
-    };
-    
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === "quiz") {
-          setIncomingQuiz(data);
-          setSessionQuizStats(prev => ({
-            ...prev,
-            questionsReceived: prev.questionsReceived + 1
-          }));
-          playNotificationSound();
-          toast.info(`📝 New quiz question received!`);
-        }
-      } catch (err) {
-        console.error("WS message parse error:", err);
-      }
-    };
-    
-    setSessionWs(ws);
-  };
 
   // ===========================================================
-  // ⭐ LOAD REAL SESSIONS FROM BACKEND
+  // ⭐ LOAD REAL SESSIONS FROM BACKEND - Event-driven updates via WebSocket
   // ===========================================================
   useEffect(() => {
     const loadSessions = async () => {
@@ -410,24 +342,14 @@ export const StudentDashboard = () => {
       // Show only upcoming and live sessions
       const filtered = allSessions.filter(s => s.status === 'upcoming' || s.status === 'live');
       setSessions(filtered.slice(0, 5)); // Show max 5
-      
-      // 🎯 AUTO-CONNECT to live sessions if not already connected
-      if (!connectedSessionId && user?.id) {
-        const liveSessions = filtered.filter(s => s.status === 'live');
-        
-        if (liveSessions.length > 0) {
-          // Auto-join the first live session
-          const liveSession = liveSessions[0];
-          console.log('🎯 Found live session, auto-connecting:', liveSession.title);
-          autoJoinSession(liveSession);
-        }
-      }
     };
+    
+    // Initial load only - no polling
     loadSessions();
     
-    const interval = setInterval(loadSessions, 3000); // Refresh every 3 seconds for near real-time updates
-    return () => clearInterval(interval);
-  }, [connectedSessionId, user?.id]); // Re-check when connection or user changes
+    // Sessions will be updated via WebSocket events (session_started, meeting_ended, etc.)
+    // No polling interval - updates are event-driven
+  }, []); // Only load once on mount
 
   // ===========================================================
   // 🎯 JOIN ZOOM MEETING + CONNECT TO SESSION WEBSOCKET
@@ -476,9 +398,12 @@ export const StudentDashboard = () => {
     
     ws.onopen = () => {
       console.log(`✅ Connected to session ${sessionKey} WebSocket`);
-      console.log(`📶 Network monitoring will start automatically`);
       setConnectedSessionId(sessionKey);
-      localStorage.setItem('connectedSessionId', sessionKey); // Persist connection state
+      localStorage.setItem('connectedSessionId', sessionKey);
+      
+      // 🎯 START NETWORK MONITORING ONLY AFTER SUCCESSFUL WEBSOCKET CONNECTION
+      // This ensures monitoring starts only when student actually joins
+      setNetworkMonitoringEnabled(true);
       
       // 📊 Reset session quiz stats for new session
       setSessionQuizStats({
@@ -496,14 +421,26 @@ export const StudentDashboard = () => {
       playNotificationSound();
       
       // Show success notification
-      toast.success(`✅ Joined "${session.title}" - You'll receive quiz notifications`);
-      toast.info(`📶 Network monitoring started for session ${sessionKey}`);
+      toast.success(`✅ Joined "${session.title}" - Network monitoring started`);
     };
     
     ws.onclose = () => {
       console.log(`🔌 Session ${sessionKey} WebSocket closed`);
       
-      // Auto-reconnect logic for maintaining real-time consistency
+      // 🎯 STOP NETWORK MONITORING when WebSocket closes (student left meeting)
+      if (networkMonitoringEnabled) {
+        stopMonitoring();
+        setNetworkMonitoringEnabled(false);
+        console.log('📶 Network monitoring stopped - student left meeting');
+      }
+      
+      // Clear connection state
+      if (connectedSessionId === sessionKey) {
+        setConnectedSessionId(null);
+        localStorage.removeItem('connectedSessionId');
+      }
+      
+      // Auto-reconnect logic for maintaining real-time consistency (only if still in session)
       if (connectedSessionId === sessionKey) {
         console.log('🔄 Attempting to reconnect WebSocket...');
         
@@ -517,6 +454,9 @@ export const StudentDashboard = () => {
               console.log(`✅ Reconnected to session ${sessionKey} WebSocket`);
               setSessionWs(reconnectWs);
               
+              // Re-enable network monitoring on successful reconnect
+              setNetworkMonitoringEnabled(true);
+              
               // Re-register with server
               reconnectWs.send(JSON.stringify({
                 type: "reconnect",
@@ -529,13 +469,9 @@ export const StudentDashboard = () => {
             
             reconnectWs.onmessage = ws.onmessage; // Reuse same message handler
             reconnectWs.onerror = ws.onerror;
-            reconnectWs.onclose = ws.onclose; // Will trigger reconnection again if needed
+            reconnectWs.onclose = ws.onclose; // Will trigger cleanup again if needed
           }
         }, 1000);
-      } else {
-        // Not supposed to be connected, clear state
-        setConnectedSessionId(null);
-        localStorage.removeItem('connectedSessionId');
       }
     };
     
@@ -587,6 +523,11 @@ export const StudentDashboard = () => {
             description: "The host has ended the meeting",
             duration: 5000,
           });
+          // Stop network monitoring
+          if (networkMonitoringEnabled) {
+            stopMonitoring();
+            setNetworkMonitoringEnabled(false);
+          }
           // Clear connection state
           setConnectedSessionId(null);
           localStorage.removeItem('connectedSessionId');
@@ -595,18 +536,20 @@ export const StudentDashboard = () => {
             sessionWs.close();
             setSessionWs(null);
           }
-          // Refresh sessions to show updated status
-          sessionService.getAllSessions().then(all => {
-            const filtered = all.filter(s => s.status === 'upcoming' || s.status === 'live');
-            setSessions(filtered.slice(0, 5));
-          });
+          // Update sessions list (event-driven, no API call needed)
+          setSessions(prev => prev.map(s => 
+            (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId) 
+              ? { ...s, status: 'completed' as const }
+              : s
+          ).filter(s => s.status === 'upcoming' || s.status === 'live').slice(0, 5));
         } else if (data.type === "session_started") {
           console.log("🟢 [StudentDashboard] Session started event received:", data);
-          // Refresh sessions to show updated status (live/ongoing)
-          sessionService.getAllSessions().then(all => {
-            const filtered = all.filter(s => s.status === 'upcoming' || s.status === 'live');
-            setSessions(filtered.slice(0, 5));
-          });
+          // Update sessions list (event-driven, no API call needed)
+          setSessions(prev => prev.map(s => 
+            (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId) 
+              ? { ...s, status: 'live' as const }
+              : s
+          ));
         }
       } catch (e) {
         console.error("Session WS JSON ERROR:", e);
@@ -616,14 +559,20 @@ export const StudentDashboard = () => {
     setSessionWs(ws);
   };
 
-  // Cleanup session WebSocket on unmount
+  // Cleanup session WebSocket and network monitoring on unmount or when leaving
   useEffect(() => {
     return () => {
+      // Stop network monitoring when component unmounts
+      if (networkMonitoringEnabled) {
+        stopMonitoring();
+        setNetworkMonitoringEnabled(false);
+      }
+      // Close WebSocket connection
       if (sessionWs) {
         sessionWs.close();
       }
     };
-  }, [sessionWs]);
+  }, [sessionWs, networkMonitoringEnabled, stopMonitoring]);
 
   // ===========================================================
   // ⭐ GLOBAL WebSocket — Receive Notifications (fallback)

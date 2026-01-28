@@ -64,39 +64,49 @@ export const SessionList = () => {
         : user.firstName || user.lastName || user.email?.split('@')[0] || 'Student')
     : 'Student';
   
+  // 📶 Network monitoring state - only enabled when student actually joins Zoom meeting
+  const [networkMonitoringEnabled, setNetworkMonitoringEnabled] = useState(false);
+  
   const {
     isMonitoring: isLatencyMonitoring,
     currentRtt,
     quality: connectionQuality,
     stats: latencyStats,
+    stopMonitoring,
   } = useLatencyMonitor({
     sessionId: connectedSessionId, // Only monitor when connected to a session
     studentId: user?.id,
     studentName: studentDisplayName,
     userRole: 'student', // Only student data is stored in database
-    enabled: !!connectedSessionId && !!user?.id && !isInstructor, // Enable only when in a session and not instructor
+    enabled: networkMonitoringEnabled && !!connectedSessionId && !!user?.id && !isInstructor, // Enable ONLY when explicitly enabled
     pingInterval: 3000, // Ping every 3 seconds for faster updates
     reportInterval: 5000, // Report to server every 5 seconds
   });
   
-  // Cleanup WebSocket on unmount
+  // Cleanup WebSocket and network monitoring on unmount or when leaving
   useEffect(() => {
     return () => {
+      // Stop network monitoring when component unmounts
+      if (networkMonitoringEnabled) {
+        stopMonitoring();
+        setNetworkMonitoringEnabled(false);
+      }
+      // Close WebSocket connection
       if (sessionWs) {
         sessionWs.close();
       }
     };
-  }, [sessionWs]);
+  }, [sessionWs, networkMonitoringEnabled, stopMonitoring]);
 
   // Note: Backend now handles enrollment tracking via enrolledStudents array
   // localStorage is no longer needed for tracking enrollments
 
   // ---------------------------------------------------
-  // ⭐ Load sessions from BACKEND
+  // ⭐ Load sessions from BACKEND - Event-driven updates only
   // ---------------------------------------------------
   useEffect(() => {
     const loadSessions = async () => {
-      const all = await sessionService.getAllSessions();  // FIXED
+      const all = await sessionService.getAllSessions();
       setSessions(all);
       
       // Check if connected session is still live/upcoming
@@ -114,91 +124,23 @@ export const SessionList = () => {
             sessionWs.close();
             setSessionWs(null);
           }
-        } else if (!isInstructor && !sessionWs) {
-          // Restore WebSocket connection if student is already connected but WebSocket is missing
-          // This happens when navigating back to this page
-          const studentId = user?.id || `STUDENT_${Date.now()}`;
-          const studentName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown Student';
-          const studentEmail = user?.email || '';
-          const wsBase = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL?.replace('/api', '') || 'ws://localhost:8000';
-          
-          const encodedName = encodeURIComponent(studentName);
-          const encodedEmail = encodeURIComponent(studentEmail);
-          const sessionWsUrl = `${wsBase}/ws/session/${storedSessionId}/${studentId}?student_name=${encodedName}&student_email=${encodedEmail}`;
-          
-          console.log(`🔄 [SessionList] Restoring WebSocket connection: ${sessionWsUrl}`);
-          
-          const ws = new WebSocket(sessionWsUrl);
-          
-          ws.onopen = () => {
-            console.log(`✅ [SessionList] Restored WebSocket connection to session ${storedSessionId}`);
-            setSessionWs(ws);
-          };
-          
-          ws.onclose = () => {
-            console.log(`🔌 [SessionList] Restored WebSocket closed`);
-            if (connectedSessionId === storedSessionId) {
-              setConnectedSessionId(null);
-              localStorage.removeItem('connectedSessionId');
-            }
-          };
-          
-          ws.onerror = (err) => {
-            console.error("[SessionList] Restored WS ERROR:", err);
-          };
-          
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === "quiz") {
-              toast.success("📝 New Quiz Question!", {
-                description: data.question || "Answer the quiz now!",
-                duration: 10000,
-              });
-            } else if (data.type === "meeting_ended") {
-              console.log("🔴 [SessionList] Meeting ended event received:", data);
-              toast.info("🔴 Meeting has ended", {
-                description: "The host has ended the meeting",
-                duration: 5000,
-              });
-              // Clear connection state
-              setConnectedSessionId(null);
-              localStorage.removeItem('connectedSessionId');
-              // Refresh sessions to show updated status
-              sessionService.getAllSessions().then(all => setSessions(all));
-            } else if (data.type === "session_started") {
-              console.log("🟢 [SessionList] Session started event received:", data);
-              // Refresh sessions to show updated status (live/ongoing)
-              sessionService.getAllSessions().then(all => {
-                setSessions(all);
-                // Update connected session if it matches
-                if (data.sessionId || data.zoomMeetingId) {
-                  const updatedSession = all.find(s => 
-                    s.id === data.sessionId || 
-                    s.zoomMeetingId === data.zoomMeetingId ||
-                    s.zoomMeetingId === data.sessionId
-                  );
-                  if (updatedSession && updatedSession.status === 'live') {
-                    setConnectedSessionId(updatedSession.zoomMeetingId || updatedSession.id);
-                  }
-                }
-              });
-            }
-          } catch (e) {
-            console.error("[SessionList] Restored WS JSON ERROR:", e);
+          // Stop network monitoring if session ended
+          if (networkMonitoringEnabled) {
+            stopMonitoring();
+            setNetworkMonitoringEnabled(false);
           }
-        };
-          
-          setSessionWs(ws);
         }
+        // NOTE: We do NOT auto-restore WebSocket connections
+        // Students must explicitly click "Join Now" to start monitoring
       }
     };
 
+    // Initial load only - no polling
     loadSessions();
-
-    const interval = setInterval(loadSessions, 3000); // Refresh every 3 seconds for near real-time updates
-    return () => clearInterval(interval);
-  }, [user?.id, isInstructor, sessionWs, connectedSessionId]);
+    
+    // Sessions will be updated via WebSocket events (session_started, meeting_ended, etc.)
+    // No polling interval - updates are event-driven
+  }, [user?.id, isInstructor]);
 
   // ---------------------------------------------------
   // ⭐ ENROLL IN SESSION (Students only - for standalone sessions)
@@ -287,20 +229,24 @@ export const SessionList = () => {
     const studentEmail = user?.email || '';
     const wsBase = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL?.replace('/api', '') || 'ws://localhost:8000';
     
-    // Open Zoom meeting
-    window.open(session.join_url, '_blank');
+    // Open Zoom meeting in new tab
+    const zoomWindow = window.open(session.join_url, '_blank');
     
-    // 🎯 Connect to session-specific WebSocket (same logic as StudentDashboard)
+    // 🎯 Connect to session-specific WebSocket
     const encodedName = encodeURIComponent(studentName);
     const encodedEmail = encodeURIComponent(studentEmail);
     const sessionWsUrl = `${wsBase}/ws/session/${sessionKey}/${studentId}?student_name=${encodedName}&student_email=${encodedEmail}`;
     
     console.log(`🔗 [SessionList] Connecting to session WebSocket: ${sessionWsUrl}`);
     
-    // Close any previous session WebSocket
+    // Close any previous session WebSocket and stop monitoring
     if (sessionWs) {
       console.log("🔌 [SessionList] Closing previous session WebSocket");
       sessionWs.close();
+    }
+    if (networkMonitoringEnabled) {
+      stopMonitoring();
+      setNetworkMonitoringEnabled(false);
     }
     
     // Create new session WebSocket
@@ -311,12 +257,22 @@ export const SessionList = () => {
       setConnectedSessionId(sessionKey);
       localStorage.setItem('connectedSessionId', sessionKey);
       
+      // 🎯 START NETWORK MONITORING ONLY AFTER SUCCESSFUL WEBSOCKET CONNECTION
+      setNetworkMonitoringEnabled(true);
+      
       toast.success(`✅ Joined "${session.title}" - Network monitoring started`);
-      toast.info(`📶 Network parameters are being captured`);
     };
     
     ws.onclose = () => {
       console.log(`🔌 [SessionList] Session ${sessionKey} WebSocket closed`);
+      
+      // 🎯 STOP NETWORK MONITORING when WebSocket closes (student left meeting)
+      if (networkMonitoringEnabled) {
+        stopMonitoring();
+        setNetworkMonitoringEnabled(false);
+        console.log('📶 [SessionList] Network monitoring stopped - student left meeting');
+      }
+      
       if (connectedSessionId === sessionKey) {
         setConnectedSessionId(null);
         localStorage.removeItem('connectedSessionId');
@@ -345,6 +301,11 @@ export const SessionList = () => {
             description: "The host has ended the meeting",
             duration: 5000,
           });
+          // Stop network monitoring
+          if (networkMonitoringEnabled) {
+            stopMonitoring();
+            setNetworkMonitoringEnabled(false);
+          }
           // Clear connection state
           setConnectedSessionId(null);
           localStorage.removeItem('connectedSessionId');
@@ -353,25 +314,20 @@ export const SessionList = () => {
             sessionWs.close();
             setSessionWs(null);
           }
-          // Refresh sessions to show updated status
-          sessionService.getAllSessions().then(all => setSessions(all));
+          // Update sessions list (event-driven, no API call needed)
+          setSessions(prev => prev.map(s => 
+            (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId) 
+              ? { ...s, status: 'completed' as const }
+              : s
+          ));
         } else if (data.type === "session_started") {
           console.log("🟢 [SessionList] Session started event received:", data);
-          // Refresh sessions to show updated status (live/ongoing)
-          sessionService.getAllSessions().then(all => {
-            setSessions(all);
-            // Update connected session if it matches
-            if (data.sessionId || data.zoomMeetingId) {
-              const updatedSession = all.find(s => 
-                s.id === data.sessionId || 
-                s.zoomMeetingId === data.zoomMeetingId ||
-                s.zoomMeetingId === data.sessionId
-              );
-              if (updatedSession && updatedSession.status === 'live') {
-                setConnectedSessionId(updatedSession.zoomMeetingId || updatedSession.id);
-              }
-            }
-          });
+          // Update sessions list (event-driven, no API call needed)
+          setSessions(prev => prev.map(s => 
+            (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId) 
+              ? { ...s, status: 'live' as const }
+              : s
+          ));
         }
       } catch (e) {
         console.error("[SessionList] Session WS JSON ERROR:", e);
@@ -789,16 +745,7 @@ export const SessionList = () => {
                           );
                         })()}
 
-                        {/* JOIN LIVE - For instructors (live only) */}
-                        {isInstructor && session.status === 'live' && (
-                          <Button
-                            variant="primary"
-                            leftIcon={<PlayIcon className="h-4 w-4" />}
-                            onClick={() => handleJoinSession(session)}
-                          >
-                            Join Live
-                          </Button>
-                        )}
+                        {/* JOIN LIVE button removed - instructors should not see this when session is already live */}
 
                         {isInstructor && session.status === 'live' && (
                           <Button
@@ -931,16 +878,7 @@ export const SessionList = () => {
                     );
                   })()}
 
-                  {/* JOIN LIVE - For instructors (live only) */}
-                  {isInstructor && session.status === 'live' && (
-                    <Button
-                      variant="primary"
-                      leftIcon={<PlayIcon className="h-4 w-4" />}
-                      onClick={() => handleJoinSession(session)}
-                    >
-                      Join Live
-                    </Button>
-                  )}
+                  {/* JOIN LIVE button removed - instructors should not see this when session is already live */}
 
                   {/* END MEETING (Instructor only - for live meetings) */}
                   {isInstructor && session.status === 'live' && (

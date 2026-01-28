@@ -74,7 +74,7 @@ class WebSocketManager:
             mongo_session_id = session_id  # Default to provided ID
             zoom_meeting_id = None
             
-            if database:
+            if database is not None:
                 session_doc = None
                 
                 # Try multiple lookup methods to find the session
@@ -173,7 +173,7 @@ class WebSocketManager:
                 database = get_database()
                 mongo_session_id = session_id
                 
-                if database:
+                if database is not None:
                     session_doc = await database.sessions.find_one({"zoomMeetingId": int(session_id) if session_id.isdigit() else session_id})
                     if not session_doc:
                         from bson import ObjectId
@@ -244,6 +244,30 @@ class WebSocketManager:
                     "status": data.get("status")
                 })
         return participants
+    
+    def get_session_participants_by_multiple_ids(self, session_ids: List[str]) -> List[dict]:
+        """
+        Get all ACTIVE participants across multiple session IDs.
+        Used when students might be connected with different IDs (zoomMeetingId vs MongoDB sessionId).
+        """
+        all_participants = []
+        seen_student_ids = set()
+        
+        for session_id in session_ids:
+            if session_id in self.session_rooms:
+                for student_id, data in self.session_rooms[session_id].items():
+                    if data.get("status") == "joined" and student_id not in seen_student_ids:
+                        seen_student_ids.add(student_id)
+                        all_participants.append({
+                            "studentId": student_id,
+                            "studentName": data.get("studentName"),
+                            "studentEmail": data.get("studentEmail"),
+                            "joinedAt": data.get("joinedAt"),
+                            "status": data.get("status"),
+                            "sessionId": session_id  # Track which session ID they're connected with
+                        })
+        
+        return all_participants
 
     def get_session_participant_count(self, session_id: str) -> int:
         """Get count of active participants in session"""
@@ -275,12 +299,34 @@ class WebSocketManager:
             print(f"⚠️ No WebSocket connection for student {student_id}")
             return False
         
+        # Check if WebSocket is still open before sending
         try:
+            # Check WebSocket state - FastAPI WebSocket may have client_state or application_state
+            try:
+                if hasattr(websocket, 'client_state'):
+                    if websocket.client_state.name != 'CONNECTED':
+                        print(f"   ⚠️ WebSocket for {student_id} is not connected (state: {websocket.client_state.name})")
+                        return False
+                elif hasattr(websocket, 'application_state'):
+                    if websocket.application_state.name != 'CONNECTED':
+                        print(f"   ⚠️ WebSocket for {student_id} is not connected (state: {websocket.application_state.name})")
+                        return False
+            except (AttributeError, Exception):
+                # If state checking fails, proceed with send attempt (will be caught by outer try-except)
+                pass
+            
             await websocket.send_json(message)
             print(f"   ✅ Sent to {participant.get('studentName', student_id)}")
             return True
         except Exception as e:
-            print(f"   ❌ Failed to send to {student_id}: {e}")
+            error_msg = str(e)
+            # Check for common closed connection errors
+            if 'websocket.close' in error_msg or 'closed' in error_msg.lower() or '1005' in error_msg:
+                print(f"   ⚠️ WebSocket for {student_id} is closed, removing from session")
+                # Mark as left and remove from session
+                await self.leave_session_room(session_id, student_id)
+            else:
+                print(f"   ❌ Failed to send to {student_id}: {e}")
             return False
 
     async def broadcast_to_session(self, session_id: str, message: dict) -> int:
@@ -312,11 +358,30 @@ class WebSocketManager:
             # Create async task for each send operation (parallel execution)
             async def send_to_student(ws, sid, name):
                 try:
+                    # Check if WebSocket is still open before sending
+                    try:
+                        if hasattr(ws, 'client_state'):
+                            if ws.client_state.name != 'CONNECTED':
+                                print(f"   ⚠️ WebSocket for {sid} is not connected (state: {ws.client_state.name})")
+                                return False
+                        elif hasattr(ws, 'application_state'):
+                            if ws.application_state.name != 'CONNECTED':
+                                print(f"   ⚠️ WebSocket for {sid} is not connected (state: {ws.application_state.name})")
+                                return False
+                    except (AttributeError, Exception):
+                        # If state checking fails, proceed with send attempt (will be caught by outer try-except)
+                        pass
+                    
                     await ws.send_json(message)
                     print(f"   ✅ Sent to {name or sid}")
                     return True
                 except Exception as e:
-                    print(f"   ❌ Failed to send to {sid}: {e}")
+                    error_msg = str(e)
+                    # Check for common closed connection errors
+                    if 'websocket.close' in error_msg or 'closed' in error_msg.lower() or '1005' in error_msg:
+                        print(f"   ⚠️ WebSocket for {sid} is closed")
+                    else:
+                        print(f"   ❌ Failed to send to {sid}: {e}")
                     return False
 
             send_tasks.append(send_to_student(websocket, student_id, data.get('studentName')))
@@ -334,7 +399,12 @@ class WebSocketManager:
 
         # Clean up dead connections
         for student_id in dead_connections:
-            await self.leave_session_room(session_id, student_id)
+            try:
+                await self.leave_session_room(session_id, student_id)
+            except Exception as cleanup_error:
+                print(f"   ⚠️ Error cleaning up dead connection for {student_id}: {cleanup_error}")
+                # Force remove from session room if leave fails
+                self.remove_from_session_room(session_id, student_id)
 
         print(f"📢 SESSION BROADCAST [{session_id}] → Sent to {sent} students INSTANTLY")
         return sent

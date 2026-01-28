@@ -59,10 +59,11 @@ export const InstructorDashboard = () => {
         setSelectedSession(liveSession);
       }
     };
+    // Initial load only
     loadSessions();
     
-    const interval = setInterval(loadSessions, 2000); // Refresh every 2 seconds for real-time updates
-    return () => clearInterval(interval);
+    // Sessions will be updated via WebSocket events (session_started, meeting_ended, participant_joined, etc.)
+    // No polling interval - updates are event-driven for better performance
   }, []);
 
   // ================================
@@ -120,13 +121,17 @@ export const InstructorDashboard = () => {
           });
         } else if (data.type === "session_started") {
           console.log("🟢 [InstructorDashboard] Session started event received:", data);
-          // Refresh sessions to show updated status (live/ongoing)
-          sessionService.getAllSessions().then(allSessions => {
-            const filtered = allSessions.filter(s => s.status === 'upcoming' || s.status === 'live');
-            setSessions(filtered.slice(0, 5));
+          // Update sessions list (event-driven, no API call needed)
+          setSessions(prev => {
+            const updated = prev.map(s => 
+              (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId) 
+                ? { ...s, status: 'live' as const }
+                : s
+            ).filter(s => s.status === 'upcoming' || s.status === 'live').slice(0, 5);
+            
             // Auto-select the session that was just started
             if (data.sessionId || data.zoomMeetingId) {
-              const startedSession = filtered.find(s => 
+              const startedSession = updated.find(s => 
                 s.id === data.sessionId || 
                 s.zoomMeetingId === data.zoomMeetingId ||
                 s.zoomMeetingId === data.sessionId
@@ -135,6 +140,8 @@ export const InstructorDashboard = () => {
                 setSelectedSession(startedSession);
               }
             }
+            
+            return updated;
           });
         }
       } catch (e) {

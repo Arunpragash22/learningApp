@@ -211,35 +211,20 @@ export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
     fetchStudentLatency();
   }, [sessionId]);
 
-  // Auto-refresh with countdown timer
+  // 🎯 OPTIMIZED: Event-driven updates instead of polling
+  // Use WebSocket events or manual refresh instead of continuous polling
+  // Only fetch when explicitly requested or when session state changes
   useEffect(() => {
-    if (!isAutoRefreshing || useDemoData) {
+    if (useDemoData) {
       return;
     }
 
-    // Reset countdown when refresh happens
-    setNextRefreshIn(refreshInterval / 1000);
-
-    // Countdown timer (updates every second)
-    const countdownInterval = setInterval(() => {
-      setNextRefreshIn(prev => {
-        if (prev <= 1) {
-          return refreshInterval / 1000;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    // Fetch interval
-    const fetchIntervalId = setInterval(() => {
-      fetchStudentLatency();
-    }, refreshInterval);
-
-    return () => {
-      clearInterval(countdownInterval);
-      clearInterval(fetchIntervalId);
-    };
-  }, [isAutoRefreshing, refreshInterval, useDemoData, fetchStudentLatency]);
+    // Initial fetch only
+    fetchStudentLatency();
+    
+    // Optional: Manual refresh can be triggered by parent component
+    // No automatic polling - updates should come via WebSocket events
+  }, [sessionId, useDemoData]); // Only refetch when sessionId changes
 
   // Refetch when demo mode changes
   useEffect(() => {
