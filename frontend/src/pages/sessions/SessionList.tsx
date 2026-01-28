@@ -166,6 +166,23 @@ export const SessionList = () => {
               localStorage.removeItem('connectedSessionId');
               // Refresh sessions to show updated status
               sessionService.getAllSessions().then(all => setSessions(all));
+            } else if (data.type === "session_started") {
+              console.log("🟢 [SessionList] Session started event received:", data);
+              // Refresh sessions to show updated status (live/ongoing)
+              sessionService.getAllSessions().then(all => {
+                setSessions(all);
+                // Update connected session if it matches
+                if (data.sessionId || data.zoomMeetingId) {
+                  const updatedSession = all.find(s => 
+                    s.id === data.sessionId || 
+                    s.zoomMeetingId === data.zoomMeetingId ||
+                    s.zoomMeetingId === data.sessionId
+                  );
+                  if (updatedSession && updatedSession.status === 'live') {
+                    setConnectedSessionId(updatedSession.zoomMeetingId || updatedSession.id);
+                  }
+                }
+              });
             }
           } catch (e) {
             console.error("[SessionList] Restored WS JSON ERROR:", e);
@@ -338,6 +355,23 @@ export const SessionList = () => {
           }
           // Refresh sessions to show updated status
           sessionService.getAllSessions().then(all => setSessions(all));
+        } else if (data.type === "session_started") {
+          console.log("🟢 [SessionList] Session started event received:", data);
+          // Refresh sessions to show updated status (live/ongoing)
+          sessionService.getAllSessions().then(all => {
+            setSessions(all);
+            // Update connected session if it matches
+            if (data.sessionId || data.zoomMeetingId) {
+              const updatedSession = all.find(s => 
+                s.id === data.sessionId || 
+                s.zoomMeetingId === data.zoomMeetingId ||
+                s.zoomMeetingId === data.sessionId
+              );
+              if (updatedSession && updatedSession.status === 'live') {
+                setConnectedSessionId(updatedSession.zoomMeetingId || updatedSession.id);
+              }
+            }
+          });
         }
       } catch (e) {
         console.error("[SessionList] Session WS JSON ERROR:", e);

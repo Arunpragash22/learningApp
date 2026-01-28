@@ -34,38 +34,71 @@ async def trigger_question(meeting_id: str):
         if not questions:
             return {"success": False, "message": "No questions found in DB"}
 
-        # 2) Pick one question randomly
-        q = random.choice(questions)
-
-        # 3) Prepare WebSocket broadcast message
-        message = {
-            "type": "quiz",
-            "questionId": str(q["_id"]),
-            "question": q["question"],
-            "options": q["options"],
-            "timeLimit": q.get("timeLimit", 30),
-            "difficulty": q.get("difficulty", "medium"),
-            "category": q.get("category", "General"),
-            "sessionId": meeting_id,
-            "timestamp": datetime.now().isoformat()
-        }
+        # 2) Get all participants in this session
+        participants = ws_manager.get_session_participants(meeting_id)
+        
+        if not participants:
+            return {"success": False, "message": "No students connected to this session"}
 
         # Debug: Show session room stats before sending
         all_stats = ws_manager.get_all_stats()
         print(f"📊 WebSocket Stats BEFORE broadcast:")
         print(f"   Session rooms: {all_stats.get('session_rooms', {})}")
         print(f"   Target session: {meeting_id}")
+        print(f"   Participants: {len(participants)} students")
         
-        # 🎯 4) Send ONLY to students in this session room (not global broadcast!)
-        # Only students who clicked "Join" and connected to /ws/session/<meetingId>/<studentId> will receive
-        ws_sent_count = await ws_manager.broadcast_to_session(meeting_id, message)
+        # 3) Send DIFFERENT random question to EACH student
+        # Filter out instructor connections - instructors have studentId starting with "instructor_" or have role="instructor"
+        student_participants = []
+        for p in participants:
+            student_id = p.get("studentId", "")
+            # Skip instructor connections (instructors connect with IDs like "instructor_xxx")
+            if student_id.startswith("instructor_") or "instructor" in student_id.lower():
+                print(f"   ⏭️ Skipping instructor: {student_id}")
+                continue
+            student_participants.append(p)
         
-        # Get participant list for response
-        participants = ws_manager.get_session_participants(meeting_id)
+        if not student_participants:
+            return {"success": False, "message": "No students found in session (only instructor connected)"}
+        
+        ws_sent_count = 0
+        sent_questions = []
+        
+        # Send individual random question to each student
+        for participant in student_participants:
+            student_id = participant.get("studentId")
+            
+            # Pick a random question for this student
+            q = random.choice(questions)
+            
+            # Prepare individual message for this student
+            message = {
+                "type": "quiz",
+                "questionId": str(q["_id"]),
+                "question": q["question"],
+                "options": q["options"],
+                "timeLimit": q.get("timeLimit", 30),
+                "difficulty": q.get("difficulty", "medium"),
+                "category": q.get("category", "General"),
+                "sessionId": meeting_id,
+                "studentId": student_id,  # Include student ID so they know it's for them
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Send to this specific student via WebSocket
+            sent = await ws_manager.send_to_student_in_session(meeting_id, student_id, message)
+            if sent:
+                ws_sent_count += 1
+                sent_questions.append({
+                    "studentId": student_id,
+                    "studentName": participant.get("studentName"),
+                    "questionId": str(q["_id"]),
+                    "question": q["question"]
+                })
+                print(f"   ✅ Sent question to {participant.get('studentName', student_id)}: {q['question'][:50]}...")
 
-        print(f"✅ Question sent to SESSION {meeting_id}: {ws_sent_count} students")
-        print(f"   Participants: {[p.get('studentId', 'unknown') for p in participants]}")
-        print(f"   Message sent: {message}")
+        print(f"✅ Questions sent to SESSION {meeting_id}: {ws_sent_count} students (each got a different random question)")
+        print(f"   Participants: {[p.get('studentName', p.get('studentId', 'unknown')) for p in student_participants]}")
 
         # 5) Optionally send Web Push Notifications to subscribed students in this session
         # (For now, push is still global - can be made session-specific later)
@@ -82,9 +115,9 @@ async def trigger_question(meeting_id: str):
             "websocketSent": ws_sent_count,
             "pushSent": push_sent_count,
             "totalReached": ws_sent_count + push_sent_count,
-            "participants": participants,
-            "sentQuestion": message,
-            "message": f"Quiz sent to {ws_sent_count} students in session {meeting_id}"
+            "participants": student_participants,
+            "sentQuestions": sent_questions,  # List of questions sent to each student
+            "message": f"Quiz sent to {ws_sent_count} students in session {meeting_id} (each received a different random question)"
         }
 
     except Exception as e:

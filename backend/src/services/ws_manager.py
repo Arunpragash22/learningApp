@@ -249,6 +249,40 @@ class WebSocketManager:
         """Get count of active participants in session"""
         return len(self.get_session_participants(session_id))
 
+    async def send_to_student_in_session(self, session_id: str, student_id: str, message: dict) -> bool:
+        """
+        Send a message to a SPECIFIC student in a session room.
+        Used for sending individual random questions to each student.
+        Returns True if sent successfully, False otherwise.
+        """
+        if session_id not in self.session_rooms:
+            print(f"⚠️ No participants in session {session_id}")
+            return False
+        
+        if student_id not in self.session_rooms[session_id]:
+            print(f"⚠️ Student {student_id} not found in session {session_id}")
+            return False
+        
+        participant = self.session_rooms[session_id][student_id]
+        
+        # Only send to JOINED students (not "left")
+        if participant.get("status") != "joined":
+            print(f"⚠️ Student {student_id} is not in joined status")
+            return False
+        
+        websocket = participant.get("websocket")
+        if not websocket:
+            print(f"⚠️ No WebSocket connection for student {student_id}")
+            return False
+        
+        try:
+            await websocket.send_json(message)
+            print(f"   ✅ Sent to {participant.get('studentName', student_id)}")
+            return True
+        except Exception as e:
+            print(f"   ❌ Failed to send to {student_id}: {e}")
+            return False
+
     async def broadcast_to_session(self, session_id: str, message: dict) -> int:
         """
         🎯 BROADCAST QUIZ TO SESSION ROOM ONLY - INSTANT DELIVERY

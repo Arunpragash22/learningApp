@@ -118,6 +118,24 @@ export const InstructorDashboard = () => {
               setSelectedSession(null);
             }
           });
+        } else if (data.type === "session_started") {
+          console.log("🟢 [InstructorDashboard] Session started event received:", data);
+          // Refresh sessions to show updated status (live/ongoing)
+          sessionService.getAllSessions().then(allSessions => {
+            const filtered = allSessions.filter(s => s.status === 'upcoming' || s.status === 'live');
+            setSessions(filtered.slice(0, 5));
+            // Auto-select the session that was just started
+            if (data.sessionId || data.zoomMeetingId) {
+              const startedSession = filtered.find(s => 
+                s.id === data.sessionId || 
+                s.zoomMeetingId === data.zoomMeetingId ||
+                s.zoomMeetingId === data.sessionId
+              );
+              if (startedSession && startedSession.status === 'live') {
+                setSelectedSession(startedSession);
+              }
+            }
+          });
         }
       } catch (e) {
         console.error("Instructor WS message error:", e);

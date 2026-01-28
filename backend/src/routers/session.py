@@ -11,6 +11,7 @@ from src.services.zoom_service import create_zoom_meeting, list_zoom_meetings, g
 from src.models.course import CourseModel
 from src.models.session_report_model import SessionReportModel
 from src.services.email_service import email_service
+from src.services.ws_manager import ws_manager
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
 
@@ -635,6 +636,26 @@ async def start_session(
                 }
             }
         )
+        
+        # 🎯 Broadcast session started event to all connected clients
+        # Use both session_id and zoomMeetingId to reach all participants
+        zoom_meeting_id = session.get("zoomMeetingId")
+        session_started_event = {
+            "type": "session_started",
+            "sessionId": session_id,
+            "zoomMeetingId": str(zoom_meeting_id) if zoom_meeting_id else None,
+            "status": "live",
+            "message": "Session has started",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        # Broadcast using zoomMeetingId if available
+        if zoom_meeting_id:
+            await ws_manager.broadcast_to_session(str(zoom_meeting_id), session_started_event)
+        # Also broadcast using MongoDB session_id
+        await ws_manager.broadcast_to_session(session_id, session_started_event)
+        
+        print(f"📢 Session started event broadcasted: session={session_id}, zoom={zoom_meeting_id}")
         
         return {"success": True, "message": "Session started", "status": "live"}
         

@@ -600,6 +600,13 @@ export const StudentDashboard = () => {
             const filtered = all.filter(s => s.status === 'upcoming' || s.status === 'live');
             setSessions(filtered.slice(0, 5));
           });
+        } else if (data.type === "session_started") {
+          console.log("🟢 [StudentDashboard] Session started event received:", data);
+          // Refresh sessions to show updated status (live/ongoing)
+          sessionService.getAllSessions().then(all => {
+            const filtered = all.filter(s => s.status === 'upcoming' || s.status === 'live');
+            setSessions(filtered.slice(0, 5));
+          });
         }
       } catch (e) {
         console.error("Session WS JSON ERROR:", e);
