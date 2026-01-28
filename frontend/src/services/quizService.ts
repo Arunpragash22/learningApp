@@ -61,15 +61,17 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const getAuthToken = (): string => {
   try {
-    const user = localStorage.getItem('user');
-    if (user) {
-      const userData = JSON.parse(user);
-      return userData.token || 'mock-token';
+    // Token is stored separately in localStorage as 'access_token'
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      console.error('❌ No authentication token found in localStorage');
+      throw new Error('Not authenticated. Please log in again.');
     }
+    return token;
   } catch (error) {
     console.error('Error getting auth token:', error);
+    throw error;
   }
-  return 'mock-token';
 };
 
 const getUserRole = (): string => {
