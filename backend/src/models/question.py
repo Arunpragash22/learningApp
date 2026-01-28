@@ -28,37 +28,50 @@ class Question:
     @staticmethod
     async def create(data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new question"""
-        database = get_database()
-        if database is None:
-            raise Exception("Database not connected")
-        
-        # If id is provided as string, use it; otherwise generate ObjectId
-        if "id" in data:
-            question_data = {**data}
-            if "_id" not in question_data:
-                try:
-                    question_data["_id"] = ObjectId(data["id"])
-                except:
-                    pass
-        else:
-            question_data = {**data}
-        
-        result = await database.questions.insert_one(question_data)
-        question_data["id"] = str(result.inserted_id)
-        if "_id" in question_data:
-            question_data["_id"] = result.inserted_id
-        
-        # ============================================================
-        # MYSQL BACKUP: Auto-backup new question (non-blocking)
-        # ============================================================
         try:
-            from ..services.mysql_backup_service import mysql_backup_service
-            asyncio.create_task(mysql_backup_service.backup_question(question_data))
-            print(f"📦 MySQL backup triggered for question: {question_data['id']}")
+            database = get_database()
+            if database is None:
+                print("❌ Database connection is None")
+                raise Exception("Database not connected")
+            
+            print(f"📝 Database connection OK, inserting question...")
+            
+            # If id is provided as string, use it; otherwise generate ObjectId
+            if "id" in data:
+                question_data = {**data}
+                if "_id" not in question_data:
+                    try:
+                        question_data["_id"] = ObjectId(data["id"])
+                    except:
+                        pass
+            else:
+                question_data = {**data}
+            
+            result = await database.questions.insert_one(question_data)
+            question_data["id"] = str(result.inserted_id)
+            if "_id" in question_data:
+                question_data["_id"] = result.inserted_id
+            
+            print(f"✅ Question inserted to MongoDB with ID: {question_data['id']}")
+            
+            # ============================================================
+            # MYSQL BACKUP: Auto-backup new question (non-blocking)
+            # ============================================================
+            try:
+                from ..services.mysql_backup_service import mysql_backup_service
+                # Run backup in background without waiting
+                asyncio.create_task(mysql_backup_service.backup_question(question_data))
+                print(f"📦 MySQL backup triggered for question: {question_data['id']}")
+            except Exception as e:
+                # MySQL backup failure is NON-FATAL - just log it
+                print(f"⚠️ MySQL question backup failed (non-fatal): {e}")
+            
+            return question_data
         except Exception as e:
-            print(f"⚠️ MySQL question backup failed (non-fatal): {e}")
-        
-        return question_data
+            import traceback
+            print(f"❌ Error in Question.create(): {e}")
+            print(f"❌ Traceback:\n{traceback.format_exc()}")
+            raise
 
     @staticmethod
     async def find_all() -> List[Dict[str, Any]]:

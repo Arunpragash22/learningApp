@@ -100,6 +100,8 @@ export const QuestionManagement = () => {
   const handleSaveQuestion = async (question: Question) => {
     
     try {
+      console.log('📝 Saving question:', question);
+      
       const questionData: CreateQuestionData = {
         question: question.question,
         options: question.options,
@@ -117,7 +119,9 @@ export const QuestionManagement = () => {
       } else {
         // Create new question
         // MongoDB will automatically create the database and collection
+        console.log('📝 Creating new question...');
         await questionService.createQuestion(questionData);
+        console.log('✅ Question created successfully');
         toast.success('Question created successfully');
       }
       
@@ -127,9 +131,25 @@ export const QuestionManagement = () => {
       setEditingQuestion(null);
       setPrefillQuestion(null);
       setPrefillCategory(null);
-    } catch (error) {
-      console.error('Error saving question:', error);
-      toast.error(editingQuestion ? 'Failed to update question. Please try again.' : 'Failed to create question. Please try again.');
+    } catch (error: any) {
+      console.error('❌ Error saving question:', error);
+      
+      // Extract detailed error message
+      let errorMessage = editingQuestion 
+        ? 'Failed to update question.' 
+        : 'Failed to create question.';
+      
+      if (error?.message) {
+        errorMessage += ` ${error.message}`;
+      }
+      
+      // Show specific error details if available
+      if (error?.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      }
+      
+      console.error('📝 Error details:', errorMessage);
+      toast.error(errorMessage);
     }
   };
 

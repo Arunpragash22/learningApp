@@ -143,7 +143,31 @@ app.include_router(mysql_sync.router)  # 🔄 Sync MongoDB reports to MySQL
 # --------------------------------------------------------
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "time": datetime.now().isoformat()}
+    from src.database.connection import get_database
+    from src.database.mysql_connection import mysql_backup
+    
+    # Check MongoDB connection
+    mongodb_status = "disconnected"
+    try:
+        db = get_database()
+        if db is not None:
+            # Try a simple operation to verify connection
+            await db.command("ping")
+            mongodb_status = "connected"
+    except Exception as e:
+        mongodb_status = f"error: {str(e)}"
+    
+    # Check MySQL backup connection
+    mysql_status = "connected" if mysql_backup.is_connected else "disconnected"
+    
+    return {
+        "status": "ok",
+        "time": datetime.now().isoformat(),
+        "database": {
+            "mongodb": mongodb_status,
+            "mysql_backup": mysql_status
+        }
+    }
 
 
 # --------------------------------------------------------

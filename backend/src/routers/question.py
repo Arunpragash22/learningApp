@@ -38,12 +38,19 @@ async def create_question(
 ):
     """Create a new question (instructor only)"""
     try:
+        print(f"📝 Creating question by user: {user.get('email', 'unknown')}")
+        print(f"📝 Question data: {question_data.dict()}")
+        
         # MongoDB will automatically create the database and collection
         # when the first document is inserted
         question_dict = question_data.dict()
         question_dict["createdAt"] = datetime.now().isoformat()
+        question_dict["createdBy"] = user.get("id", "")
+        question_dict["createdByEmail"] = user.get("email", "")
         
+        print(f"📝 Attempting to save question to MongoDB...")
         created_question = await Question.create(question_dict)
+        print(f"✅ Question created successfully with ID: {created_question.get('id', '')}")
         
         # Convert to response format
         response = QuestionResponse(
@@ -59,8 +66,13 @@ async def create_question(
         )
         
         return response
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error creating question: {e}")
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ Error creating question: {e}")
+        print(f"❌ Full traceback:\n{error_details}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create question: {str(e)}"
