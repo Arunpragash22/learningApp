@@ -103,6 +103,21 @@ export const InstructorDashboard = () => {
               setSelectedSession(updatedSession);
             }
           });
+        } else if (data.type === "meeting_ended") {
+          console.log("🔴 [InstructorDashboard] Meeting ended event received:", data);
+          toast.info("🔴 Meeting has ended", {
+            description: "The meeting has been ended",
+            duration: 5000,
+          });
+          // Refresh sessions to show updated status
+          sessionService.getAllSessions().then(allSessions => {
+            const filtered = allSessions.filter(s => s.status === 'upcoming' || s.status === 'live');
+            setSessions(filtered.slice(0, 5));
+            // Clear selected session if it was the one that ended
+            if (selectedSession && (selectedSession.id === data.sessionId || selectedSession.zoomMeetingId === data.zoomMeetingId)) {
+              setSelectedSession(null);
+            }
+          });
         }
       } catch (e) {
         console.error("Instructor WS message error:", e);

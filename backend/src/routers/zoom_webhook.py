@@ -4,6 +4,7 @@ from datetime import datetime
 from bson import ObjectId
 from src.database.connection import get_database
 from src.models.session_report_model import SessionReportModel
+from src.services.ws_manager import ws_manager
 
 router = APIRouter(prefix="/api/zoom", tags=["Zoom Webhook"])
 
@@ -248,6 +249,25 @@ async def zoom_events(
                     )
                     
                     print(f"✅ Session marked as completed: {session_id}, {total_participants} participants")
+                    
+                    # 🎯 Broadcast meeting ended event to all connected clients (instructor + students)
+                    # Use both session_id and zoom_meeting_id to reach all participants
+                    meeting_ended_event = {
+                        "type": "meeting_ended",
+                        "sessionId": session_id,
+                        "zoomMeetingId": str(zoom_meeting_id),
+                        "status": "completed",
+                        "message": "Meeting has ended",
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                    
+                    # Broadcast to session room using zoom_meeting_id
+                    await ws_manager.broadcast_to_session(str(zoom_meeting_id), meeting_ended_event)
+                    # Also broadcast using MongoDB session_id
+                    if str(zoom_meeting_id) != session_id:
+                        await ws_manager.broadcast_to_session(session_id, meeting_ended_event)
+                    
+                    print(f"📢 Meeting ended event broadcasted to all participants")
                     
                     # Generate and save MASTER report
                     report = await SessionReportModel.generate_master_report(

@@ -581,6 +581,25 @@ export const StudentDashboard = () => {
           console.log(`👥 Participant ${data.type === 'participant_joined' ? 'joined' : 'left'}:`, data.studentName || data.studentId);
           // Optionally refresh sessions to show updated participant counts
           // This will be handled by the auto-refresh interval already in place
+        } else if (data.type === "meeting_ended") {
+          console.log("🔴 [StudentDashboard] Meeting ended event received:", data);
+          toast.info("🔴 Meeting has ended", {
+            description: "The host has ended the meeting",
+            duration: 5000,
+          });
+          // Clear connection state
+          setConnectedSessionId(null);
+          localStorage.removeItem('connectedSessionId');
+          // Close WebSocket
+          if (sessionWs) {
+            sessionWs.close();
+            setSessionWs(null);
+          }
+          // Refresh sessions to show updated status
+          sessionService.getAllSessions().then(all => {
+            const filtered = all.filter(s => s.status === 'upcoming' || s.status === 'live');
+            setSessions(filtered.slice(0, 5));
+          });
         }
       } catch (e) {
         console.error("Session WS JSON ERROR:", e);
