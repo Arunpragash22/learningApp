@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/ui/Button";
-import { BarChart3Icon, TargetIcon, PlayIcon, CalendarIcon, ClockIcon, WifiIcon, ActivityIcon, UsersIcon } from "lucide-react";
+import { TargetIcon, PlayIcon, CalendarIcon, ClockIcon, WifiIcon, ActivityIcon, UsersIcon } from "lucide-react";
 import { sessionService, Session } from "../../services/sessionService";
 import { Badge } from "../../components/ui/Badge";
 import { useLatencyMonitor, ConnectionQuality } from "../../hooks/useLatencyMonitor";
@@ -269,12 +269,6 @@ export const InstructorDashboard = () => {
               {selectedSession ? 'Trigger Quiz' : 'Select Session'}
             </Button>
           </div>
-
-          <Link to="/dashboard/instructor/analytics">
-            <Button variant="primary" leftIcon={<BarChart3Icon className="h-4 w-4" />}>
-              View Analytics
-            </Button>
-          </Link>
         </div>
       </div>
 
