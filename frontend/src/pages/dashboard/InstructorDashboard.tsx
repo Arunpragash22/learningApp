@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/ui/Button";
-import { BarChart3Icon, TargetIcon, PlayIcon, CalendarIcon, ClockIcon, WifiIcon, ActivityIcon, UsersIcon, RefreshCw as RefreshCwIcon } from "lucide-react";
+import { BarChart3Icon, TargetIcon, PlayIcon, CalendarIcon, ClockIcon, WifiIcon, ActivityIcon, UsersIcon } from "lucide-react";
 import { sessionService, Session } from "../../services/sessionService";
 import { Badge } from "../../components/ui/Badge";
 import { useLatencyMonitor, ConnectionQuality } from "../../hooks/useLatencyMonitor";
@@ -270,40 +270,6 @@ export const InstructorDashboard = () => {
             </Button>
           </div>
 
-          {/* 🔄 Sync Zoom Meetings Button */}
-          <Button
-            variant="outline"
-            leftIcon={<RefreshCwIcon className="h-4 w-4" />}
-            onClick={async () => {
-              try {
-                const apiUrl = import.meta.env.VITE_API_URL;
-                const res = await fetch(`${apiUrl}/api/sessions/sync-zoom-meetings`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${localStorage.getItem("access_token")}`
-                  }
-                });
-                
-                if (res.ok) {
-                  const data = await res.json();
-                  toast.success(`✅ Synced ${data.syncedCount} meetings from Zoom`);
-                  // Refresh sessions list
-                  const allSessions = await sessionService.getAllSessions();
-                  const filtered = allSessions.filter(s => s.status === 'upcoming' || s.status === 'live');
-                  setSessions(filtered.slice(0, 5));
-                } else {
-                  toast.error('Failed to sync Zoom meetings');
-                }
-              } catch (error) {
-                console.error('Sync error:', error);
-                toast.error('Error syncing Zoom meetings');
-              }
-            }}
-          >
-            Sync Zoom
-          </Button>
-
           <Link to="/dashboard/instructor/analytics">
             <Button variant="primary" leftIcon={<BarChart3Icon className="h-4 w-4" />}>
               View Analytics
@@ -313,74 +279,7 @@ export const InstructorDashboard = () => {
       </div>
 
       {/* ================= CARDS SECTION ================= */}
-      <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-
-        {/* Active Courses */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5 flex items-center">
-            <div className="flex-shrink-0 bg-indigo-500 rounded-md p-3"></div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Active Courses
-                </dt>
-                <dd>
-                  <div className="text-lg font-medium text-gray-900">3</div>
-                </dd>
-              </dl>
-            </div>
-          </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <a className="text-sm font-medium text-indigo-700 hover:text-indigo-900" href="#">
-              View all
-            </a>
-          </div>
-        </div>
-
-        {/* Upcoming Sessions */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5 flex items-center">
-            <div className="flex-shrink-0 bg-blue-500 rounded-md p-3"></div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Upcoming Sessions
-                </dt>
-                <dd>
-                  <div className="text-lg font-medium text-gray-900">4</div>
-                </dd>
-              </dl>
-            </div>
-          </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <a className="text-sm font-medium text-indigo-700 hover:text-indigo-900" href="#">
-              View all
-            </a>
-          </div>
-        </div>
-
-        {/* Total Students */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5 flex items-center">
-            <div className="flex-shrink-0 bg-blue-500 rounded-md p-3"></div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  Total Students
-                </dt>
-                <dd>
-                  <div className="text-lg font-medium text-gray-900">124</div>
-                </dd>
-              </dl>
-            </div>
-          </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <a className="text-sm font-medium text-indigo-700 hover:text-indigo-900" href="#">
-              View details
-            </a>
-          </div>
-        </div>
-
+      <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-1">
         {/* 📶 Connection Quality Card */}
         <div className="bg-white overflow-hidden shadow rounded-lg">
           <div className="p-5">
