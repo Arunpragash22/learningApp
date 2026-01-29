@@ -231,34 +231,6 @@ const QuizPopup = ({ quiz, onClose, onAnswerSubmitted, networkStrength }: QuizPo
   );
 };
 
-// --------------------------------------
-// DEFAULT DASHBOARD CONTENT
-// --------------------------------------
-const recentActivities = [
-  {
-    id: "1",
-    type: "session",
-    title: "Database Management Systems",
-    course: "CS202: Database Systems",
-    date: "2023-10-10",
-    engagement: "High",
-  },
-  {
-    id: "2",
-    type: "quiz",
-    title: "Mid-term Assessment",
-    course: "CS301: Machine Learning Fundamentals",
-    date: "2023-10-08",
-    score: "85%",
-  },
-];
-
-const performanceData = {
-  engagementScore: 85,
-  attendanceRate: 92,
-  questionsAsked: 12,
-  quizAverage: 88,
-};
 
 // --------------------------------------
 // MAIN COMPONENT
@@ -675,19 +647,14 @@ export const StudentDashboard = () => {
 
       {/* Performance Summary */}
       <div className="mb-8 text-white rounded-xl shadow-lg p-6" style={{ background: 'linear-gradient(to right, #3B82F6, #2563eb)' }}>
-        <div className="flex justify-between">
-          <div>
-            <h2 className="text-xl font-bold">Your Learning Summary</h2>
-            <p className="mt-1" style={{ color: '#d1f5e8' }}>
-              You are in <span className="font-semibold">Active Participants</span>
-            </p>
-          </div>
-          <span className="px-3 py-1 rounded-full bg-white bg-opacity-25 text-sm font-medium">
-            {performanceData.engagementScore}% Engagement
-          </span>
+        <div>
+          <h2 className="text-xl font-bold">Your Learning Summary</h2>
+          <p className="mt-1" style={{ color: '#d1f5e8' }}>
+            You are in <span className="font-semibold">Active Participants</span>
+          </p>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {/* Network Strength - Shows connection quality when in session */}
           <div className="bg-white bg-opacity-10 rounded-lg p-4">
             <WifiIcon className="h-6 w-6" style={{ color: '#b8e6d4' }} />
@@ -730,18 +697,12 @@ export const StudentDashboard = () => {
               </span>
             </p>
           </div>
-
-          <div className="bg-white bg-opacity-10 rounded-lg p-4">
-            <CalendarIcon className="h-6 w-6" style={{ color: '#b8e6d4' }} />
-            <p className="text-sm font-medium">Next Class</p>
-            <p className="text-lg font-bold">7 days</p>
-          </div>
         </div>
       </div>
 
-      {/* Meetings Sections + Recent Activity */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* MEETINGS SECTIONS - LEFT COLUMN */}
+      {/* Meetings Section */}
+      <div>
+        {/* MEETINGS SECTIONS */}
         <div className="space-y-4">
           {/* Header with View All Link */}
           <div className="flex justify-between items-center">
@@ -889,35 +850,6 @@ export const StudentDashboard = () => {
               )}
             </>
           )}
-        </div>
-
-        {/* Activity */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5">
-            <h3 className="text-lg font-medium text-gray-900">Recent Activity</h3>
-          </div>
-
-          {recentActivities.map((activity) => (
-            <div key={activity.id} className="px-4 py-4 border-t">
-              <p className="text-sm font-medium" style={{ color: '#3B82F6' }}>
-                {activity.title}
-              </p>
-              <p className="text-xs text-gray-500">{activity.course}</p>
-              <p className="text-xs mt-1 text-gray-500">{activity.date}</p>
-
-              {activity.type === "session" && (
-                <p className="text-xs mt-1 font-medium" style={{ color: '#3B82F6' }}>
-                  Engagement: {activity.engagement}
-                </p>
-              )}
-
-              {activity.type === "quiz" && (
-                <p className="text-xs mt-1 font-medium" style={{ color: '#3B82F6' }}>
-                  Score: {activity.score}
-                </p>
-              )}
-            </div>
-          ))}
         </div>
       </div>
     </div>
