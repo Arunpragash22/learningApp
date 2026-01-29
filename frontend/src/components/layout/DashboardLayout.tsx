@@ -9,6 +9,7 @@ export const DashboardLayout = () => {
   const { user, logout, isAuthenticated, isLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Get dashboard route based on user role
   const getDashboardRoute = () => {
@@ -72,12 +73,19 @@ export const DashboardLayout = () => {
   }, [user?.role]);
 
   const handleLogout = () => {
-    // Show confirmation dialog before logging out
-    const confirmed = window.confirm('Are you sure you want to logout?');
-    if (confirmed) {
-      logout();
-      navigate('/login');
-    }
+    // Show custom confirmation modal
+    setShowLogoutModal(true);
+    setUserMenuOpen(false);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutModal(false);
+    logout();
+    navigate('/login');
+  };
+
+  const cancelLogout = () => {
+    setShowLogoutModal(false);
   };
 
   // Check if current path matches the item
@@ -298,6 +306,53 @@ export const DashboardLayout = () => {
           </div>
         </div>
       </main>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+            onClick={cancelLogout}
+          ></div>
+          
+          {/* Modal */}
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all">
+              {/* Icon */}
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                <LogOutIcon className="h-6 w-6 text-red-600" />
+              </div>
+              
+              {/* Content */}
+              <div className="mt-4 text-center">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Confirm Logout
+                </h3>
+                <p className="mt-2 text-sm text-gray-500">
+                  Are you sure you want to logout? You will need to login again to access your account.
+                </p>
+              </div>
+              
+              {/* Buttons */}
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={cancelLogout}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmLogout}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
