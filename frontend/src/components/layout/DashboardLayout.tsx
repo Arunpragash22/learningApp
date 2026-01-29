@@ -72,8 +72,12 @@ export const DashboardLayout = () => {
   }, [user?.role]);
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    // Show confirmation dialog before logging out
+    const confirmed = window.confirm('Are you sure you want to logout?');
+    if (confirmed) {
+      logout();
+      navigate('/login');
+    }
   };
 
   // Check if current path matches the item
