@@ -143,6 +143,70 @@ export const SessionList = () => {
   }, [user?.id, isInstructor]);
 
   // ---------------------------------------------------
+  // ⭐ WEBSOCKET LISTENER FOR REAL-TIME SESSION STATUS UPDATES
+  // ---------------------------------------------------
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const wsBase = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL?.replace('/api', '') || 'ws://localhost:8000';
+    const wsUrl = `${wsBase}/ws/global/${user.id}`;
+    
+    const ws = new WebSocket(wsUrl);
+    
+    ws.onopen = () => {
+      console.log('✅ Connected to global WebSocket for session updates');
+    };
+    
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('📬 Session update received:', data);
+        
+        // Handle session started event
+        if (data.type === 'session_started') {
+          console.log('🟢 Session started:', data.sessionId || data.zoomMeetingId);
+          setSessions(prev => prev.map(s => 
+            (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId || s.zoomMeetingId === data.sessionId)
+              ? { ...s, status: 'live' as const }
+              : s
+          ));
+          toast.success('Meeting is now live!');
+        }
+        
+        // Handle meeting ended event
+        if (data.type === 'meeting_ended') {
+          console.log('🔴 Meeting ended:', data.sessionId || data.zoomMeetingId);
+          setSessions(prev => prev.map(s => 
+            (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId)
+              ? { ...s, status: 'completed' as const }
+              : s
+          ));
+          toast.info('Meeting has ended');
+          
+          // Clear starting state if this session was being started
+          if (startingSessionId === data.sessionId || startingSessionId === data.zoomMeetingId) {
+            setStartingSessionId(null);
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+    
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+    
+    ws.onclose = () => {
+      console.log('🔌 WebSocket closed');
+    };
+    
+    return () => {
+      ws.close();
+    };
+  }, [user?.id, startingSessionId]);
+
+  // ---------------------------------------------------
   // ⭐ ENROLL IN SESSION (Students only - for standalone sessions)
   // ---------------------------------------------------
   const handleOpenEnrollModal = (session: Session) => {
