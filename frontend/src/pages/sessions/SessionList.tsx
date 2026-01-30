@@ -281,18 +281,33 @@ export const SessionList = () => {
       return;
     }
 
-    // 🎯 STEP 1: Call backend join endpoint first
+    // 🎯 STEP 1: Check if student needs enrollment (for standalone sessions)
+    if (session.isStandalone && session.requiresEnrollment) {
+      // Check if student is enrolled
+      const isEnrolled = session.enrolledStudents?.some(
+        (enrolledId: string) => enrolledId === user?.id
+      );
+
+      if (!isEnrolled) {
+        toast.error("Please enroll with an enrollment key first");
+        handleOpenEnrollModal(session);
+        return;
+      }
+    }
+
+    // 🎯 STEP 2: Call backend join endpoint
     try {
       const joinResult = await sessionService.joinSession(session.id);
 
       if (!joinResult.success) {
-        toast.error(joinResult.message || "Failed to join session");
+        toast.error(joinResult.message || "Failed to join session. Please try again.");
+        console.error("Join failed:", joinResult);
         return;
       }
 
       console.log("✅ [SessionList] Backend join successful:", joinResult);
 
-      // 🎯 STEP 2: Open Zoom meeting
+      // 🎯 STEP 3: Open Zoom meeting
       if (!session.join_url) {
         toast.error("❌ Zoom join URL missing");
         return;
@@ -300,7 +315,7 @@ export const SessionList = () => {
 
       window.open(session.join_url, '_blank');
 
-      // 🎯 STEP 3: Connect to WebSocket
+      // 🎯 STEP 4: Connect to WebSocket
       const sessionKey = session.zoomMeetingId || session.id;
       const studentId = user?.id || `STUDENT_${Date.now()}`;
       const studentName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown Student';
