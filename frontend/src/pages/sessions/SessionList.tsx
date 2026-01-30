@@ -40,33 +40,33 @@ export const SessionList = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [endingSessionId, setEndingSessionId] = useState<string | null>(null);
   const [startingSessionId, setStartingSessionId] = useState<string | null>(null);
-  
+
   // Enrollment key states for students
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [enrollmentKey, setEnrollmentKey] = useState('');
   const [enrollingSession, setEnrollingSession] = useState<Session | null>(null);
   const [isEnrolling, setIsEnrolling] = useState(false);
-  
+
   // Track which session the user is currently connected to
   const [connectedSessionId, setConnectedSessionId] = useState<string | null>(
     localStorage.getItem('connectedSessionId')
   );
-  
+
   // WebSocket connection for session room
   const [sessionWs, setSessionWs] = useState<WebSocket | null>(null);
 
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
-  
+
   // 📶 Network monitoring - Initialize when connected to a session
-  const studentDisplayName = user 
-    ? (user.firstName && user.lastName 
-        ? `${user.firstName} ${user.lastName}`.trim()
-        : user.firstName || user.lastName || user.email?.split('@')[0] || 'Student')
+  const studentDisplayName = user
+    ? (user.firstName && user.lastName
+      ? `${user.firstName} ${user.lastName}`.trim()
+      : user.firstName || user.lastName || user.email?.split('@')[0] || 'Student')
     : 'Student';
-  
+
   // 📶 Network monitoring state - only enabled when student actually joins Zoom meeting
   const [networkMonitoringEnabled, setNetworkMonitoringEnabled] = useState(false);
-  
+
   const {
     isMonitoring: isLatencyMonitoring,
     currentRtt,
@@ -82,7 +82,7 @@ export const SessionList = () => {
     pingInterval: 3000, // Ping every 3 seconds for faster updates
     reportInterval: 5000, // Report to server every 5 seconds
   });
-  
+
   // Cleanup WebSocket and network monitoring on unmount or when leaving
   useEffect(() => {
     return () => {
@@ -108,14 +108,14 @@ export const SessionList = () => {
     const loadSessions = async () => {
       const all = await sessionService.getAllSessions();
       setSessions(all);
-      
+
       // Check if connected session is still live/upcoming
       const storedSessionId = localStorage.getItem('connectedSessionId');
       if (storedSessionId) {
-        const connectedSession = all.find(s => 
+        const connectedSession = all.find(s =>
           (s.zoomMeetingId === storedSessionId || s.id === storedSessionId)
         );
-        
+
         // Clear connection if session ended or doesn't exist
         if (!connectedSession || connectedSession.status === 'completed') {
           localStorage.removeItem('connectedSessionId');
@@ -137,7 +137,7 @@ export const SessionList = () => {
 
     // Initial load only - no polling
     loadSessions();
-    
+
     // Sessions will be updated via WebSocket events (session_started, meeting_ended, etc.)
     // No polling interval - updates are event-driven
   }, [user?.id, isInstructor]);
@@ -161,7 +161,7 @@ export const SessionList = () => {
 
     try {
       // If enrolling from header button (no specific session), use general enroll endpoint
-      const enrollUrl = enrollingSession 
+      const enrollUrl = enrollingSession
         ? `${import.meta.env.VITE_API_URL}/api/sessions/${enrollingSession.id}/enroll`
         : `${import.meta.env.VITE_API_URL}/api/sessions/enroll-by-key`;
 
@@ -178,12 +178,12 @@ export const SessionList = () => {
 
       if (response.ok && data.success) {
         const sessionTitle = enrollingSession?.title || data.sessionTitle;
-        
+
         toast.success(`Successfully enrolled in meeting "${sessionTitle}"!`);
         setShowEnrollModal(false);
         setEnrollmentKey('');
         setEnrollingSession(null);
-        
+
         // Reload sessions from backend - this will now include the newly enrolled meeting
         const all = await sessionService.getAllSessions();
         setSessions(all);
@@ -199,9 +199,9 @@ export const SessionList = () => {
   };
 
   // ---------------------------------------------------
-  // ⭐ JOIN LIVE BUTTON
+  // ⭐ JOIN SESSION - Call backend first, then connect WebSocket
   // ---------------------------------------------------
-  const handleJoinSession = (session: Session) => {
+  const handleJoinSession = async (session: Session) => {
     if (isInstructor) {
       if (!session.start_url) {
         alert("❌ Zoom host start URL missing");
@@ -209,7 +209,7 @@ export const SessionList = () => {
       }
       // For instructors, open Zoom in new tab
       window.open(session.start_url, '_blank');
-      
+
       // Store session ID for instructor too
       const sessionKey = session.zoomMeetingId || session.id;
       localStorage.setItem('connectedSessionId', sessionKey);
@@ -217,128 +217,187 @@ export const SessionList = () => {
       return;
     }
 
-    if (!session.join_url) {
-      alert("❌ Zoom join URL missing");
-      return;
-    }
-    
-    // 🎯 For students: Open Zoom + Connect to WebSocket + Start network monitoring
-    const sessionKey = session.zoomMeetingId || session.id;
-    const studentId = user?.id || `STUDENT_${Date.now()}`;
-    const studentName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown Student';
-    const studentEmail = user?.email || '';
-    const wsBase = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL?.replace('/api', '') || 'ws://localhost:8000';
-    
-    // Open Zoom meeting in new tab
-    const zoomWindow = window.open(session.join_url, '_blank');
-    
-    // 🎯 Connect to session-specific WebSocket
-    const encodedName = encodeURIComponent(studentName);
-    const encodedEmail = encodeURIComponent(studentEmail);
-    const sessionWsUrl = `${wsBase}/ws/session/${sessionKey}/${studentId}?student_name=${encodedName}&student_email=${encodedEmail}`;
-    
-    console.log(`🔗 [SessionList] Connecting to session WebSocket: ${sessionWsUrl}`);
-    
-    // Close any previous session WebSocket and stop monitoring
-    if (sessionWs) {
-      console.log("🔌 [SessionList] Closing previous session WebSocket");
-      sessionWs.close();
-    }
-    if (networkMonitoringEnabled) {
-      stopMonitoring();
-      setNetworkMonitoringEnabled(false);
-    }
-    
-    // Create new session WebSocket
-    const ws = new WebSocket(sessionWsUrl);
-    
-    ws.onopen = () => {
-      console.log(`✅ [SessionList] Connected to session ${sessionKey} WebSocket`);
-      setConnectedSessionId(sessionKey);
-      localStorage.setItem('connectedSessionId', sessionKey);
-      
-      // 🎯 START NETWORK MONITORING ONLY AFTER SUCCESSFUL WEBSOCKET CONNECTION
-      setNetworkMonitoringEnabled(true);
-      
-      toast.success(`✅ Joined "${session.title}" - Network monitoring started`);
-    };
-    
-    ws.onclose = () => {
-      console.log(`🔌 [SessionList] Session ${sessionKey} WebSocket closed`);
-      
-      // 🎯 STOP NETWORK MONITORING when WebSocket closes (student left meeting)
+    // 🎯 STEP 1: Call backend join endpoint first
+    try {
+      const joinResult = await sessionService.joinSession(session.id);
+
+      if (!joinResult.success) {
+        toast.error(joinResult.message || "Failed to join session");
+        return;
+      }
+
+      console.log("✅ [SessionList] Backend join successful:", joinResult);
+
+      // 🎯 STEP 2: Open Zoom meeting
+      if (!session.join_url) {
+        toast.error("❌ Zoom join URL missing");
+        return;
+      }
+
+      window.open(session.join_url, '_blank');
+
+      // 🎯 STEP 3: Connect to WebSocket
+      const sessionKey = session.zoomMeetingId || session.id;
+      const studentId = user?.id || `STUDENT_${Date.now()}`;
+      const studentName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown Student';
+      const studentEmail = user?.email || '';
+      const wsBase = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL?.replace('/api', '') || 'ws://localhost:8000';
+
+      const encodedName = encodeURIComponent(studentName);
+      const encodedEmail = encodeURIComponent(studentEmail);
+      const sessionWsUrl = `${wsBase}/ws/session/${sessionKey}/${studentId}?student_name=${encodedName}&student_email=${encodedEmail}`;
+
+      console.log(`🔗 [SessionList] Connecting to session WebSocket: ${sessionWsUrl}`);
+
+      // Close any previous session WebSocket and stop monitoring
+      if (sessionWs) {
+        console.log("🔌 [SessionList] Closing previous session WebSocket");
+        sessionWs.close();
+      }
       if (networkMonitoringEnabled) {
         stopMonitoring();
         setNetworkMonitoringEnabled(false);
-        console.log('📶 [SessionList] Network monitoring stopped - student left meeting');
       }
-      
-      if (connectedSessionId === sessionKey) {
-        setConnectedSessionId(null);
-        localStorage.removeItem('connectedSessionId');
-      }
-    };
-    
-    ws.onerror = (err) => {
-      console.error("[SessionList] Session WS ERROR:", err);
-    };
-    
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log("📬 [SessionList] Session WS message:", data);
-        
-        if (data.type === "quiz") {
-          toast.success("📝 New Quiz Question!", {
-            description: data.question || "Answer the quiz now!",
-            duration: 10000,
-          });
-        } else if (data.type === "session_joined") {
-          console.log("✅ [SessionList] Session join confirmed:", data);
-        } else if (data.type === "meeting_ended") {
-          console.log("🔴 [SessionList] Meeting ended event received:", data);
-          toast.info("🔴 Meeting has ended", {
-            description: "The host has ended the meeting",
-            duration: 5000,
-          });
-          // Stop network monitoring
-          if (networkMonitoringEnabled) {
-            stopMonitoring();
-            setNetworkMonitoringEnabled(false);
-          }
-          // Clear connection state
+
+      // Create new session WebSocket
+      const ws = new WebSocket(sessionWsUrl);
+
+      ws.onopen = () => {
+        console.log(`✅ [SessionList] Connected to session ${sessionKey} WebSocket`);
+        setConnectedSessionId(sessionKey);
+        localStorage.setItem('connectedSessionId', sessionKey);
+
+        // 🎯 START NETWORK MONITORING ONLY AFTER SUCCESSFUL WEBSOCKET CONNECTION
+        setNetworkMonitoringEnabled(true);
+
+        toast.success(`✅ Joined "${session.title}" - Network monitoring started`);
+      };
+
+      ws.onclose = () => {
+        console.log(`🔌 [SessionList] Session ${sessionKey} WebSocket closed`);
+
+        // 🎯 STOP NETWORK MONITORING when WebSocket closes (student left meeting)
+        if (networkMonitoringEnabled) {
+          stopMonitoring();
+          setNetworkMonitoringEnabled(false);
+          console.log('📶 [SessionList] Network monitoring stopped - student left meeting');
+        }
+
+        if (connectedSessionId === sessionKey) {
           setConnectedSessionId(null);
           localStorage.removeItem('connectedSessionId');
-          // Close WebSocket
-          if (sessionWs) {
-            sessionWs.close();
-            setSessionWs(null);
-          }
-          // Update sessions list (event-driven, no API call needed)
-          setSessions(prev => prev.map(s => 
-            (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId) 
-              ? { ...s, status: 'completed' as const }
-              : s
-          ));
-        } else if (data.type === "session_started") {
-          console.log("🟢 [SessionList] Session started event received:", data);
-          // Update sessions list (event-driven, no API call needed)
-          setSessions(prev => prev.map(s => 
-            (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId) 
-              ? { ...s, status: 'live' as const }
-              : s
-          ));
         }
-      } catch (e) {
-        console.error("[SessionList] Session WS JSON ERROR:", e);
+      };
+
+      ws.onerror = (err) => {
+        console.error("[SessionList] Session WS ERROR:", err);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log("📬 [SessionList] Session WS message:", data);
+
+          if (data.type === "quiz") {
+            toast.success("📝 New Quiz Question!", {
+              description: data.question || "Answer the quiz now!",
+              duration: 10000,
+            });
+          } else if (data.type === "session_joined") {
+            console.log("✅ [SessionList] Session join confirmed:", data);
+          } else if (data.type === "meeting_ended") {
+            console.log("🔴 [SessionList] Meeting ended event received:", data);
+            toast.info("🔴 Meeting has ended", {
+              description: "The host has ended the meeting",
+              duration: 5000,
+            });
+            // Stop network monitoring
+            if (networkMonitoringEnabled) {
+              stopMonitoring();
+              setNetworkMonitoringEnabled(false);
+            }
+            // Clear connection state
+            setConnectedSessionId(null);
+            localStorage.removeItem('connectedSessionId');
+            // Close WebSocket
+            if (sessionWs) {
+              sessionWs.close();
+              setSessionWs(null);
+            }
+            // Update sessions list (event-driven, no API call needed)
+            setSessions(prev => prev.map(s =>
+              (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId)
+                ? { ...s, status: 'completed' as const }
+                : s
+            ));
+          } else if (data.type === "session_started") {
+            console.log("🟢 [SessionList] Session started event received:", data);
+            // Update sessions list (event-driven, no API call needed)
+            setSessions(prev => prev.map(s =>
+              (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId)
+                ? { ...s, status: 'live' as const }
+                : s
+            ));
+          }
+        } catch (e) {
+          console.error("[SessionList] Session WS JSON ERROR:", e);
+        }
+      };
+
+      setSessionWs(ws);
+
+      // Store session ID in localStorage
+      localStorage.setItem('connectedSessionId', sessionKey);
+      setConnectedSessionId(sessionKey);
+
+    } catch (error) {
+      console.error("Error joining session:", error);
+      toast.error("Failed to join session");
+    }
+  };
+
+  // ---------------------------------------------------
+  // ⭐ LEAVE SESSION - Call backend and cleanup
+  // ---------------------------------------------------
+  const handleLeaveSession = async (session: Session) => {
+    const sessionKey = session.zoomMeetingId || session.id;
+
+    // Only allow leaving if currently in this session
+    if (connectedSessionId !== sessionKey) {
+      return;
+    }
+
+    try {
+      // 🎯 STEP 1: Call backend leave endpoint
+      const leaveResult = await sessionService.leaveSession(session.id);
+
+      if (leaveResult.success) {
+        console.log("✅ [SessionList] Backend leave successful");
+        toast.success("Left session successfully");
       }
-    };
-    
-    setSessionWs(ws);
-    
-    // Store session ID in localStorage
-    localStorage.setItem('connectedSessionId', sessionKey);
-    setConnectedSessionId(sessionKey);
+
+      // 🎯 STEP 2: Stop network monitoring
+      if (networkMonitoringEnabled) {
+        stopMonitoring();
+        setNetworkMonitoringEnabled(false);
+        console.log('📶 [SessionList] Network monitoring stopped');
+      }
+
+      // 🎯 STEP 3: Close WebSocket connection
+      if (sessionWs) {
+        sessionWs.close();
+        setSessionWs(null);
+        console.log('🔌 [SessionList] WebSocket closed');
+      }
+
+      // 🎯 STEP 4: Clear localStorage and state
+      localStorage.removeItem('connectedSessionId');
+      setConnectedSessionId(null);
+
+    } catch (error) {
+      console.error("Error leaving session:", error);
+      toast.error("Failed to leave session");
+    }
   };
 
   // ---------------------------------------------------
@@ -349,11 +408,11 @@ export const SessionList = () => {
     const result = await sessionService.startSession(session.id);
     if (result.success) {
       toast.success('Session started successfully!');
-      
+
       // Reload sessions to update status
       const all = await sessionService.getAllSessions();
       setSessions(all);
-      
+
       // 🎯 Open Zoom directly after starting session
       if (session.start_url) {
         window.open(session.start_url, '_blank');
@@ -374,10 +433,10 @@ export const SessionList = () => {
     if (!confirm(`Are you sure you want to end "${sessionTitle}"?\n\nThis will:\n• Mark the session as completed\n• Generate the final report\n• Send email notifications to all participants`)) {
       return;
     }
-    
+
     setEndingSessionId(sessionId);
     const result = await sessionService.endSession(sessionId);
-    
+
     if (result.success) {
       toast.success(
         <div>
@@ -404,7 +463,7 @@ export const SessionList = () => {
   let filtered = sessions.filter((session) => {
     const s = searchTerm.toLowerCase();
 
-    const matches = 
+    const matches =
       session.title.toLowerCase().includes(s) ||
       session.course.toLowerCase().includes(s) ||
       session.instructor.toLowerCase().includes(s) ||
@@ -573,7 +632,7 @@ export const SessionList = () => {
                   Standalone Meetings Available
                 </h3>
                 <p className="text-sm text-indigo-700 mb-4">
-                  {unenrolledStandaloneSessions.length} meeting(s) require an enrollment key to access. 
+                  {unenrolledStandaloneSessions.length} meeting(s) require an enrollment key to access.
                   Ask your instructor for the key to join these meetings.
                 </p>
                 <div className="space-y-2">
@@ -656,7 +715,7 @@ export const SessionList = () => {
         </Card>
       ) : (
         <div className="space-y-8">
-          
+
           {/* Standalone Meetings Section */}
           {standaloneMeetings.length > 0 && (
             <div>
@@ -717,8 +776,8 @@ export const SessionList = () => {
                           <Button
                             variant="primary"
                             leftIcon={
-                              startingSessionId === session.id 
-                                ? <Loader2Icon className="h-4 w-4 animate-spin" /> 
+                              startingSessionId === session.id
+                                ? <Loader2Icon className="h-4 w-4 animate-spin" />
                                 : <PlayIcon className="h-4 w-4" />
                             }
                             onClick={() => handleStartSession(session)}
@@ -728,38 +787,66 @@ export const SessionList = () => {
                           </Button>
                         )}
 
-                        {/* JOIN BUTTON - For students (upcoming and live) */}
+                        {/* JOIN/LEAVE BUTTON - For students (upcoming and live) */}
                         {!isInstructor && (session.status === 'upcoming' || session.status === 'live') && (() => {
                           const sessionKey = session.zoomMeetingId || session.id;
                           const isInThisMeeting = connectedSessionId === sessionKey;
-                          
+
                           return (
-                            <Button
-                              variant={isInThisMeeting ? 'success' : session.status === 'live' ? 'primary' : 'outline'}
-                              leftIcon={isInThisMeeting ? <CheckCircleIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
-                              onClick={() => handleJoinSession(session)}
-                              disabled={isInThisMeeting}
-                            >
-                              {isInThisMeeting ? 'In Meeting' : session.status === 'live' ? 'Join Live' : 'Join Meeting'}
-                            </Button>
+                            <>
+                              {!isInThisMeeting ? (
+                                <Button
+                                  variant={session.status === 'live' ? 'primary' : 'outline'}
+                                  leftIcon={<PlayIcon className="h-4 w-4" />}
+                                  onClick={() => handleJoinSession(session)}
+                                >
+                                  {session.status === 'live' ? 'Join Live' : 'Join Meeting'}
+                                </Button>
+                              ) : (
+                                <>
+                                  <Button
+                                    variant="primary"
+                                    leftIcon={<CheckCircleIcon className="h-4 w-4" />}
+                                    disabled
+                                  >
+                                    In Meeting
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    leftIcon={<XIcon className="h-4 w-4" />}
+                                    onClick={() => handleLeaveSession(session)}
+                                  >
+                                    Leave Session
+                                  </Button>
+                                </>
+                              )}
+                            </>
                           );
                         })()}
 
-                        {/* JOIN LIVE button removed - instructors should not see this when session is already live */}
-
+                        {/* JOIN LIVE button for instructors when session is live */}
                         {isInstructor && session.status === 'live' && (
-                          <Button
-                            variant="danger"
-                            leftIcon={
-                              endingSessionId === session.id 
-                                ? <Loader2Icon className="h-4 w-4 animate-spin" /> 
-                                : <StopCircleIcon className="h-4 w-4" />
-                            }
-                            onClick={() => handleEndSession(session.id, session.title)}
-                            disabled={endingSessionId === session.id}
-                          >
-                            {endingSessionId === session.id ? 'Ending...' : 'End Meeting'}
-                          </Button>
+                          <>
+                            <Button
+                              variant="primary"
+                              leftIcon={<VideoIcon className="h-4 w-4" />}
+                              onClick={() => handleStartSession(session)}
+                            >
+                              Join Live
+                            </Button>
+                            <Button
+                              variant="danger"
+                              leftIcon={
+                                endingSessionId === session.id
+                                  ? <Loader2Icon className="h-4 w-4 animate-spin" />
+                                  : <StopCircleIcon className="h-4 w-4" />
+                              }
+                              onClick={() => handleEndSession(session.id, session.title)}
+                              disabled={endingSessionId === session.id}
+                            >
+                              {endingSessionId === session.id ? 'Ending...' : 'End Meeting'}
+                            </Button>
+                          </>
                         )}
 
                         {isInstructor && (
@@ -800,125 +887,152 @@ export const SessionList = () => {
               </div>
               <div className="space-y-4">
                 {courseMeetings.map((session) => (
-            <Card key={session.id} className="p-6">
+                  <Card key={session.id} className="p-6">
 
-              <div className="flex justify-between">
+                    <div className="flex justify-between">
 
-                {/* Info */}
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-xl font-semibold dark:text-white">{session.title}</h3>
-                    {getStatusBadge(session.status)}
-                  </div>
+                      {/* Info */}
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-xl font-semibold dark:text-white">{session.title}</h3>
+                          {getStatusBadge(session.status)}
+                        </div>
 
-                  <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
-                    <BookOpenIcon className="h-4 w-4" />
-                    {session.course} ({session.courseCode})
-                  </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
+                          <BookOpenIcon className="h-4 w-4" />
+                          {session.course} ({session.courseCode})
+                        </p>
 
-                  <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
-                    <UsersIcon className="h-4 w-4" />
-                    {session.instructor}
-                  </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
+                          <UsersIcon className="h-4 w-4" />
+                          {session.instructor}
+                        </p>
 
-                  <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
-                    <CalendarIcon className="h-4 w-4" />
-                    {session.date}
-                  </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
+                          <CalendarIcon className="h-4 w-4" />
+                          {session.date}
+                        </p>
 
-                  <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
-                    <ClockIcon className="h-4 w-4" />
-                    {session.time} ({session.duration})
-                  </p>
-                </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 mt-2">
+                          <ClockIcon className="h-4 w-4" />
+                          {session.time} ({session.duration})
+                        </p>
+                      </div>
 
-                {/* Buttons */}
-                <div className="flex flex-col gap-3">
+                      {/* Buttons */}
+                      <div className="flex flex-col gap-3">
 
-                  {isInstructor && (
-                    <Button
-                      variant="outline"
-                      leftIcon={<EditIcon className="h-4 w-4" />}
-                      onClick={() => navigate(`/dashboard/sessions/${session.id}/edit`)}
-                    >
-                      Edit
-                    </Button>
-                  )}
+                        {isInstructor && (
+                          <Button
+                            variant="outline"
+                            leftIcon={<EditIcon className="h-4 w-4" />}
+                            onClick={() => navigate(`/dashboard/sessions/${session.id}/edit`)}
+                          >
+                            Edit
+                          </Button>
+                        )}
 
-                  {/* START MEETING (Instructor only - for upcoming meetings) */}
-                  {isInstructor && session.status === 'upcoming' && (
-                    <Button
-                      variant="primary"
-                      leftIcon={
-                        startingSessionId === session.id 
-                          ? <Loader2Icon className="h-4 w-4 animate-spin" /> 
-                          : <PlayIcon className="h-4 w-4" />
-                      }
-                      onClick={() => handleStartSession(session)}
-                      disabled={startingSessionId === session.id}
-                    >
-                      {startingSessionId === session.id ? 'Starting...' : 'Start Meeting'}
-                    </Button>
-                  )}
+                        {/* START MEETING (Instructor only - for upcoming meetings) */}
+                        {isInstructor && session.status === 'upcoming' && (
+                          <Button
+                            variant="primary"
+                            leftIcon={
+                              startingSessionId === session.id
+                                ? <Loader2Icon className="h-4 w-4 animate-spin" />
+                                : <PlayIcon className="h-4 w-4" />
+                            }
+                            onClick={() => handleStartSession(session)}
+                            disabled={startingSessionId === session.id}
+                          >
+                            {startingSessionId === session.id ? 'Starting...' : 'Start Meeting'}
+                          </Button>
+                        )}
 
-                  {/* JOIN BUTTON - For students (upcoming and live) */}
-                  {!isInstructor && (session.status === 'upcoming' || session.status === 'live') && (() => {
-                    const sessionKey = session.zoomMeetingId || session.id;
-                    const isInThisMeeting = connectedSessionId === sessionKey;
-                    
-                    return (
-                      <Button
-                        variant={isInThisMeeting ? 'success' : session.status === 'live' ? 'primary' : 'outline'}
-                        leftIcon={isInThisMeeting ? <CheckCircleIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
-                        onClick={() => handleJoinSession(session)}
-                        disabled={isInThisMeeting}
-                      >
-                        {isInThisMeeting ? 'In Meeting' : session.status === 'live' ? 'Join Live' : 'Join Meeting'}
-                      </Button>
-                    );
-                  })()}
+                        {/* JOIN/LEAVE BUTTON - For students (upcoming and live) */}
+                        {!isInstructor && (session.status === 'upcoming' || session.status === 'live') && (() => {
+                          const sessionKey = session.zoomMeetingId || session.id;
+                          const isInThisMeeting = connectedSessionId === sessionKey;
 
-                  {/* JOIN LIVE button removed - instructors should not see this when session is already live */}
+                          return (
+                            <>
+                              {!isInThisMeeting ? (
+                                <Button
+                                  variant={session.status === 'live' ? 'primary' : 'outline'}
+                                  leftIcon={<PlayIcon className="h-4 w-4" />}
+                                  onClick={() => handleJoinSession(session)}
+                                >
+                                  {session.status === 'live' ? 'Join Live' : 'Join Meeting'}
+                                </Button>
+                              ) : (
+                                <>
+                                  <Button
+                                    variant="primary"
+                                    leftIcon={<CheckCircleIcon className="h-4 w-4" />}
+                                    disabled
+                                  >
+                                    In Meeting
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    leftIcon={<XIcon className="h-4 w-4" />}
+                                    onClick={() => handleLeaveSession(session)}
+                                  >
+                                    Leave Session
+                                  </Button>
+                                </>
+                              )}
+                            </>
+                          );
+                        })()}
 
-                  {/* END MEETING (Instructor only - for live meetings) */}
-                  {isInstructor && session.status === 'live' && (
-                    <Button
-                      variant="danger"
-                      leftIcon={
-                        endingSessionId === session.id 
-                          ? <Loader2Icon className="h-4 w-4 animate-spin" /> 
-                          : <StopCircleIcon className="h-4 w-4" />
-                      }
-                      onClick={() => handleEndSession(session.id, session.title)}
-                      disabled={endingSessionId === session.id}
-                    >
-                      {endingSessionId === session.id ? 'Ending...' : 'End Meeting'}
-                    </Button>
-                  )}
+                        {/* JOIN LIVE button for instructors when session is live */}
+                        {isInstructor && session.status === 'live' && (
+                          <>
+                            <Button
+                              variant="primary"
+                              leftIcon={<VideoIcon className="h-4 w-4" />}
+                              onClick={() => handleStartSession(session)}
+                            >
+                              Join Live
+                            </Button>
+                            <Button
+                              variant="danger"
+                              leftIcon={
+                                endingSessionId === session.id
+                                  ? <Loader2Icon className="h-4 w-4 animate-spin" />
+                                  : <StopCircleIcon className="h-4 w-4" />
+                              }
+                              onClick={() => handleEndSession(session.id, session.title)}
+                              disabled={endingSessionId === session.id}
+                            >
+                              {endingSessionId === session.id ? 'Ending...' : 'End Meeting'}
+                            </Button>
+                          </>
+                        )}
 
-                  {/* VIEW REPORT - ONLY for instructors */}
-                  {isInstructor && (
-                    <Button
-                      variant="outline"
-                      leftIcon={<FileTextIcon className="h-4 w-4" />}
-                      onClick={() => navigate(`/dashboard/sessions/${session.id}/report`)}
-                    >
-                      View Report
-                    </Button>
-                  )}
+                        {/* VIEW REPORT - ONLY for instructors */}
+                        {isInstructor && (
+                          <Button
+                            variant="outline"
+                            leftIcon={<FileTextIcon className="h-4 w-4" />}
+                            onClick={() => navigate(`/dashboard/sessions/${session.id}/report`)}
+                          >
+                            View Report
+                          </Button>
+                        )}
 
-                  {/* Show completed indicator for instructors */}
-                  {isInstructor && session.status === 'completed' && (
-                    <div className="flex items-center gap-2 text-blue-600 text-sm">
-                      <CheckCircleIcon className="h-4 w-4" />
-                      <span>Report Available</span>
+                        {/* Show completed indicator for instructors */}
+                        {isInstructor && session.status === 'completed' && (
+                          <div className="flex items-center gap-2 text-blue-600 text-sm">
+                            <CheckCircleIcon className="h-4 w-4" />
+                            <span>Report Available</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
 
-            </Card>
-          ))}
+                  </Card>
+                ))}
               </div>
             </div>
           )}
