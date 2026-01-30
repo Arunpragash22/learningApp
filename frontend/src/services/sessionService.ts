@@ -264,6 +264,9 @@ export const sessionService = {
       }
 
       return await res.json();
+    } catch (error) {
+      console.error('Error starting session:', error);
+      return { success: false, message: "Failed to start session" };
     }
   },
 
