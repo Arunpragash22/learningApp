@@ -18,6 +18,7 @@ export interface Session {
   recordingAvailable?: boolean;
   isStandalone?: boolean;        // True for standalone sessions, false for course-based
   enrollmentKey?: string;        // Enrollment key for standalone sessions
+  enrolledStudents?: string[];   // Array of enrolled student IDs
   courseId?: string;             // Link to course for course-based sessions
 }
 
@@ -263,9 +264,57 @@ export const sessionService = {
       }
 
       return await res.json();
+    }
+  },
+
+  // Join a session (student) - tracks participation
+  async joinSession(sessionId: string): Promise<{ 
+    success: boolean; 
+    message: string; 
+    sessionId?: string;
+    sessionKey?: string;
+    sessionTitle?: string;
+    status?: string;
+    join_url?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/join`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+        },
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        return { success: false, message: errorText || "Failed to join session" };
+      }
+
+      return await res.json();
     } catch (err) {
-      console.error("Start session error:", err);
-      return { success: false, message: "Failed to start session" };
+      console.error("Join session error:", err);
+      return { success: false, message: "Failed to join session" };
+    }
+  },
+
+  // Leave a session (student) - updates participation status
+  async leaveSession(sessionId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/leave`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+        },
+      });
+
+      if (!res.ok) {
+        return { success: false, message: "Failed to leave session" };
+      }
+
+      return await res.json();
+    } catch (err) {
+      console.error("Leave session error:", err);
+      return { success: false, message: "Failed to leave session" };
     }
   },
 };

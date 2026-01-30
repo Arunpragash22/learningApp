@@ -282,7 +282,7 @@ export const SessionList = () => {
     }
 
     // 🎯 STEP 1: Check if student needs enrollment (for standalone sessions)
-    if (session.isStandalone && session.requiresEnrollment) {
+    if (session.isStandalone) {
       // Check if student is enrolled
       const isEnrolled = session.enrolledStudents?.some(
         (enrolledId: string) => enrolledId === user?.id
