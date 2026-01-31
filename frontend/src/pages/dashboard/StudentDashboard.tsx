@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   BellIcon,
@@ -254,6 +254,9 @@ export const StudentDashboard = () => {
     correctAnswers: 0,       // Correct answers count
   });
 
+  // Track last quiz we showed (so polling doesn't show the same one twice)
+  const lastShownQuestionIdRef = useRef<string | null>(null);
+
   // 📶 WebRTC-aware Connection Latency Monitoring
   // This monitors network quality when student joins a session
   const handleConnectionQualityChange = useCallback((quality: ConnectionQuality) => {
@@ -323,6 +326,76 @@ export const StudentDashboard = () => {
     // Sessions will be updated via WebSocket events (session_started, meeting_ended, etc.)
     // No polling interval - updates are event-driven
   }, []); // Only load once on mount
+
+  // ===========================================================
+  // 📬 FETCH MISSED QUIZ WHEN DASHBOARD LOADS (e.g. after clicking push notification)
+  // ===========================================================
+  useEffect(() => {
+    const sessionId = localStorage.getItem("connectedSessionId");
+    if (!sessionId || !user?.id) return;
+
+    const fetchLatestQuiz = async () => {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL;
+        const res = await fetch(`${apiUrl}/api/live/latest-quiz/${sessionId}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("access_token") || ""}` },
+        });
+        const data = await res.json();
+        if (data.success && data.quiz) {
+          const qid = data.quiz.questionId || data.quiz.question_id;
+          if (qid !== lastShownQuestionIdRef.current) {
+            lastShownQuestionIdRef.current = qid;
+            console.log("📬 [StudentDashboard] Fetched missed quiz – showing on website");
+            setIncomingQuiz(data.quiz);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch latest quiz:", e);
+      }
+    };
+
+    fetchLatestQuiz();
+
+    // Also fetch when page becomes visible (e.g. user clicked notification to focus tab)
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && localStorage.getItem("connectedSessionId")) {
+        fetchLatestQuiz();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [user?.id]);
+
+  // ===========================================================
+  // 📬 POLL FOR QUIZ EVERY 15s WHILE CONNECTED (fallback if WebSocket misses)
+  // ===========================================================
+  useEffect(() => {
+    const sessionId = connectedSessionId || localStorage.getItem("connectedSessionId");
+    if (!sessionId || !user?.id) return;
+
+    const poll = async () => {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL;
+        const res = await fetch(`${apiUrl}/api/live/latest-quiz/${sessionId}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("access_token") || ""}` },
+        });
+        const data = await res.json();
+        if (data.success && data.quiz) {
+          const qid = data.quiz.questionId || data.quiz.question_id;
+          if (qid !== lastShownQuestionIdRef.current) {
+            lastShownQuestionIdRef.current = qid;
+            console.log("📬 [StudentDashboard] Poll: new quiz – showing on website");
+            setIncomingQuiz(data.quiz);
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    const interval = setInterval(poll, 15000); // every 15 seconds
+    return () => clearInterval(interval);
+  }, [connectedSessionId, user?.id]);
 
   // ===========================================================
   // 🎯 JOIN ZOOM MEETING + CONNECT TO SESSION WEBSOCKET
@@ -491,7 +564,8 @@ export const StudentDashboard = () => {
           // 🔔 3) Show browser/system notification (if permitted)
           showBrowserNotification("📝 New Quiz!", data.question || "You have a new quiz question");
           
-          // 4) Show quiz popup
+          // 4) Show quiz popup (and track so polling doesn't show again)
+          lastShownQuestionIdRef.current = data.questionId || data.question_id;
           setIncomingQuiz(data);
         } else if (data.type === "session_joined") {
           console.log("✅ Session join confirmed:", data);

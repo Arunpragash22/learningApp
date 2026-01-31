@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
@@ -208,6 +208,7 @@ export const SessionList = () => {
 
   // Quiz popup state
   const [incomingQuiz, setIncomingQuiz] = useState<any | null>(null);
+  const lastShownQuestionIdRef = useRef<string | null>(null);
 
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
 
@@ -291,6 +292,77 @@ export const SessionList = () => {
     // Sessions will be updated via WebSocket events (session_started, meeting_ended, etc.)
     // No polling interval - updates are event-driven
   }, [user?.id, isInstructor]);
+
+  // ---------------------------------------------------
+  // 📬 FETCH MISSED QUIZ WHEN PAGE LOADS (e.g. after clicking push notification)
+  // ---------------------------------------------------
+  useEffect(() => {
+    if (isInstructor || !user?.id) return;
+    const sessionId = localStorage.getItem("connectedSessionId");
+    if (!sessionId) return;
+
+    const fetchLatestQuiz = async () => {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL;
+        const res = await fetch(`${apiUrl}/api/live/latest-quiz/${sessionId}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("access_token") || ""}` },
+        });
+        const data = await res.json();
+        if (data.success && data.quiz) {
+          const qid = data.quiz.questionId || data.quiz.question_id;
+          if (qid !== lastShownQuestionIdRef.current) {
+            lastShownQuestionIdRef.current = qid;
+            console.log("📬 [SessionList] Fetched missed quiz – showing on website");
+            setIncomingQuiz(data.quiz);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch latest quiz:", e);
+      }
+    };
+
+    fetchLatestQuiz();
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && localStorage.getItem("connectedSessionId")) {
+        fetchLatestQuiz();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [user?.id, isInstructor]);
+
+  // ---------------------------------------------------
+  // 📬 POLL FOR QUIZ EVERY 15s WHILE CONNECTED (fallback if WebSocket misses)
+  // ---------------------------------------------------
+  useEffect(() => {
+    if (isInstructor || !user?.id) return;
+    const sessionId = connectedSessionId || localStorage.getItem("connectedSessionId");
+    if (!sessionId) return;
+
+    const poll = async () => {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL;
+        const res = await fetch(`${apiUrl}/api/live/latest-quiz/${sessionId}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("access_token") || ""}` },
+        });
+        const data = await res.json();
+        if (data.success && data.quiz) {
+          const qid = data.quiz.questionId || data.quiz.question_id;
+          if (qid !== lastShownQuestionIdRef.current) {
+            lastShownQuestionIdRef.current = qid;
+            console.log("📬 [SessionList] Poll: new quiz – showing on website");
+            setIncomingQuiz(data.quiz);
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    const interval = setInterval(poll, 15000);
+    return () => clearInterval(interval);
+  }, [connectedSessionId, user?.id, isInstructor]);
 
   // ---------------------------------------------------
   // ⭐ WEBSOCKET LISTENER FOR REAL-TIME SESSION STATUS UPDATES
@@ -540,7 +612,8 @@ export const SessionList = () => {
               position: "top-center",
             });
             
-            // 2) Show quiz popup
+            // 2) Show quiz popup (and track so polling doesn't show again)
+            lastShownQuestionIdRef.current = data.questionId || data.question_id;
             setIncomingQuiz(data);
           } else if (data.type === "session_joined") {
             console.log("✅ [SessionList] Session join confirmed:", data);

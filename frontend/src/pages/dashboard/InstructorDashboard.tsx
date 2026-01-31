@@ -233,8 +233,11 @@ export const InstructorDashboard = () => {
       
       if (res.data.success) {
         const sentCount = res.data.websocketSent || 0;
-        const participants = res.data.participants || [];
-        alert(` Question sent to ${sentCount} students in "${targetSession.title}"!\n\nParticipants: ${participants.map((p: any) => p.studentId || p.studentName).join(', ') || 'None connected yet'}`);
+        const participants = (res.data.participants || []).filter(
+          (p: any) => !String(p.studentId || p.studentName || '').toLowerCase().includes('instructor')
+        );
+        const studentList = participants.map((p: any) => p.studentName || p.studentId).join(', ') || 'None';
+        alert(`✅ Question sent to ${sentCount} student(s) in "${targetSession.title}"!\n\nStudents who received it: ${studentList}`);
       } else {
         alert(`⚠️ ${res.data.message || 'Failed to send question'}`);
       }

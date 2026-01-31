@@ -3,11 +3,12 @@ Live Learning Router
 Trigger questions → Sent ONLY to students who JOINED the session via WebSocket
 🎯 Session-based delivery: Only students connected to /ws/session/<meetingId>/<studentId> receive quizzes
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from bson import ObjectId
 from src.services.ws_manager import ws_manager
 from src.services.push_service import push_service
 from src.database.connection import db
+from src.middleware.auth import get_current_user
 import random
 from datetime import datetime
 
@@ -217,3 +218,21 @@ async def get_meeting_stats(meeting_id: str):
 async def get_all_stats():
     stats = ws_manager.get_all_stats()
     return {"success": True, "stats": stats}
+
+
+# ================================================================
+# 📬 LATEST QUIZ (Student: fetch missed quiz when opening dashboard after push)
+# ================================================================
+@router.get("/latest-quiz/{session_id}")
+async def get_latest_quiz_for_student(session_id: str, user: dict = Depends(get_current_user)):
+    """
+    If a quiz was sent to this session in the last 2 minutes, return it so the student
+    can see the quiz popup on the website (e.g. after clicking the push notification).
+    """
+    student_id = user.get("id") or user.get("_id")
+    if not student_id:
+        return {"success": False, "quiz": None, "message": "User not found"}
+    quiz = ws_manager.get_recent_quiz_for_student(session_id, str(student_id), max_age_seconds=120)
+    if not quiz:
+        return {"success": True, "quiz": None, "message": "No recent quiz"}
+    return {"success": True, "quiz": quiz, "message": "Recent quiz found"}
