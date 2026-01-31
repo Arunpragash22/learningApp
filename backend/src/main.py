@@ -334,7 +334,8 @@ async def get_ws_stats():
 async def trigger_quiz_to_session(session_id: str, request: Request):
     """
     Trigger quiz to ONLY students who have joined the session room.
-    This is called when instructor clicks 'Trigger Question'.
+    Reliably sends the same question to all joined students (any page/tab).
+    Resolves session_id to the actual room key (zoom id or mongo id) so delivery works.
     """
     try:
         body = await request.json()
@@ -345,19 +346,51 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
             "sessionId": session_id,
             "question": question_data.get("question", ""),
             "questionId": question_data.get("id", ""),
+            "question_id": question_data.get("id", ""),
             "options": question_data.get("options", []),
             "timeLimit": question_data.get("timeLimit", 30),
             "triggeredAt": datetime.now().isoformat()
         }
         
-        # 🎯 Broadcast ONLY to session room participants
-        sent_count = await ws_manager.broadcast_to_session(session_id, message)
-        
+        # Resolve session_id to the room key that has participants (students may join with zoom id or mongo id)
+        effective_session_id = session_id
         participants = ws_manager.get_session_participants(session_id)
+        if not participants:
+            try:
+                from src.database.connection import get_database
+                from bson import ObjectId
+                db = get_database()
+                if db and db.sessions:
+                    session_doc = None
+                    if session_id.isdigit():
+                        session_doc = await db.sessions.find_one({"zoomMeetingId": int(session_id)})
+                    if not session_doc:
+                        session_doc = await db.sessions.find_one({"zoomMeetingId": session_id})
+                    if not session_doc and len(session_id) == 24:
+                        try:
+                            session_doc = await db.sessions.find_one({"_id": ObjectId(session_id)})
+                        except Exception:
+                            pass
+                    if session_doc:
+                        zoom_id = str(session_doc.get("zoomMeetingId", "")) if session_doc.get("zoomMeetingId") is not None else None
+                        mongo_id = str(session_doc["_id"])
+                        for candidate in [zoom_id, mongo_id]:
+                            if candidate and ws_manager.get_session_participant_count(candidate) > 0:
+                                effective_session_id = candidate
+                                participants = ws_manager.get_session_participants(candidate)
+                                print(f"📍 Trigger: resolved session to room {effective_session_id} ({len(participants)} participants)")
+                                break
+            except Exception as resolve_err:
+                print(f"⚠️ Trigger: could not resolve session id: {resolve_err}")
+        
+        # 🎯 Broadcast to session room (one trigger, all joined students receive)
+        sent_count = await ws_manager.broadcast_to_session(effective_session_id, message)
+        
+        participants = ws_manager.get_session_participants(effective_session_id)
         
         return {
             "success": True,
-            "sessionId": session_id,
+            "sessionId": effective_session_id,
             "sentTo": sent_count,
             "participants": participants,
             "message": f"Quiz sent to {sent_count} students in session"

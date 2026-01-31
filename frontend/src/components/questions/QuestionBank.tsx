@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { Plus, Edit, Trash2, Search, Filter, Tag, Target, Clock, Zap } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Filter, Tag, Target, Clock, Zap, Loader2 } from 'lucide-react';
 
 export interface Question {
   id: string;
@@ -31,7 +31,8 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
   onEditQuestion,
   onDeleteQuestion,
   onTriggerQuestion,
-  showTriggerButton = false
+  showTriggerButton = false,
+  isTriggerLoading = false
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -189,10 +190,11 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
                     <Button
                       variant="primary"
                       size="sm"
-                      leftIcon={<Zap className="h-3 w-3" />}
+                      leftIcon={isTriggerLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
                       onClick={() => onTriggerQuestion(question)}
+                      disabled={isTriggerLoading}
                     >
-                      Trigger
+                      {isTriggerLoading ? 'Sending…' : 'Trigger'}
                     </Button>
                   )}
                   <Button

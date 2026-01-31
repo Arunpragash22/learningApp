@@ -393,20 +393,15 @@ export const LiveSession = () => {
   // This eliminates unnecessary API calls and reduces latency
   // Questions will be received through useSessionSocket hook when student joins
 
-  // Update engagement clusters when question is triggered
+  // When instructor selects a question, prepare UI only — trigger happens on button click only
   useEffect(() => {
     if (activeQuestion && sessionId) {
       questionStartTime.current = Date.now();
       setAnswerSubmitted(false);
       setShowPerformance(false);
       setQuizPerformance(null);
-      
-      // Trigger question on backend
-      if (isInstructor) {
-        quizService.triggerQuestion(activeQuestion.id, sessionId);
-      }
     }
-  }, [activeQuestion, sessionId, isInstructor]);
+  }, [activeQuestion, sessionId]);
 
   // 🎯 OPTIMIZED: Performance fetching - on-demand instead of polling
   // Fetch performance when instructor opens performance view (not continuous polling)
@@ -441,41 +436,44 @@ export const LiveSession = () => {
     }
   }, [activeQuestion, isInstructor, showPerformance, sessionId]);
 
+  const [triggerLoading, setTriggerLoading] = useState(false);
   const handleTriggerQuestion = async (question: Question) => {
-    console.log('Triggering question:', question.id, 'for session:', sessionId);
-    
     if (!sessionId) {
-      console.error('No sessionId available');
       toast.error('Session ID not found. Please refresh the page.');
       return;
     }
-
     if (!question || !question.id) {
-      console.error('Invalid question:', question);
       toast.error('Invalid question. Please try again.');
       return;
     }
-    
-    if (isInstructor) {
-      try {
-        console.log('Calling quizService.triggerQuestion...');
-        const result = await quizService.triggerQuestion(question.id, sessionId);
-        console.log('Question triggered successfully:', result);
-        toast.success('Questions triggered! Each student will receive a unique question.');
-        
-        // Clear the active question for instructor - students will get their own
+    if (!isInstructor) return;
+
+    if (triggerLoading) return; // Prevent duplicate trigger
+    setTriggerLoading(true);
+    try {
+      const questionPayload = {
+        id: question.id,
+        question: question.question,
+        options: question.options ?? [],
+        timeLimit: question.timeLimit ?? 30,
+      };
+      const result = await quizService.triggerQuestionToSession(sessionId, questionPayload);
+      if (result.success) {
+        const sentTo = result.sentTo ?? 0;
+        toast.success(`Question sent to ${sentTo} student(s) in this meeting.`);
         setActiveQuestion(null);
         setShowQuestions(false);
         setAnswerSubmitted(false);
         setShowPerformance(false);
         setQuizPerformance(null);
-      } catch (error) {
-        console.error('Error triggering question:', error);
-        toast.error('Failed to trigger question. Please try again.');
+      } else {
+        toast.error(result.error ?? 'Failed to send question. Make sure students have joined the meeting.');
       }
-    } else {
-      console.log('Question triggered by student (local only)');
-      toast.success('Question received!');
+    } catch (error) {
+      console.error('Error triggering question:', error);
+      toast.error('Failed to trigger question. Please try again.');
+    } finally {
+      setTriggerLoading(false);
     }
   };
 
@@ -953,6 +951,7 @@ export const LiveSession = () => {
                   onDeleteQuestion={() => {}}
                   onTriggerQuestion={handleTriggerQuestion}
                   showTriggerButton={true}
+                  isTriggerLoading={triggerLoading}
                 />
               </CardContent>
             </Card>
