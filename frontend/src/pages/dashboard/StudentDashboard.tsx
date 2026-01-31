@@ -8,6 +8,7 @@ import {
   PlayIcon,
   CalendarIcon,
   WifiIcon,
+  XIcon,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
