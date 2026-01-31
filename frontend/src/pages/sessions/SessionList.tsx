@@ -258,7 +258,7 @@ export const SessionList = () => {
   };
 
   // ---------------------------------------------------
-  // ⭐ JOIN SESSION - Call backend first, then connect WebSocket
+  // ⭐ JOIN SESSION - Direct WebSocket connection
   // ---------------------------------------------------
   const handleJoinSession = async (session: Session) => {
     if (isInstructor) {
@@ -276,63 +276,44 @@ export const SessionList = () => {
       return;
     }
 
-    // 🎯 STUDENTS: If the meeting is visible in their list, they're already enrolled or it's a course meeting
-    // Backend will handle enrollment verification, so we can proceed directly
+    // 🎯 STUDENTS: Direct join (same as Dashboard)
+    // If the meeting is visible in their list, they're already enrolled
     
-    // 🎯 STEP 1: Call backend join endpoint
-    try {
-      const joinResult = await sessionService.joinSession(session.id);
+    // 🎯 STEP 1: Open Zoom meeting
+    if (!session.join_url) {
+      toast.error("❌ Zoom join URL missing");
+      return;
+    }
 
-      if (!joinResult.success) {
-        // If backend says not enrolled, show enrollment modal
-        if (joinResult.message?.includes("not enrolled") || joinResult.message?.includes("enrollment")) {
-          toast.error("Please enroll with an enrollment key first");
-          handleOpenEnrollModal(session);
-          return;
-        }
-        
-        toast.error(joinResult.message || "Failed to join session. Please try again.");
-        console.error("Join failed:", joinResult);
-        return;
-      }
+    window.open(session.join_url, '_blank');
 
-      console.log("✅ [SessionList] Backend join successful:", joinResult);
+    // 🎯 STEP 2: Connect to WebSocket (same as StudentDashboard)
+    const sessionKey = session.zoomMeetingId || session.id;
+    const studentId = user?.id || `STUDENT_${Date.now()}`;
+    const studentName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown Student';
+    const studentEmail = user?.email || '';
+    const wsBase = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL?.replace('/api', '').replace('http', 'ws') || 'ws://localhost:8000';
 
-      // 🎯 STEP 2: Open Zoom meeting
-      if (!session.join_url) {
-        toast.error("❌ Zoom join URL missing");
-        return;
-      }
+    const encodedName = encodeURIComponent(studentName);
+    const encodedEmail = encodeURIComponent(studentEmail);
+    const sessionWsUrl = `${wsBase}/ws/session/${sessionKey}/${studentId}?student_name=${encodedName}&student_email=${encodedEmail}`;
 
-      window.open(session.join_url, '_blank');
+    console.log(`🔗 [SessionList] Connecting to session WebSocket: ${sessionWsUrl}`);
 
-      // 🎯 STEP 4: Connect to WebSocket
-      const sessionKey = session.zoomMeetingId || session.id;
-      const studentId = user?.id || `STUDENT_${Date.now()}`;
-      const studentName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown Student';
-      const studentEmail = user?.email || '';
-      const wsBase = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL?.replace('/api', '') || 'ws://localhost:8000';
+    // Close any previous session WebSocket and stop monitoring
+    if (sessionWs) {
+      console.log("🔌 [SessionList] Closing previous session WebSocket");
+      sessionWs.close();
+    }
+    if (networkMonitoringEnabled) {
+      stopMonitoring();
+      setNetworkMonitoringEnabled(false);
+    }
 
-      const encodedName = encodeURIComponent(studentName);
-      const encodedEmail = encodeURIComponent(studentEmail);
-      const sessionWsUrl = `${wsBase}/ws/session/${sessionKey}/${studentId}?student_name=${encodedName}&student_email=${encodedEmail}`;
+    // Create new session WebSocket
+    const ws = new WebSocket(sessionWsUrl);
 
-      console.log(`🔗 [SessionList] Connecting to session WebSocket: ${sessionWsUrl}`);
-
-      // Close any previous session WebSocket and stop monitoring
-      if (sessionWs) {
-        console.log("🔌 [SessionList] Closing previous session WebSocket");
-        sessionWs.close();
-      }
-      if (networkMonitoringEnabled) {
-        stopMonitoring();
-        setNetworkMonitoringEnabled(false);
-      }
-
-      // Create new session WebSocket
-      const ws = new WebSocket(sessionWsUrl);
-
-      ws.onopen = () => {
+    ws.onopen = () => {
         console.log(`✅ [SessionList] Connected to session ${sessionKey} WebSocket`);
         setConnectedSessionId(sessionKey);
         localStorage.setItem('connectedSessionId', sessionKey);
@@ -359,9 +340,10 @@ export const SessionList = () => {
         }
       };
 
-      ws.onerror = (err) => {
-        console.error("[SessionList] Session WS ERROR:", err);
-      };
+    ws.onerror = (err) => {
+      console.error("[SessionList] Session WS ERROR:", err);
+      toast.error("Failed to connect to session");
+    };
 
       ws.onmessage = (event) => {
         try {
@@ -415,15 +397,6 @@ export const SessionList = () => {
       };
 
       setSessionWs(ws);
-
-      // Store session ID in localStorage
-      localStorage.setItem('connectedSessionId', sessionKey);
-      setConnectedSessionId(sessionKey);
-
-    } catch (error) {
-      console.error("Error joining session:", error);
-      toast.error("Failed to join session");
-    }
   };
 
   // ---------------------------------------------------
