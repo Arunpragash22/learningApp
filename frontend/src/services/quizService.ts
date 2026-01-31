@@ -223,7 +223,7 @@ export const quizService = {
   async triggerSameQuestionToSession(meetingId: string): Promise<{ success: boolean; sentTo?: number; message?: string }> {
     try {
       const encoded = encodeURIComponent(meetingId);
-      const response = await fetch(`${API_BASE_URL}/live/trigger-same/${encoded}`, {
+      const response = await fetch(`${API_BASE_URL}/api/live/trigger-same/${encoded}`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
