@@ -31,6 +31,13 @@ class WebSocketManager:
         # Structure: {sessionId: {studentId: {"websocket": ws, "status": "joined", "name": str, "email": str}}}
         self.session_rooms: Dict[str, Dict[str, dict]] = {}
 
+        # 📬 Last quiz per session (for "same question to all" - main.py trigger). Sent on reconnect.
+        # session_id -> {"message": {...}, "sent_at": datetime}
+        self.last_session_quiz: Dict[str, dict] = {}
+        # 📬 Last quiz per student per session (for "different question per student" - live.py trigger). Sent on reconnect.
+        # session_id -> { student_id -> {"message": {...}, "sent_at": datetime} }
+        self.last_student_quiz: Dict[str, Dict[str, dict]] = {}
+
     # =========================================================
     # 🎯 SESSION ROOM HANDLERS (NEW - For Quiz Delivery)
     # =========================================================
@@ -317,6 +324,12 @@ class WebSocketManager:
             
             await websocket.send_json(message)
             print(f"   ✅ Sent to {participant.get('studentName', student_id)}")
+            # 📬 Store last quiz for this student/session so they get it on reconnect
+            if message.get("type") == "quiz":
+                if session_id not in self.last_student_quiz:
+                    self.last_student_quiz[session_id] = {}
+                self.last_student_quiz[session_id][student_id] = {"message": message, "sent_at": datetime.now()}
+                print(f"   📌 Stored last quiz for session {session_id} / student {student_id[:8]}... (reconnect catch-up)")
             return True
         except Exception as e:
             error_msg = str(e)
@@ -327,6 +340,43 @@ class WebSocketManager:
                 await self.leave_session_room(session_id, student_id)
             else:
                 print(f"   ❌ Failed to send to {student_id}: {e}")
+            return False
+
+    def get_recent_quiz_for_student(self, session_id: str, student_id: str, max_age_seconds: int = 120) -> Optional[dict]:
+        """
+        Get the most recent quiz for this student in this session (for reconnect catch-up).
+        Checks per-student quiz first (live.py), then session-wide quiz (main.py).
+        Returns None if no recent quiz.
+        """
+        now = datetime.now()
+        # 1) Per-student quiz (live.py - different question per student)
+        if session_id in self.last_student_quiz and student_id in self.last_student_quiz[session_id]:
+            entry = self.last_student_quiz[session_id][student_id]
+            sent_at = entry.get("sent_at")
+            if sent_at and (now - sent_at).total_seconds() <= max_age_seconds:
+                return entry.get("message")
+        # 2) Session-wide quiz (main.py - same question to all)
+        if session_id in self.last_session_quiz:
+            entry = self.last_session_quiz[session_id]
+            sent_at = entry.get("sent_at")
+            if sent_at and (now - sent_at).total_seconds() <= max_age_seconds:
+                return entry.get("message")
+        return None
+
+    async def send_missed_quiz_if_any(self, session_id: str, student_id: str, websocket: WebSocket) -> bool:
+        """
+        If a quiz was sent to this session in the last 2 minutes, send it to this websocket
+        (so students who reconnect get the quiz they missed). Returns True if sent.
+        """
+        quiz = self.get_recent_quiz_for_student(session_id, student_id, max_age_seconds=120)
+        if not quiz:
+            return False
+        try:
+            await websocket.send_json(quiz)
+            print(f"   📬 Sent missed quiz to reconnected student {student_id[:8]}... (catch-up)")
+            return True
+        except Exception as e:
+            print(f"   ⚠️ Failed to send missed quiz to {student_id}: {e}")
             return False
 
     async def broadcast_to_session(self, session_id: str, message: dict) -> int:
@@ -405,6 +455,11 @@ class WebSocketManager:
                 print(f"   ⚠️ Error cleaning up dead connection for {student_id}: {cleanup_error}")
                 # Force remove from session room if leave fails
                 self.remove_from_session_room(session_id, student_id)
+
+        # 📬 Store last quiz for this session so reconnecting students can receive it
+        if message.get("type") == "quiz":
+            self.last_session_quiz[session_id] = {"message": message, "sent_at": datetime.now()}
+            print(f"   📌 Stored last quiz for session {session_id} (reconnect catch-up)")
 
         print(f"📢 SESSION BROADCAST [{session_id}] → Sent to {sent} students INSTANTLY")
         return sent

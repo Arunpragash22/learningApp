@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   BellIcon,
@@ -247,13 +247,6 @@ export const StudentDashboard = () => {
     localStorage.getItem('connectedSessionId')
   );
 
-  // Reconnect: remember which session we joined so we can auto-reconnect if WS drops
-  const lastJoinedSessionKeyRef = useRef<string | null>(null);
-  const sessionsRef = useRef<Session[]>([]);
-  sessionsRef.current = sessions;
-  const reconnectAttemptRef = useRef(0);
-  const MAX_RECONNECT_ATTEMPTS = 5;
-  
   // 📊 Session quiz tracking - resets each session
   const [sessionQuizStats, setSessionQuizStats] = useState({
     questionsReceived: 0,    // Questions sent by instructor
@@ -385,9 +378,6 @@ export const StudentDashboard = () => {
     // Show toast to indicate connection attempt
     toast.info(`Connecting to session...`);
     
-    // Remember which session we joined (for auto-reconnect if WS drops)
-    lastJoinedSessionKeyRef.current = sessionKey;
-
     // Close any previous session WebSocket
     if (sessionWs) {
       console.log("🔌 Closing previous session WebSocket");
@@ -399,7 +389,6 @@ export const StudentDashboard = () => {
     
     ws.onopen = () => {
       console.log(`✅ Connected to session ${sessionKey} WebSocket`);
-      reconnectAttemptRef.current = 0; // Reset so next drop gets full backoff again
       setConnectedSessionId(sessionKey);
       localStorage.setItem('connectedSessionId', sessionKey);
       
@@ -464,38 +453,11 @@ export const StudentDashboard = () => {
         localStorage.removeItem('connectedSessionId');
         toast.info("Disconnected from session");
       }
-
-      // 🔄 Auto-reconnect if we didn't explicitly leave (exponential backoff, max attempts)
-      const keyToReconnect = lastJoinedSessionKeyRef.current;
-      if (keyToReconnect) {
-        const attempt = reconnectAttemptRef.current + 1;
-        reconnectAttemptRef.current = attempt;
-        if (attempt > MAX_RECONNECT_ATTEMPTS) {
-          lastJoinedSessionKeyRef.current = null;
-          console.warn(`🔄 [StudentDashboard] Stopped reconnecting after ${MAX_RECONNECT_ATTEMPTS} attempts`);
-          toast.error("Could not reconnect. Please click Join again.");
-          return;
-        }
-        const delayMs = Math.min(2000 * Math.pow(2, attempt - 1), 30000);
-        console.log(`🔄 [StudentDashboard] Will auto-reconnect to session ${keyToReconnect} in ${delayMs / 1000}s (attempt ${attempt}/${MAX_RECONNECT_ATTEMPTS})`);
-        toast.info(`Reconnecting in ${delayMs / 1000}s...`);
-        setTimeout(() => {
-          if (lastJoinedSessionKeyRef.current !== keyToReconnect) return; // User left
-          const session = sessionsRef.current.find(s => (s.zoomMeetingId || s.id) === keyToReconnect);
-          if (session && (session.status === 'live' || session.status === 'upcoming')) {
-            console.log(`🔄 [StudentDashboard] Reconnecting to session ${keyToReconnect}`);
-            handleJoinSession(session);
-          }
-        }, delayMs);
-      }
     };
     
     ws.onerror = (err) => {
       console.error("❌ Session WebSocket ERROR:", err);
-      // Don't show error toast when auto-reconnecting (onclose will show "Reconnecting...")
-      if (reconnectAttemptRef.current === 0) {
-        toast.error(`Failed to connect to session. Please try again.`);
-      }
+      toast.error(`Failed to connect to session. Please try again.`);
       // Error will trigger onclose, which handles cleanup
     };
     
@@ -585,9 +547,6 @@ export const StudentDashboard = () => {
   // ===========================================================
   const handleLeaveSession = (session: Session) => {
     const sessionKey = session.zoomMeetingId || session.id;
-    
-    // Don't auto-reconnect when user explicitly leaves
-    lastJoinedSessionKeyRef.current = null;
     
     // Close WebSocket connection
     if (sessionWs) {

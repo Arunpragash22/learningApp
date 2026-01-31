@@ -254,6 +254,9 @@ async def websocket_session(
             "timestamp": datetime.now().isoformat()
         })
         
+        # 📬 If a quiz was sent in the last 2 minutes, send it now (catch-up for reconnecting students)
+        await ws_manager.send_missed_quiz_if_any(session_id, student_id, websocket)
+        
         # Keep connection alive and handle reconnection
         while True:
             try:
@@ -284,6 +287,8 @@ async def websocket_session(
                                 "participantCount": result.get("participantCount", 0),
                                 "timestamp": datetime.now().isoformat()
                             })
+                            # 📬 Send any quiz they missed while disconnected
+                            await ws_manager.send_missed_quiz_if_any(session_id, student_id, websocket)
                     except:
                         pass
             except Exception as e:
