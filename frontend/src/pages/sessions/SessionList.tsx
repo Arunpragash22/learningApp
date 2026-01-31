@@ -323,14 +323,19 @@ export const SessionList = () => {
 
       toast.success(`✅ Joined "${session.title}" - Network monitoring started`);
       
-      // 🔄 Send keepalive ping every 30 seconds to prevent connection timeout
-      const pingInterval = setInterval(() => {
+      // 🔄 Send keepalive ping immediately, then every 15 seconds to prevent connection timeout
+      const sendPing = () => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send('ping');
-        } else {
-          clearInterval(pingInterval);
+          console.log('📡 [SessionList] Sent keepalive ping');
         }
-      }, 30000);
+      };
+      
+      // Send first ping immediately
+      sendPing();
+      
+      // Then send ping every 15 seconds
+      const pingInterval = setInterval(sendPing, 15000);
       
       // Store interval ID to clear it later
       (ws as any).pingInterval = pingInterval;
