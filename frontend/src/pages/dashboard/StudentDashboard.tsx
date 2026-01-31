@@ -361,6 +361,10 @@ export const StudentDashboard = () => {
       wsBase: wsBase
     });
     
+    console.log(`🔑 SESSION KEY USED: ${sessionKey}`);
+    console.log(`🔑 ZOOM ID: ${session.zoomMeetingId}`);
+    console.log(`🔑 SESSION ID: ${session.id}`);
+    
     // Include student name and email as query parameters for report generation
     const encodedName = encodeURIComponent(studentName);
     const encodedEmail = encodeURIComponent(studentEmail);

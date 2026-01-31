@@ -210,6 +210,11 @@ export const InstructorDashboard = () => {
     // 🎯 Use the real Zoom meeting ID as the session room key
     const meetingId = targetSession.zoomMeetingId || targetSession.id;
     
+    console.log(`🔑 INSTRUCTOR TRIGGERING WITH:`);
+    console.log(`🔑 MEETING ID: ${meetingId}`);
+    console.log(`🔑 ZOOM ID: ${targetSession.zoomMeetingId}`);
+    console.log(`🔑 SESSION ID: ${targetSession.id}`);
+    
     if (!meetingId) {
       alert("❌ Session has no meeting ID");
       return;
