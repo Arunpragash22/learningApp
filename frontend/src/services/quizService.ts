@@ -219,6 +219,25 @@ export const quizService = {
     }
   },
 
+  /** Trigger one random question to all joined students (Instructor Dashboard one-click). */
+  async triggerSameQuestionToSession(meetingId: string): Promise<{ success: boolean; sentTo?: number; message?: string }> {
+    try {
+      const encoded = encodeURIComponent(meetingId);
+      const response = await fetch(`${API_BASE_URL}/live/trigger-same/${encoded}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return { success: false, sentTo: 0, message: data.message || `Failed: ${response.status}` };
+      }
+      return { success: true, sentTo: data.sentTo ?? 0, message: data.message };
+    } catch (error) {
+      console.error('Error trigger-same:', error);
+      return { success: false, sentTo: 0, message: 'Network error' };
+    }
+  },
+
   // 🎯 Trigger question to session room via WebSocket endpoint
   // Only students who joined the session will receive this
   async triggerQuestionToSession(sessionId: string, question: any): Promise<{ success: boolean; sentTo?: number }> {

@@ -8,7 +8,7 @@ from bson import ObjectId
 from src.services.ws_manager import ws_manager
 from src.services.push_service import push_service
 from src.database.connection import db
-from src.middleware.auth import get_current_user
+from src.middleware.auth import get_current_user, require_instructor
 import random
 from datetime import datetime
 
@@ -200,6 +200,95 @@ async def trigger_question(meeting_id: str):
             "success": False,
             "message": f"Error: {str(e)}"
         }
+
+
+# ================================================================
+# 🎯 TRIGGER SAME QUESTION TO ALL (Instructor Dashboard one-click)
+# Same question sent to all joined students via WebSocket broadcast.
+# ================================================================
+@router.post("/trigger-same/{meeting_id}")
+async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(require_instructor)):
+    """
+    Instructor triggers one random question; it is sent to ALL students
+    currently joined in the meeting (same question to everyone).
+    Reliable delivery via WebSocket broadcast; works regardless of student page/tab.
+    """
+    try:
+        questions = await db.database.questions.find({}).to_list(length=None)
+        if not questions:
+            return {"success": False, "message": "No questions found in DB"}
+
+        participants = ws_manager.get_session_participants(meeting_id)
+        effective_meeting_id = meeting_id
+        session_ids_to_check = [meeting_id]
+
+        if not participants:
+            try:
+                session_doc = None
+                if meeting_id.isdigit():
+                    try:
+                        session_doc = await db.database.sessions.find_one({"zoomMeetingId": int(meeting_id)})
+                    except Exception:
+                        pass
+                if not session_doc:
+                    session_doc = await db.database.sessions.find_one({"zoomMeetingId": meeting_id})
+                if not session_doc and len(meeting_id) == 24:
+                    try:
+                        session_doc = await db.database.sessions.find_one({"_id": ObjectId(meeting_id)})
+                    except Exception:
+                        pass
+                if session_doc:
+                    zoom_id = str(session_doc.get("zoomMeetingId", "")) if session_doc.get("zoomMeetingId") is not None else None
+                    mongo_id = str(session_doc["_id"])
+                    if zoom_id and zoom_id not in session_ids_to_check:
+                        session_ids_to_check.append(zoom_id)
+                    if mongo_id and mongo_id not in session_ids_to_check:
+                        session_ids_to_check.append(mongo_id)
+                    participants = ws_manager.get_session_participants_by_multiple_ids(session_ids_to_check)
+                    if participants:
+                        participant_counts = {}
+                        for p in participants:
+                            sid = p.get("sessionId", meeting_id)
+                            participant_counts[sid] = participant_counts.get(sid, 0) + 1
+                        if participant_counts:
+                            effective_meeting_id = max(participant_counts.items(), key=lambda x: x[1])[0]
+            except Exception as lookup_error:
+                print(f"⚠️ trigger-same: resolve error: {lookup_error}")
+
+        if not participants:
+            return {
+                "success": False,
+                "message": "No students connected to this session. Ask students to join the meeting first.",
+                "sentTo": 0,
+            }
+
+        q = random.choice(questions)
+        message = {
+            "type": "quiz",
+            "questionId": str(q["_id"]),
+            "question_id": str(q["_id"]),
+            "question": q["question"],
+            "options": q.get("options", []),
+            "timeLimit": q.get("timeLimit", 30),
+            "sessionId": effective_meeting_id,
+            "triggeredAt": datetime.now().isoformat(),
+        }
+
+        sent_count = await ws_manager.broadcast_to_session(effective_meeting_id, message)
+        participants_list = ws_manager.get_session_participants(effective_meeting_id)
+
+        return {
+            "success": True,
+            "sessionId": effective_meeting_id,
+            "sentTo": sent_count,
+            "participants": participants_list,
+            "message": f"Question sent to {sent_count} student(s) in session",
+        }
+    except Exception as e:
+        print(f"❌ Error trigger-same: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "message": str(e), "sentTo": 0}
 
 
 # ================================================================

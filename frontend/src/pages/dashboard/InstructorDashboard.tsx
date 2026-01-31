@@ -4,8 +4,9 @@ import { toast } from "sonner";
 
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/ui/Button";
-import { WifiIcon, ActivityIcon, UsersIcon } from "lucide-react";
+import { WifiIcon, ActivityIcon, UsersIcon, TargetIcon, Loader2Icon } from "lucide-react";
 import { sessionService, Session } from "../../services/sessionService";
+import { quizService } from "../../services/quizService";
 import { isWithinNext24Hours } from "../../utils/sessionFilters";
 import { Badge } from "../../components/ui/Badge";
 import { useLatencyMonitor, ConnectionQuality } from "../../hooks/useLatencyMonitor";
@@ -71,6 +72,27 @@ export const InstructorDashboard = () => {
   // Close only on unmount or when sessionId changes.
   // ================================
   const sessionId = selectedSession?.zoomMeetingId || selectedSession?.id || '';
+
+  const [triggerLoading, setTriggerLoading] = useState(false);
+  const handleTriggerQuestion = async () => {
+    const session = selectedSession || sessions[0];
+    if (!session || triggerLoading) return;
+    const meetingKey = session.zoomMeetingId ?? session.id;
+    setTriggerLoading(true);
+    try {
+      const result = await quizService.triggerSameQuestionToSession(String(meetingKey));
+      if (result.success) {
+        const count = result.sentTo ?? 0;
+        toast.success(`Question sent to ${count} student(s) in this meeting.`);
+      } else {
+        toast.error(result.message ?? "No students are in the meeting. Ask them to join first.");
+      }
+    } catch (e) {
+      toast.error("Failed to send question. Try again.");
+    } finally {
+      setTriggerLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!sessionId || !user?.id) {
@@ -178,10 +200,23 @@ export const InstructorDashboard = () => {
           </p>
         </div>
 
-        {/* View-only: start/trigger from Meetings page */}
-        <Link to="/dashboard/sessions" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
-          Start from Meetings →
-        </Link>
+        <div className="flex items-center gap-3">
+          {/* Trigger Question: send one random question to all joined students (one click, no duplicate) */}
+          {(selectedSession || sessions[0]) ? (
+            <Button
+              variant="primary"
+              size="sm"
+              leftIcon={triggerLoading ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <TargetIcon className="h-4 w-4" />}
+              onClick={handleTriggerQuestion}
+              disabled={triggerLoading}
+            >
+              {triggerLoading ? "Sending…" : "Trigger Question"}
+            </Button>
+          ) : null}
+          <Link to="/dashboard/sessions" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+            Start from Meetings →
+          </Link>
+        </div>
       </div>
 
       {/* ================= CARDS SECTION ================= */}
