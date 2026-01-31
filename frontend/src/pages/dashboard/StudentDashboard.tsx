@@ -328,6 +328,14 @@ export const StudentDashboard = () => {
   // Only students who click Join will receive quiz questions
   // ===========================================================
   const handleJoinSession = (session: Session) => {
+    const sessionKey = session.zoomMeetingId || session.id;
+    
+    // If already connected to this session, treat as leave action
+    if (connectedSessionId === sessionKey) {
+      handleLeaveSession(session);
+      return;
+    }
+    
     if (!session.join_url) {
       alert("❌ Zoom join URL missing");
       return;
@@ -529,6 +537,32 @@ export const StudentDashboard = () => {
     };
     
     setSessionWs(ws);
+  };
+
+  // ===========================================================
+  // 🎯 LEAVE SESSION - Disconnect WebSocket and stop monitoring
+  // ===========================================================
+  const handleLeaveSession = (session: Session) => {
+    const sessionKey = session.zoomMeetingId || session.id;
+    
+    // Close WebSocket connection
+    if (sessionWs) {
+      sessionWs.close();
+      setSessionWs(null);
+    }
+    
+    // Stop network monitoring
+    if (networkMonitoringEnabled) {
+      stopMonitoring();
+      setNetworkMonitoringEnabled(false);
+    }
+    
+    // Clear connection state
+    setConnectedSessionId(null);
+    localStorage.removeItem('connectedSessionId');
+    
+    toast.info(`Left "${session.title}"`);
+    console.log('👋 Left session:', sessionKey);
   };
 
   // Cleanup session WebSocket and network monitoring on unmount or when leaving
@@ -780,14 +814,37 @@ export const StudentDashboard = () => {
                               {session.date} • {session.time}
                             </p>
                           </div>
-                          <Button
-                            variant={isConnectedToThis ? 'secondary' : session.status === 'live' ? 'primary' : 'outline'}
-                            size="sm"
-                            leftIcon={isConnectedToThis ? <WifiIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
-                            onClick={() => handleJoinSession(session)}
-                          >
-                            {isConnectedToThis ? 'Joined' : session.status === 'live' ? 'Join' : 'Join'}
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            {!isConnectedToThis ? (
+                              <Button
+                                variant={session.status === 'live' ? 'primary' : 'outline'}
+                                size="sm"
+                                leftIcon={<PlayIcon className="h-4 w-4" />}
+                                onClick={() => handleJoinSession(session)}
+                              >
+                                {session.status === 'live' ? 'Join' : 'Join'}
+                              </Button>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="success"
+                                  size="sm"
+                                  leftIcon={<CheckCircleIcon className="h-4 w-4" />}
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                  Live
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  leftIcon={<XIcon className="h-4 w-4" />}
+                                  onClick={() => handleJoinSession(session)}
+                                >
+                                  Leave
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -834,14 +891,37 @@ export const StudentDashboard = () => {
                               {session.date} • {session.time}
                             </p>
                           </div>
-                          <Button
-                            variant={isConnectedToThis ? 'secondary' : session.status === 'live' ? 'primary' : 'outline'}
-                            size="sm"
-                            leftIcon={isConnectedToThis ? <WifiIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
-                            onClick={() => handleJoinSession(session)}
-                          >
-                            {isConnectedToThis ? 'Joined' : session.status === 'live' ? 'Join' : 'Join'}
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            {!isConnectedToThis ? (
+                              <Button
+                                variant={session.status === 'live' ? 'primary' : 'outline'}
+                                size="sm"
+                                leftIcon={<PlayIcon className="h-4 w-4" />}
+                                onClick={() => handleJoinSession(session)}
+                              >
+                                {session.status === 'live' ? 'Join' : 'Join'}
+                              </Button>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="success"
+                                  size="sm"
+                                  leftIcon={<CheckCircleIcon className="h-4 w-4" />}
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                  Live
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  leftIcon={<XIcon className="h-4 w-4" />}
+                                  onClick={() => handleJoinSession(session)}
+                                >
+                                  Leave
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );

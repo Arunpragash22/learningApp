@@ -879,23 +879,23 @@ export const SessionList = () => {
                                   leftIcon={<PlayIcon className="h-4 w-4" />}
                                   onClick={() => handleJoinSession(session)}
                                 >
-                                  {session.status === 'live' ? 'Join Live' : 'Join Meeting'}
+                                  {session.status === 'live' ? 'Join Live' : 'Join'}
                                 </Button>
                               ) : (
                                 <>
                                   <Button
-                                    variant="primary"
+                                    variant="success"
                                     leftIcon={<CheckCircleIcon className="h-4 w-4" />}
-                                    disabled
+                                    className="bg-green-600 hover:bg-green-700 text-white"
                                   >
-                                    In Meeting
+                                    Live
                                   </Button>
                                   <Button
                                     variant="outline"
                                     leftIcon={<XIcon className="h-4 w-4" />}
                                     onClick={() => handleLeaveSession(session)}
                                   >
-                                    Leave Session
+                                    Leave
                                   </Button>
                                 </>
                               )}
@@ -1040,23 +1040,23 @@ export const SessionList = () => {
                                   leftIcon={<PlayIcon className="h-4 w-4" />}
                                   onClick={() => handleJoinSession(session)}
                                 >
-                                  {session.status === 'live' ? 'Join Live' : 'Join Meeting'}
+                                  {session.status === 'live' ? 'Join Live' : 'Join'}
                                 </Button>
                               ) : (
                                 <>
                                   <Button
-                                    variant="primary"
+                                    variant="success"
                                     leftIcon={<CheckCircleIcon className="h-4 w-4" />}
-                                    disabled
+                                    className="bg-green-600 hover:bg-green-700 text-white"
                                   >
-                                    In Meeting
+                                    Live
                                   </Button>
                                   <Button
                                     variant="outline"
                                     leftIcon={<XIcon className="h-4 w-4" />}
                                     onClick={() => handleLeaveSession(session)}
                                   >
-                                    Leave Session
+                                    Leave
                                   </Button>
                                 </>
                               )}
