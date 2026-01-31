@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
@@ -208,6 +208,11 @@ export const SessionList = () => {
 
   // Quiz popup state
   const [incomingQuiz, setIncomingQuiz] = useState<any | null>(null);
+
+  // Reconnect: remember which session we joined so we can auto-reconnect if WS drops
+  const lastJoinedSessionKeyRef = useRef<string | null>(null);
+  const sessionsRef = useRef<Session[]>([]);
+  sessionsRef.current = sessions;
 
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
 
@@ -455,6 +460,9 @@ export const SessionList = () => {
 
     console.log(`🔗 [SessionList] Connecting to session WebSocket: ${sessionWsUrl}`);
 
+    // Remember which session we joined (for auto-reconnect if WS drops)
+    lastJoinedSessionKeyRef.current = sessionKey;
+
     // Close any previous session WebSocket and stop monitoring
     if (sessionWs) {
       console.log("🔌 [SessionList] Closing previous session WebSocket");
@@ -516,6 +524,21 @@ export const SessionList = () => {
         localStorage.removeItem('connectedSessionId');
         toast.info("Disconnected from session");
       }
+
+      // 🔄 Auto-reconnect if we didn't explicitly leave (so quiz popup can receive messages)
+      const keyToReconnect = lastJoinedSessionKeyRef.current;
+      if (keyToReconnect) {
+        console.log(`🔄 [SessionList] Will auto-reconnect to session ${keyToReconnect} in 2s`);
+        toast.info("Reconnecting to session...");
+        setTimeout(() => {
+          if (lastJoinedSessionKeyRef.current !== keyToReconnect) return;
+          const session = sessionsRef.current.find(s => (s.zoomMeetingId || s.id) === keyToReconnect);
+          if (session && (session.status === 'live' || session.status === 'upcoming')) {
+            console.log(`🔄 [SessionList] Reconnecting to session ${keyToReconnect}`);
+            handleJoinSession(session);
+          }
+        }, 2000);
+      }
     };
 
     ws.onerror = (err) => {
@@ -524,6 +547,8 @@ export const SessionList = () => {
     };
 
       ws.onmessage = (event) => {
+        // Backend sends "pong" as plain text for keepalive - don't parse as JSON
+        if (event.data === 'pong') return;
         try {
           const data = JSON.parse(event.data);
           console.log("📬 [SessionList] Session WS message:", data);
@@ -594,6 +619,9 @@ export const SessionList = () => {
     if (connectedSessionId !== sessionKey) {
       return;
     }
+
+    // Don't auto-reconnect when user explicitly leaves
+    lastJoinedSessionKeyRef.current = null;
 
     try {
       // 🎯 STEP 1: Call backend leave endpoint

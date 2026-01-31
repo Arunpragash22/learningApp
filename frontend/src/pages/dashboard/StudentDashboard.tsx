@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   BellIcon,
@@ -246,6 +246,11 @@ export const StudentDashboard = () => {
   const [connectedSessionId, setConnectedSessionId] = useState<string | null>(
     localStorage.getItem('connectedSessionId')
   );
+
+  // Reconnect: remember which session we joined so we can auto-reconnect if WS drops
+  const lastJoinedSessionKeyRef = useRef<string | null>(null);
+  const sessionsRef = useRef<Session[]>([]);
+  sessionsRef.current = sessions;
   
   // 📊 Session quiz tracking - resets each session
   const [sessionQuizStats, setSessionQuizStats] = useState({
@@ -378,6 +383,9 @@ export const StudentDashboard = () => {
     // Show toast to indicate connection attempt
     toast.info(`Connecting to session...`);
     
+    // Remember which session we joined (for auto-reconnect if WS drops)
+    lastJoinedSessionKeyRef.current = sessionKey;
+
     // Close any previous session WebSocket
     if (sessionWs) {
       console.log("🔌 Closing previous session WebSocket");
@@ -453,6 +461,21 @@ export const StudentDashboard = () => {
         localStorage.removeItem('connectedSessionId');
         toast.info("Disconnected from session");
       }
+
+      // 🔄 Auto-reconnect if we didn't explicitly leave (so quiz popup can receive messages)
+      const keyToReconnect = lastJoinedSessionKeyRef.current;
+      if (keyToReconnect) {
+        console.log(`🔄 [StudentDashboard] Will auto-reconnect to session ${keyToReconnect} in 2s`);
+        toast.info("Reconnecting to session...");
+        setTimeout(() => {
+          if (lastJoinedSessionKeyRef.current !== keyToReconnect) return; // User left
+          const session = sessionsRef.current.find(s => (s.zoomMeetingId || s.id) === keyToReconnect);
+          if (session && (session.status === 'live' || session.status === 'upcoming')) {
+            console.log(`🔄 [StudentDashboard] Reconnecting to session ${keyToReconnect}`);
+            handleJoinSession(session);
+          }
+        }, 2000);
+      }
     };
     
     ws.onerror = (err) => {
@@ -462,6 +485,8 @@ export const StudentDashboard = () => {
     };
     
     ws.onmessage = (event) => {
+      // Backend sends "pong" as plain text for keepalive - don't parse as JSON
+      if (event.data === 'pong') return;
       try {
         const data = JSON.parse(event.data);
         console.log("📬 Session WS message:", data);
@@ -545,6 +570,9 @@ export const StudentDashboard = () => {
   // ===========================================================
   const handleLeaveSession = (session: Session) => {
     const sessionKey = session.zoomMeetingId || session.id;
+    
+    // Don't auto-reconnect when user explicitly leaves
+    lastJoinedSessionKeyRef.current = null;
     
     // Close WebSocket connection
     if (sessionWs) {
