@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
 import { useLatencyMonitor } from '../../hooks/useLatencyMonitor';
@@ -9,7 +9,6 @@ import {
   CalendarIcon,
   ClockIcon,
   UsersIcon,
-  ActivityIcon,
   PlayIcon,
   VideoIcon,
   BookOpenIcon,
@@ -68,10 +67,6 @@ export const SessionList = () => {
   const [networkMonitoringEnabled, setNetworkMonitoringEnabled] = useState(false);
 
   const {
-    isMonitoring: isLatencyMonitoring,
-    currentRtt,
-    quality: connectionQuality,
-    stats: latencyStats,
     stopMonitoring,
   } = useLatencyMonitor({
     sessionId: connectedSessionId, // Only monitor when connected to a session
@@ -883,13 +878,12 @@ export const SessionList = () => {
                                 </Button>
                               ) : (
                                 <>
-                                  <Button
-                                    variant="success"
-                                    leftIcon={<CheckCircleIcon className="h-4 w-4" />}
-                                    className="bg-green-600 hover:bg-green-700 text-white"
-                                  >
-                                    Live
-                                  </Button>
+                                <Button
+                                  variant="success"
+                                  leftIcon={<CheckCircleIcon className="h-4 w-4" />}
+                                >
+                                  Live
+                                </Button>
                                   <Button
                                     variant="outline"
                                     leftIcon={<XIcon className="h-4 w-4" />}
@@ -1044,13 +1038,12 @@ export const SessionList = () => {
                                 </Button>
                               ) : (
                                 <>
-                                  <Button
-                                    variant="success"
-                                    leftIcon={<CheckCircleIcon className="h-4 w-4" />}
-                                    className="bg-green-600 hover:bg-green-700 text-white"
-                                  >
-                                    Live
-                                  </Button>
+                                <Button
+                                  variant="success"
+                                  leftIcon={<CheckCircleIcon className="h-4 w-4" />}
+                                >
+                                  Live
+                                </Button>
                                   <Button
                                     variant="outline"
                                     leftIcon={<XIcon className="h-4 w-4" />}

@@ -830,7 +830,6 @@ export const StudentDashboard = () => {
                                   variant="success"
                                   size="sm"
                                   leftIcon={<CheckCircleIcon className="h-4 w-4" />}
-                                  className="bg-green-600 hover:bg-green-700 text-white"
                                 >
                                   Live
                                 </Button>
@@ -907,7 +906,6 @@ export const StudentDashboard = () => {
                                   variant="success"
                                   size="sm"
                                   leftIcon={<CheckCircleIcon className="h-4 w-4" />}
-                                  className="bg-green-600 hover:bg-green-700 text-white"
                                 >
                                   Live
                                 </Button>
