@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   BellIcon,
@@ -15,7 +15,7 @@ import { useLatencyMonitor } from "../../hooks/useLatencyMonitor";
 import { ConnectionQualityBadge } from "../../components/engagement/ConnectionQualityIndicator";
 import { sessionService, Session } from "../../services/sessionService";
 import { quizService } from "../../services/quizService";
-import { isWithinNext24Hours } from "../../utils/sessionFilters";
+import { isWithinNext24Hours, normalizeStatus } from "../../utils/sessionFilters";
 import { toast } from "sonner";
 
 // =====================================================
@@ -121,22 +121,37 @@ export const StudentDashboard = () => {
   // ===========================================================
   // ⭐ LOAD REAL SESSIONS FROM BACKEND - Next 24h upcoming/live only
   // ===========================================================
-  useEffect(() => {
-    const loadSessions = async () => {
-      const allSessions = await sessionService.getAllSessions();
-      const filtered = allSessions.filter(
-        s => (s.status === "upcoming" || s.status === "live") && isWithinNext24Hours(s)
-      );
-      const sorted = [...filtered].sort((a, b) => {
-        const tA = `${a.date}T${a.time || "00:00"}`;
-        const tB = `${b.date}T${b.time || "00:00"}`;
-        return new Date(tA).getTime() - new Date(tB).getTime();
-      });
-      setSessions(sorted.slice(0, 10));
+  const loadSessions = useCallback(async () => {
+    const allSessions = await sessionService.getAllSessions();
+    const statusOk = (s: Session) => {
+      const status = normalizeStatus(s.status);
+      return status === "upcoming" || status === "live";
     };
-
-    loadSessions();
+    const filtered = allSessions.filter(
+      s => statusOk(s) && isWithinNext24Hours(s)
+    );
+    const byId = new Map<string, Session>();
+    filtered.forEach(s => byId.set(s.id, s));
+    const deduped = Array.from(byId.values());
+    const sorted = [...deduped].sort((a, b) => {
+      const tA = `${a.date}T${a.time || "00:00"}`;
+      const tB = `${b.date}T${b.time || "00:00"}`;
+      return new Date(tA).getTime() - new Date(tB).getTime();
+    });
+    setSessions(sorted.slice(0, 20));
   }, []);
+
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    refreshIntervalRef.current = setInterval(loadSessions, 60000);
+    return () => {
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+    };
+  }, [loadSessions]);
 
   // ===========================================================
   // 📊 REHYDRATE: Load persisted session stats on mount/refresh and after submit (no double-count)
@@ -248,24 +263,12 @@ export const StudentDashboard = () => {
         const data = JSON.parse(event.data);
 
         if (data.type === "session_started") {
-          setSessions(prev =>
-            prev.map(s =>
-              s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId || s.zoomMeetingId === data.sessionId
-                ? { ...s, status: "live" as const }
-                : s
-            )
-          );
+          loadSessions();
           toast.success("Meeting is now live!");
         }
 
         if (data.type === "meeting_ended") {
-          setSessions(prev =>
-            prev.map(s =>
-              s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId
-                ? { ...s, status: "completed" as const }
-                : s
-            ).filter(s => s.status === "upcoming" || s.status === "live")
-          );
+          loadSessions();
           toast.info("Meeting has ended");
         }
       } catch (e) {
@@ -274,7 +277,7 @@ export const StudentDashboard = () => {
     };
 
     return () => ws.close();
-  }, [user?.id]);
+  }, [user?.id, loadSessions]);
 
   // ===========================================================
   // UI RENDER

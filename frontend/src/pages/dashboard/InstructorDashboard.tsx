@@ -74,16 +74,22 @@ export const InstructorDashboard = () => {
   const sessionId = selectedSession?.zoomMeetingId || selectedSession?.id || '';
 
   const [triggerLoading, setTriggerLoading] = useState(false);
+  const triggerCooldownRef = useRef(false);
   const handleTriggerQuestion = async () => {
     const session = selectedSession || sessions[0];
-    if (!session || triggerLoading) return;
-    const meetingKey = session.zoomMeetingId ?? session.id;
+    if (!session || triggerLoading || triggerCooldownRef.current) return;
     setTriggerLoading(true);
     try {
-      const result = await quizService.triggerSameQuestionToSession(String(meetingKey));
+      const meetingKey = session.zoomMeetingId != null ? String(session.zoomMeetingId) : session.id;
+      let result = await quizService.triggerSameQuestionToSession(meetingKey);
+      if (!result.success && (result.sentTo ?? 0) === 0 && session.zoomMeetingId != null && session.id) {
+        result = await quizService.triggerSameQuestionToSession(session.id);
+      }
       if (result.success) {
         const count = result.sentTo ?? 0;
         toast.success(`Question sent to ${count} student(s) in this meeting.`);
+        triggerCooldownRef.current = true;
+        setTimeout(() => { triggerCooldownRef.current = false; }, 2000);
       } else {
         toast.error(result.message ?? "No students are in the meeting. Ask them to join first.");
       }
