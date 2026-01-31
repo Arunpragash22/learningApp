@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import axios from "axios";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 
 import { useAuth } from "../../context/AuthContext";
@@ -16,6 +16,9 @@ export const InstructorDashboard = () => {
   const { user } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+
+  // Instructor WebSocket: one per session, stored in ref to prevent re-creation on re-renders
+  const instructorWsRef = useRef<{ ws: WebSocket; sessionId: string } | null>(null);
 
   // ================================
   // 📶 WebRTC-aware Connection Latency Monitoring
@@ -68,79 +71,76 @@ export const InstructorDashboard = () => {
 
   // ================================
   // ⭐ REAL-TIME PARTICIPANT STATUS VIA WEBSOCKET
-  // Listen for join/leave events and update session list immediately
+  // One WebSocket per sessionId only; useRef prevents re-creation on re-renders.
+  // Close only on unmount or when sessionId changes.
   // ================================
+  const sessionId = selectedSession?.zoomMeetingId || selectedSession?.id || '';
+
   useEffect(() => {
-    if (!selectedSession) return;
+    if (!sessionId || !user?.id) {
+      if (instructorWsRef.current) {
+        instructorWsRef.current.ws.close();
+        instructorWsRef.current = null;
+      }
+      return;
+    }
 
-    const sessionKey = selectedSession.zoomMeetingId || selectedSession.id;
-    if (!sessionKey) return;
+    // Already have a live connection for this session – do not re-create
+    if (instructorWsRef.current?.sessionId === sessionId) return;
 
-    // Connect to WebSocket to receive real-time participant updates
+    // Close previous WebSocket if switching to another session
+    if (instructorWsRef.current) {
+      instructorWsRef.current.ws.close();
+      instructorWsRef.current = null;
+    }
+
     const wsBase = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL?.replace('/api', '') || 'ws://localhost:8000';
-    const wsUrl = `${wsBase}/ws/session/${sessionKey}/instructor_${user?.id || 'monitor'}`;
-    
+    const wsUrl = `${wsBase}/ws/session/${sessionId}/instructor_${user.id}`;
     const ws = new WebSocket(wsUrl);
-    
+
     ws.onopen = () => {
       console.log('✅ Instructor connected to session WebSocket for real-time updates');
+      instructorWsRef.current = { ws, sessionId };
     };
-    
+
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        
+
         if (data.type === "participant_joined" || data.type === "participant_left") {
           console.log(`👥 Real-time update: ${data.studentName || data.studentId} ${data.type === 'participant_joined' ? 'joined' : 'left'}`);
-          
-          // Immediately refresh sessions to show updated participant count
           sessionService.getAllSessions().then(allSessions => {
             const filtered = allSessions.filter(s => s.status === 'upcoming' || s.status === 'live');
             setSessions(filtered.slice(0, 5));
-            
-            // Update selected session if it's the one being monitored
-            const updatedSession = filtered.find(s => s.id === selectedSession.id);
-            if (updatedSession) {
-              setSelectedSession(updatedSession);
-            }
+            setSelectedSession(prev => {
+              if (!prev) return null;
+              const updated = filtered.find(s => s.id === prev.id);
+              return updated || prev;
+            });
           });
         } else if (data.type === "meeting_ended") {
           console.log("🔴 [InstructorDashboard] Meeting ended event received:", data);
-          toast.info("🔴 Meeting has ended", {
-            description: "The meeting has been ended",
-            duration: 5000,
-          });
-          // Refresh sessions to show updated status
+          toast.info("🔴 Meeting has ended", { description: "The meeting has been ended", duration: 5000 });
           sessionService.getAllSessions().then(allSessions => {
             const filtered = allSessions.filter(s => s.status === 'upcoming' || s.status === 'live');
             setSessions(filtered.slice(0, 5));
-            // Clear selected session if it was the one that ended
-            if (selectedSession && (selectedSession.id === data.sessionId || selectedSession.zoomMeetingId === data.zoomMeetingId)) {
-              setSelectedSession(null);
-            }
+            setSelectedSession(prev => {
+              if (!prev || (prev.id === data.sessionId || prev.zoomMeetingId === data.zoomMeetingId)) return null;
+              return prev;
+            });
           });
         } else if (data.type === "session_started") {
           console.log("🟢 [InstructorDashboard] Session started event received:", data);
-          // Update sessions list (event-driven, no API call needed)
           setSessions(prev => {
-            const updated = prev.map(s => 
-              (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId) 
+            const updated = prev.map(s =>
+              (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId)
                 ? { ...s, status: 'live' as const }
                 : s
             ).filter(s => s.status === 'upcoming' || s.status === 'live').slice(0, 5);
-            
-            // Auto-select the session that was just started
-            if (data.sessionId || data.zoomMeetingId) {
-              const startedSession = updated.find(s => 
-                s.id === data.sessionId || 
-                s.zoomMeetingId === data.zoomMeetingId ||
-                s.zoomMeetingId === data.sessionId
-              );
-              if (startedSession && startedSession.status === 'live') {
-                setSelectedSession(startedSession);
-              }
-            }
-            
+            const startedSession = (data.sessionId || data.zoomMeetingId) && updated.find(s =>
+              s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId || s.zoomMeetingId === data.sessionId
+            );
+            if (startedSession?.status === 'live') setSelectedSession(startedSession);
             return updated;
           });
         }
@@ -148,19 +148,23 @@ export const InstructorDashboard = () => {
         console.error("Instructor WS message error:", e);
       }
     };
-    
-    ws.onerror = (err) => {
-      console.error("Instructor WS error:", err);
-    };
-    
+
+    ws.onerror = (err) => console.error("Instructor WS error:", err);
     ws.onclose = () => {
+      if (instructorWsRef.current?.sessionId === sessionId) {
+        instructorWsRef.current = null;
+      }
       console.log('🔌 Instructor WebSocket closed');
     };
-    
+
+    // Cleanup: close only on unmount or when sessionId changes
     return () => {
-      ws.close();
+      if (instructorWsRef.current?.sessionId === sessionId) {
+        instructorWsRef.current.ws.close();
+        instructorWsRef.current = null;
+      }
     };
-  }, [selectedSession, user?.id]);
+  }, [sessionId, user?.id]);
 
   // ================================
   // ⭐ START/JOIN ZOOM MEETING (INSTRUCTOR)

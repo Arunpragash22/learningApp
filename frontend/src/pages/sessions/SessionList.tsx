@@ -203,8 +203,8 @@ export const SessionList = () => {
     localStorage.getItem('connectedSessionId')
   );
 
-  // WebSocket connection for session room
-  const [sessionWs, setSessionWs] = useState<WebSocket | null>(null);
+  // WebSocket connection for session room (ref only – cleanup runs on unmount; state would trigger effect and close WS)
+  const sessionWsRef = useRef<WebSocket | null>(null);
 
   // Quiz popup state
   const [incomingQuiz, setIncomingQuiz] = useState<any | null>(null);
@@ -234,20 +234,17 @@ export const SessionList = () => {
     reportInterval: 5000, // Report to server every 5 seconds
   });
 
-  // Cleanup WebSocket and network monitoring on unmount or when leaving
+  // Cleanup WebSocket and network monitoring ONLY on unmount (do not close when sessionWs/networkMonitoringEnabled change)
   useEffect(() => {
     return () => {
-      // Stop network monitoring when component unmounts
-      if (networkMonitoringEnabled) {
-        stopMonitoring();
-        setNetworkMonitoringEnabled(false);
-      }
-      // Close WebSocket connection
-      if (sessionWs) {
-        sessionWs.close();
+      stopMonitoring();
+      setNetworkMonitoringEnabled(false);
+      if (sessionWsRef.current) {
+        sessionWsRef.current.close();
+        sessionWsRef.current = null;
       }
     };
-  }, [sessionWs, networkMonitoringEnabled, stopMonitoring]);
+  }, []);
 
   // Note: Backend now handles enrollment tracking via enrolledStudents array
   // localStorage is no longer needed for tracking enrollments
@@ -271,9 +268,9 @@ export const SessionList = () => {
         if (!connectedSession || connectedSession.status === 'completed') {
           localStorage.removeItem('connectedSessionId');
           setConnectedSessionId(null);
-          if (sessionWs) {
-            sessionWs.close();
-            setSessionWs(null);
+          if (sessionWsRef.current) {
+            sessionWsRef.current.close();
+            sessionWsRef.current = null;
           }
           // Stop network monitoring if session ended
           if (networkMonitoringEnabled) {
@@ -426,7 +423,7 @@ export const SessionList = () => {
     return () => {
       ws.close();
     };
-  }, [user?.id, startingSessionId]);
+  }, [user?.id]);
 
   // ---------------------------------------------------
   // ⭐ ENROLL IN SESSION (Students only - for standalone sessions)
@@ -528,9 +525,10 @@ export const SessionList = () => {
     console.log(`🔗 [SessionList] Connecting to session WebSocket: ${sessionWsUrl}`);
 
     // Close any previous session WebSocket and stop monitoring
-    if (sessionWs) {
+    if (sessionWsRef.current) {
       console.log("🔌 [SessionList] Closing previous session WebSocket");
-      sessionWs.close();
+      sessionWsRef.current.close();
+      sessionWsRef.current = null;
     }
     if (networkMonitoringEnabled) {
       stopMonitoring();
@@ -570,19 +568,19 @@ export const SessionList = () => {
 
     ws.onclose = () => {
       console.log(`🔌 [SessionList] Session ${sessionKey} WebSocket closed`);
-      
+      if (sessionWsRef.current === ws) {
+        sessionWsRef.current = null;
+      }
       // Clear ping interval if it exists
       if ((ws as any).pingInterval) {
         clearInterval((ws as any).pingInterval);
       }
-
       // 🎯 STOP NETWORK MONITORING when WebSocket closes (student left meeting)
       if (networkMonitoringEnabled) {
         stopMonitoring();
         setNetworkMonitoringEnabled(false);
         console.log('📶 [SessionList] Network monitoring stopped - student left meeting');
       }
-
       if (connectedSessionId === sessionKey) {
         setConnectedSessionId(null);
         localStorage.removeItem('connectedSessionId');
@@ -632,9 +630,9 @@ export const SessionList = () => {
             setConnectedSessionId(null);
             localStorage.removeItem('connectedSessionId');
             // Close WebSocket
-            if (sessionWs) {
-              sessionWs.close();
-              setSessionWs(null);
+            if (sessionWsRef.current) {
+              sessionWsRef.current.close();
+              sessionWsRef.current = null;
             }
             // Update sessions list (event-driven, no API call needed)
             setSessions(prev => prev.map(s =>
@@ -656,7 +654,7 @@ export const SessionList = () => {
         }
       };
 
-      setSessionWs(ws);
+      sessionWsRef.current = ws;
   };
 
   // ---------------------------------------------------
@@ -687,9 +685,9 @@ export const SessionList = () => {
       }
 
       // 🎯 STEP 3: Close WebSocket connection
-      if (sessionWs) {
-        sessionWs.close();
-        setSessionWs(null);
+      if (sessionWsRef.current) {
+        sessionWsRef.current.close();
+        sessionWsRef.current = null;
         console.log('🔌 [SessionList] WebSocket closed');
       }
 

@@ -257,11 +257,17 @@ async def websocket_session(
         # 📬 If a quiz was sent in the last 2 minutes, send it now (catch-up for reconnecting students)
         await ws_manager.send_missed_quiz_if_any(session_id, student_id, websocket)
         
-        # Keep connection alive and handle reconnection
+        # Infinite receive loop: keep connection alive; only exit on disconnect
         while True:
             try:
                 data = await websocket.receive_text()
-                
+            except WebSocketDisconnect:
+                raise  # Re-raise so outer handler runs and we leave session room
+            except Exception as e:
+                print(f"Error in WebSocket receive: {e}")
+                continue  # Stay in loop; do not close connection
+
+            try:
                 # Handle ping/pong for keepalive
                 if data == "ping":
                     await websocket.send_text("pong")
@@ -289,11 +295,13 @@ async def websocket_session(
                             })
                             # 📬 Send any quiz they missed while disconnected
                             await ws_manager.send_missed_quiz_if_any(session_id, student_id, websocket)
-                    except:
+                    except Exception:
                         pass
+            except WebSocketDisconnect:
+                raise
             except Exception as e:
                 print(f"Error in WebSocket message handling: {e}")
-                break
+                # Continue loop; do not break – keep connection alive
 
     except WebSocketDisconnect:
         # Mark student as left when they disconnect

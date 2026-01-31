@@ -243,6 +243,7 @@ export const StudentDashboard = () => {
   
   // 🎯 Session WebSocket state - only joined sessions receive quizzes
   const [sessionWs, setSessionWs] = useState<WebSocket | null>(null);
+  const sessionWsRef = useRef<WebSocket | null>(null);
   const [connectedSessionId, setConnectedSessionId] = useState<string | null>(
     localStorage.getItem('connectedSessionId')
   );
@@ -452,9 +453,11 @@ export const StudentDashboard = () => {
     toast.info(`Connecting to session...`);
     
     // Close any previous session WebSocket
-    if (sessionWs) {
+    if (sessionWsRef.current) {
       console.log("🔌 Closing previous session WebSocket");
-      sessionWs.close();
+      sessionWsRef.current.close();
+      sessionWsRef.current = null;
+      setSessionWs(null);
     }
     
     // Create new session WebSocket
@@ -507,19 +510,20 @@ export const StudentDashboard = () => {
     
     ws.onclose = () => {
       console.log(`🔌 Session ${sessionKey} WebSocket closed`);
-      
+      if (sessionWsRef.current === ws) {
+        sessionWsRef.current = null;
+        setSessionWs(null);
+      }
       // Clear ping interval if it exists
       if ((ws as any).pingInterval) {
         clearInterval((ws as any).pingInterval);
       }
-      
       // 🎯 STOP NETWORK MONITORING when WebSocket closes (student left meeting)
       if (networkMonitoringEnabled) {
         stopMonitoring();
         setNetworkMonitoringEnabled(false);
         console.log('📶 Network monitoring stopped - student left meeting');
       }
-      
       // Clear connection state only if we're leaving this specific session
       if (connectedSessionId === sessionKey) {
         setConnectedSessionId(null);
@@ -589,8 +593,9 @@ export const StudentDashboard = () => {
           setConnectedSessionId(null);
           localStorage.removeItem('connectedSessionId');
           // Close WebSocket
-          if (sessionWs) {
-            sessionWs.close();
+          if (sessionWsRef.current) {
+            sessionWsRef.current.close();
+            sessionWsRef.current = null;
             setSessionWs(null);
           }
           // Update sessions list (event-driven, no API call needed)
@@ -613,6 +618,7 @@ export const StudentDashboard = () => {
       }
     };
     
+    sessionWsRef.current = ws;
     setSessionWs(ws);
   };
 
@@ -623,8 +629,9 @@ export const StudentDashboard = () => {
     const sessionKey = session.zoomMeetingId || session.id;
     
     // Close WebSocket connection
-    if (sessionWs) {
-      sessionWs.close();
+    if (sessionWsRef.current) {
+      sessionWsRef.current.close();
+      sessionWsRef.current = null;
       setSessionWs(null);
     }
     
@@ -642,20 +649,17 @@ export const StudentDashboard = () => {
     console.log('👋 Left session:', sessionKey);
   };
 
-  // Cleanup session WebSocket and network monitoring on unmount or when leaving
+  // Cleanup session WebSocket and network monitoring ONLY on unmount (do not close when sessionWs/networkMonitoringEnabled change)
   useEffect(() => {
     return () => {
-      // Stop network monitoring when component unmounts
-      if (networkMonitoringEnabled) {
-        stopMonitoring();
-        setNetworkMonitoringEnabled(false);
-      }
-      // Close WebSocket connection
-      if (sessionWs) {
-        sessionWs.close();
+      stopMonitoring();
+      setNetworkMonitoringEnabled(false);
+      if (sessionWsRef.current) {
+        sessionWsRef.current.close();
+        sessionWsRef.current = null;
       }
     };
-  }, [sessionWs, networkMonitoringEnabled, stopMonitoring]);
+  }, []);
 
   // ===========================================================
   // ⭐ GLOBAL WebSocket — Receive Notifications (fallback)
@@ -693,7 +697,7 @@ export const StudentDashboard = () => {
     };
 
     return () => ws.close();
-  }, [user, connectedSessionId]);
+  }, [user?.id]);
 
   // ===========================================================
   // UI RENDER
