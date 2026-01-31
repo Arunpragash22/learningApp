@@ -310,3 +310,33 @@ async def check_participant_status(
             detail="Failed to check participant status"
         )
 
+
+@router.get("/session-stats")
+async def get_session_stats(
+    session_id: str = Query(..., alias="sessionId"),
+    user: dict = Depends(get_current_user)
+):
+    """
+    Get cumulative session stats for the current student (dashboard rehydration).
+    Returns questionsAnswered, correctAnswers, questionsReceived so the dashboard
+    can restore state after refresh without resetting to zero.
+    """
+    try:
+        student_id = user.get("id")
+        if not student_id or not session_id:
+            return {
+                "questionsAnswered": 0,
+                "correctAnswers": 0,
+                "questionsReceived": 0,
+            }
+
+        from ..models.quiz_answer_model import QuizAnswerModel
+        stats = await QuizAnswerModel.get_student_session_stats(student_id, session_id)
+        return stats
+    except Exception as e:
+        print(f"Error getting session stats: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+

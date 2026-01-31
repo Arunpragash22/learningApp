@@ -14,6 +14,7 @@ import { useSessionConnection } from "../../context/SessionConnectionContext";
 import { useLatencyMonitor } from "../../hooks/useLatencyMonitor";
 import { ConnectionQualityBadge } from "../../components/engagement/ConnectionQualityIndicator";
 import { sessionService, Session } from "../../services/sessionService";
+import { quizService } from "../../services/quizService";
 import { toast } from "sonner";
 
 // =====================================================
@@ -304,6 +305,25 @@ export const StudentDashboard = () => {
 
     loadSessions();
   }, []);
+
+  // ===========================================================
+  // 📊 REHYDRATE: Load persisted session stats on mount/refresh (no reset to zero)
+  // ===========================================================
+  useEffect(() => {
+    const sessionId = connectedSessionId || localStorage.getItem("connectedSessionId");
+    if (!sessionId || !user?.id) return;
+
+    const loadStats = async () => {
+      const stats = await quizService.getSessionStats(sessionId);
+      setSessionQuizStats({
+        questionsReceived: stats.questionsReceived ?? 0,
+        questionsAnswered: stats.questionsAnswered ?? 0,
+        correctAnswers: stats.correctAnswers ?? 0,
+      });
+    };
+
+    loadStats();
+  }, [connectedSessionId, user?.id]);
 
   // ===========================================================
   // 📊 REAL-TIME: Increment "Questions Given" when new quiz arrives (no refresh)

@@ -18,6 +18,7 @@ class QuizAnswer(BaseModel):
     sessionId: str
     timestamp: Optional[datetime] = None
     networkStrength: Optional[NetworkStrength] = None  # Network quality at answer time
+    isCorrect: Optional[bool] = None  # Set when storing so session stats can be computed without re-checking question
 
     class Config:
         json_schema_extra = {

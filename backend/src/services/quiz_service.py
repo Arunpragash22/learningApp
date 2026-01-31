@@ -69,12 +69,12 @@ class QuizService:
         """Store answer in MongoDB"""
         await self._initialize_mock_data()
         
-        # Store answer in database
-        stored_answer = await QuizAnswerModel.create(answer)
-
-        # Get question to check correctness
+        # Get question to check correctness before storing
         question = await Question.find_by_id(answer.questionId)
         is_correct = question and answer.answerIndex == question.get("correctAnswer")
+
+        # Store answer with isCorrect so session stats can be rehydrated
+        stored_answer = await QuizAnswerModel.create(answer, is_correct=is_correct or False)
 
         session_state = await QuestionSessionModel.get_state(answer.sessionId)
         activation_version = session_state.get("version") if session_state else None

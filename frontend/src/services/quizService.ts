@@ -56,6 +56,12 @@ export interface ParticipantStatusResponse {
   studentId: string;
 }
 
+export interface SessionStatsResponse {
+  questionsAnswered: number;
+  correctAnswers: number;
+  questionsReceived: number;
+}
+
 // ✔ Correct API root — no slash, no /api suffix
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -373,6 +379,22 @@ export const quizService = {
     } catch (error) {
       console.error('Error getting participants:', error);
       return { success: false, count: 0, participants: [] };
+    }
+  },
+
+  /** Get cumulative session stats for current student (dashboard rehydration after refresh) */
+  async getSessionStats(sessionId: string): Promise<SessionStatsResponse> {
+    try {
+      const encoded = encodeURIComponent(sessionId);
+      const response = await fetch(`${API_BASE_URL}/api/quiz/session-stats?sessionId=${encoded}`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+      if (!response.ok) return { questionsAnswered: 0, correctAnswers: 0, questionsReceived: 0 };
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching session stats:', error);
+      return { questionsAnswered: 0, correctAnswers: 0, questionsReceived: 0 };
     }
   },
 };
