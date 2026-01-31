@@ -276,25 +276,21 @@ export const SessionList = () => {
       return;
     }
 
-    // 🎯 STEP 1: Check if student needs enrollment (for standalone sessions)
-    if (session.isStandalone) {
-      // Check if student is enrolled
-      const isEnrolled = session.enrolledStudents?.some(
-        (enrolledId: string) => enrolledId === user?.id
-      );
-
-      if (!isEnrolled) {
-        toast.error("Please enroll with an enrollment key first");
-        handleOpenEnrollModal(session);
-        return;
-      }
-    }
-
-    // 🎯 STEP 2: Call backend join endpoint
+    // 🎯 STUDENTS: If the meeting is visible in their list, they're already enrolled or it's a course meeting
+    // Backend will handle enrollment verification, so we can proceed directly
+    
+    // 🎯 STEP 1: Call backend join endpoint
     try {
       const joinResult = await sessionService.joinSession(session.id);
 
       if (!joinResult.success) {
+        // If backend says not enrolled, show enrollment modal
+        if (joinResult.message?.includes("not enrolled") || joinResult.message?.includes("enrollment")) {
+          toast.error("Please enroll with an enrollment key first");
+          handleOpenEnrollModal(session);
+          return;
+        }
+        
         toast.error(joinResult.message || "Failed to join session. Please try again.");
         console.error("Join failed:", joinResult);
         return;
@@ -302,7 +298,7 @@ export const SessionList = () => {
 
       console.log("✅ [SessionList] Backend join successful:", joinResult);
 
-      // 🎯 STEP 3: Open Zoom meeting
+      // 🎯 STEP 2: Open Zoom meeting
       if (!session.join_url) {
         toast.error("❌ Zoom join URL missing");
         return;
