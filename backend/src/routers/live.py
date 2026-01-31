@@ -112,15 +112,13 @@ async def trigger_question(meeting_id: str):
         print(f"   Participants: {len(participants)} students")
         
         # 3) Send DIFFERENT random question to EACH student
-        # Filter out instructor connections - instructors have studentId starting with "instructor_" or have role="instructor"
-        student_participants = []
-        for p in participants:
-            student_id = p.get("studentId", "")
-            # Skip instructor connections (instructors connect with IDs like "instructor_xxx")
-            if student_id.startswith("instructor_") or "instructor" in student_id.lower():
-                print(f"   ⏭️ Skipping instructor: {student_id}")
-                continue
-            student_participants.append(p)
+        # All connected participants are students if they're in the session room
+        # (Instructors don't connect to session rooms, they only trigger questions)
+        student_participants = participants
+        
+        print(f"📊 Found {len(student_participants)} participants to send questions to")
+        for p in student_participants:
+            print(f"   - {p.get('studentName')} (ID: {p.get('studentId')})")
         
         if not student_participants:
             return {"success": False, "message": "No students found in session (only instructor connected)"}
