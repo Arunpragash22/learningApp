@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom";
-import axios from "axios";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/ui/Button";
-import { TargetIcon, PlayIcon, CalendarIcon, ClockIcon, WifiIcon, ActivityIcon, UsersIcon } from "lucide-react";
+import { WifiIcon, ActivityIcon, UsersIcon } from "lucide-react";
 import { sessionService, Session } from "../../services/sessionService";
+import { isWithinNext24Hours } from "../../utils/sessionFilters";
 import { Badge } from "../../components/ui/Badge";
 import { useLatencyMonitor, ConnectionQuality } from "../../hooks/useLatencyMonitor";
 import { ConnectionQualityIndicator } from "../../components/engagement/ConnectionQualityIndicator";
@@ -47,26 +47,22 @@ export const InstructorDashboard = () => {
   });
 
   // ================================
-  // ⭐ LOAD REAL SESSIONS FROM BACKEND
+  // ⭐ LOAD REAL SESSIONS FROM BACKEND - Next 24h only, view-only
   // ================================
   useEffect(() => {
     const loadSessions = async () => {
       const allSessions = await sessionService.getAllSessions();
-      // Show only upcoming and live sessions
-      const filtered = allSessions.filter(s => s.status === 'upcoming' || s.status === 'live');
-      setSessions(filtered.slice(0, 5)); // Show max 5
-      
-      // Auto-select first live session for quick trigger
+      const filtered = allSessions.filter(
+        s => (s.status === 'upcoming' || s.status === 'live') && isWithinNext24Hours(s)
+      );
+      setSessions(filtered.slice(0, 10));
+
       const liveSession = filtered.find(s => s.status === 'live');
       if (liveSession && !selectedSession) {
         setSelectedSession(liveSession);
       }
     };
-    // Initial load only
     loadSessions();
-    
-    // Sessions will be updated via WebSocket events (session_started, meeting_ended, participant_joined, etc.)
-    // No polling interval - updates are event-driven for better performance
   }, []);
 
   // ================================
@@ -110,8 +106,10 @@ export const InstructorDashboard = () => {
         if (data.type === "participant_joined" || data.type === "participant_left") {
           console.log(`👥 Real-time update: ${data.studentName || data.studentId} ${data.type === 'participant_joined' ? 'joined' : 'left'}`);
           sessionService.getAllSessions().then(allSessions => {
-            const filtered = allSessions.filter(s => s.status === 'upcoming' || s.status === 'live');
-            setSessions(filtered.slice(0, 5));
+            const filtered = allSessions.filter(
+              s => (s.status === 'upcoming' || s.status === 'live') && isWithinNext24Hours(s)
+            );
+            setSessions(filtered.slice(0, 10));
             setSelectedSession(prev => {
               if (!prev) return null;
               const updated = filtered.find(s => s.id === prev.id);
@@ -122,8 +120,10 @@ export const InstructorDashboard = () => {
           console.log("🔴 [InstructorDashboard] Meeting ended event received:", data);
           toast.info("🔴 Meeting has ended", { description: "The meeting has been ended", duration: 5000 });
           sessionService.getAllSessions().then(allSessions => {
-            const filtered = allSessions.filter(s => s.status === 'upcoming' || s.status === 'live');
-            setSessions(filtered.slice(0, 5));
+            const filtered = allSessions.filter(
+              s => (s.status === 'upcoming' || s.status === 'live') && isWithinNext24Hours(s)
+            );
+            setSessions(filtered.slice(0, 10));
             setSelectedSession(prev => {
               if (!prev || (prev.id === data.sessionId || prev.zoomMeetingId === data.zoomMeetingId)) return null;
               return prev;
@@ -136,7 +136,7 @@ export const InstructorDashboard = () => {
               (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId)
                 ? { ...s, status: 'live' as const }
                 : s
-            ).filter(s => s.status === 'upcoming' || s.status === 'live').slice(0, 5);
+            ).filter(s => (s.status === 'upcoming' || s.status === 'live') && isWithinNext24Hours(s)).slice(0, 10);
             const startedSession = (data.sessionId || data.zoomMeetingId) && updated.find(s =>
               s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId || s.zoomMeetingId === data.sessionId
             );
@@ -166,91 +166,6 @@ export const InstructorDashboard = () => {
     };
   }, [sessionId, user?.id]);
 
-  // ================================
-  // ⭐ START/JOIN ZOOM MEETING (INSTRUCTOR)
-  // Opens Zoom directly and starts network monitoring
-  // ================================
-  const handleJoinSession = (session: Session) => {
-    if (!session.start_url) {
-      toast.error("❌ Zoom host start URL missing");
-      return;
-    }
-    
-    // Open Zoom meeting directly
-    window.open(session.start_url, '_blank');
-    
-    // Auto-select this session for triggering questions and network monitoring
-    setSelectedSession(session);
-    
-    // Show notifications
-    toast.success(`🚀 Opening Zoom meeting: ${session.title}`);
-    toast.info(`📶 Network monitoring started for this session`);
-    
-    console.log('🎯 Instructor started meeting:', {
-      sessionTitle: session.title,
-      sessionId: session.id,
-      zoomMeetingId: session.zoomMeetingId,
-      status: session.status
-    });
-    
-    // Network monitoring will automatically start via StudentNetworkMonitor component
-    // which uses selectedSession.zoomMeetingId || selectedSession.id
-    // Student network parameters will be retrieved as soon as students join
-  };
-
-  // ================================
-  // 🎯 TRIGGER QUESTION TO SPECIFIC SESSION
-  // Only students who clicked "Join" on this session will receive the quiz
-  // ================================
-  const handleTriggerQuestion = async (session?: Session) => {
-    // Use provided session or the currently selected one
-    const targetSession = session || selectedSession;
-    
-    if (!targetSession) {
-      alert("❌ Please select a session first or click 'Trigger' on a specific session");
-      return;
-    }
-    
-    // 🎯 Use the real Zoom meeting ID as the session room key
-    const meetingId = targetSession.zoomMeetingId || targetSession.id;
-    
-    console.log(`🔑 INSTRUCTOR TRIGGERING WITH:`);
-    console.log(`🔑 MEETING ID: ${meetingId}`);
-    console.log(`🔑 ZOOM ID: ${targetSession.zoomMeetingId}`);
-    console.log(`🔑 SESSION ID: ${targetSession.id}`);
-    
-    if (!meetingId) {
-      alert("❌ Session has no meeting ID");
-      return;
-    }
-    
-    try {
-      const apiUrl = import.meta.env.VITE_API_URL;
-
-      console.log(` Triggering question to session: ${meetingId} (${targetSession.title})`);
-      
-      const res = await axios.post(
-        `${apiUrl}/api/live/trigger/${meetingId}`
-      );
-
-      console.log("Trigger Response:", res.data);
-      
-      if (res.data.success) {
-        const sentCount = res.data.websocketSent || 0;
-        const participants = (res.data.participants || []).filter(
-          (p: any) => !String(p.studentId || p.studentName || '').toLowerCase().includes('instructor')
-        );
-        const studentList = participants.map((p: any) => p.studentName || p.studentId).join(', ') || 'None';
-        alert(`✅ Question sent to ${sentCount} student(s) in "${targetSession.title}"!\n\nStudents who received it: ${studentList}`);
-      } else {
-        alert(`⚠️ ${res.data.message || 'Failed to send question'}`);
-      }
-    } catch (error) {
-      console.error("Trigger Error:", error);
-      alert("❌ Failed to send question");
-    }
-  };
-
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -263,25 +178,10 @@ export const InstructorDashboard = () => {
           </p>
         </div>
 
-        {/* BUTTON GROUP */}
-        <div className="flex gap-3 items-center">
-          {/* 🎯 Trigger Question Button (uses selected session) */}
-          <div className="flex items-center gap-2">
-            {selectedSession && (
-              <span className="text-sm text-gray-500">
-                Session: <span className="font-medium text-indigo-600">{selectedSession.title}</span>
-              </span>
-            )}
-            <Button
-              variant="secondary"
-              leftIcon={<TargetIcon className="h-4 w-4" />}
-              onClick={() => handleTriggerQuestion()}
-              disabled={!selectedSession}
-            >
-              {selectedSession ? 'Trigger Quiz' : 'Select Session'}
-            </Button>
-          </div>
-        </div>
+        {/* View-only: start/trigger from Meetings page */}
+        <Link to="/dashboard/sessions" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+          Start from Meetings →
+        </Link>
       </div>
 
       {/* ================= CARDS SECTION ================= */}
@@ -344,20 +244,23 @@ export const InstructorDashboard = () => {
         </div>
       </div>
 
-      {/* ================= REAL UPCOMING SESSION LIST - TWO SECTIONS ================= */}
+      {/* ================= REAL UPCOMING SESSION LIST - VIEW-ONLY, NEXT 24H ================= */}
       <div className="mt-8">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-medium text-gray-900">Your Meetings</h2>
-          <Link to="/dashboard/sessions">
-            <Button variant="outline" size="sm">View All</Button>
+          <h2 className="text-lg font-medium text-gray-900">Upcoming Meetings (next 24 hours)</h2>
+          <Link to="/dashboard/sessions" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+            Start from Meetings →
           </Link>
         </div>
-        
+        <p className="text-xs text-gray-500 mb-2">
+          View-only. Go to <Link to="/dashboard/sessions" className="text-indigo-600 hover:underline">Meetings</Link> to start or manage.
+        </p>
+
         {sessions.length === 0 ? (
           <div className="bg-white shadow overflow-hidden sm:rounded-md px-4 py-8 text-center text-gray-500">
-            <p>No upcoming meetings</p>
-            <Link to="/dashboard/sessions/create">
-              <Button variant="primary" className="mt-4">Create Your First Meeting</Button>
+            <p>No meetings in the next 24 hours</p>
+            <Link to="/dashboard/sessions">
+              <span className="text-sm text-indigo-600 hover:underline mt-2 inline-block">Go to Meetings</span>
             </Link>
           </div>
         ) : (
@@ -386,45 +289,14 @@ export const InstructorDashboard = () => {
                                 <Badge variant="danger" className="bg-red-600 text-white">LIVE</Badge>
                               )}
                             </div>
-                            <p className="mt-1 text-sm text-gray-500 flex items-center gap-3">
-                              <span className="flex items-center gap-1">
-                                <CalendarIcon className="h-4 w-4" />
-                                {session.date}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <ClockIcon className="h-4 w-4" />
-                                {session.time}
-                              </span>
-                            </p>
-                            <p className="mt-1 text-xs text-gray-400">
-                              {session.course} ({session.courseCode})
+                            <p className="mt-1 text-xs text-gray-500">
+                              {session.date} · {session.time}
+                              {session.instructor && ` · ${session.instructor}`}
                             </p>
                           </div>
-                          
-                          <div className="ml-4 flex gap-2">
-                            {/* 🎯 Trigger Quiz Button - Only joined students receive */}
-                            {session.status === 'live' && (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                leftIcon={<TargetIcon className="h-4 w-4" />}
-                                onClick={() => handleTriggerQuestion(session)}
-                              >
-                                Trigger Quiz
-                              </Button>
-                            )}
-                            {/* Start Meeting button - Only show when meeting is NOT live */}
-                            {session.status !== 'live' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                leftIcon={<PlayIcon className="h-4 w-4" />}
-                                onClick={() => handleJoinSession(session)}
-                              >
-                                Start Meeting
-                              </Button>
-                            )}
-                          </div>
+                          <Link to="/dashboard/sessions" className="text-xs font-medium text-indigo-600 hover:underline whitespace-nowrap">
+                            Start from Meetings →
+                          </Link>
                         </div>
                       </li>
                     ))}
@@ -457,45 +329,14 @@ export const InstructorDashboard = () => {
                                 <Badge variant="danger" className="bg-red-600 text-white">LIVE</Badge>
                               )}
                             </div>
-                            <p className="mt-1 text-sm text-gray-500 flex items-center gap-3">
-                              <span className="flex items-center gap-1">
-                                <CalendarIcon className="h-4 w-4" />
-                                {session.date}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <ClockIcon className="h-4 w-4" />
-                                {session.time}
-                              </span>
-                            </p>
-                            <p className="mt-1 text-xs text-gray-400">
-                              {session.course} ({session.courseCode})
+                            <p className="mt-1 text-xs text-gray-500">
+                              {session.date} · {session.time}
+                              {session.instructor && ` · ${session.instructor}`}
                             </p>
                           </div>
-                          
-                          <div className="ml-4 flex gap-2">
-                            {/* 🎯 Trigger Quiz Button - Only joined students receive */}
-                            {session.status === 'live' && (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                leftIcon={<TargetIcon className="h-4 w-4" />}
-                                onClick={() => handleTriggerQuestion(session)}
-                              >
-                                Trigger Quiz
-                              </Button>
-                            )}
-                            {/* Start Meeting button - Only show when meeting is NOT live */}
-                            {session.status !== 'live' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                leftIcon={<PlayIcon className="h-4 w-4" />}
-                                onClick={() => handleJoinSession(session)}
-                              >
-                                Start Meeting
-                              </Button>
-                            )}
-                          </div>
+                          <Link to="/dashboard/sessions" className="text-xs font-medium text-indigo-600 hover:underline whitespace-nowrap">
+                            Start from Meetings →
+                          </Link>
                         </div>
                       </li>
                     ))}

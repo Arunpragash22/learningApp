@@ -15,6 +15,7 @@ import { useLatencyMonitor } from "../../hooks/useLatencyMonitor";
 import { ConnectionQualityBadge } from "../../components/engagement/ConnectionQualityIndicator";
 import { sessionService, Session } from "../../services/sessionService";
 import { quizService } from "../../services/quizService";
+import { isWithinNext24Hours } from "../../utils/sessionFilters";
 import { toast } from "sonner";
 
 // =====================================================
@@ -117,32 +118,14 @@ export const StudentDashboard = () => {
     reportInterval: 5000,
   });
 
-  // Helper: true if session date is today (dashboard shows only today's sessions)
-  const isSessionToday = (session: Session): boolean => {
-    const today = new Date();
-    const todayStr = today.toISOString().slice(0, 10); // YYYY-MM-DD
-    const d = session.date;
-    if (!d) return false;
-    if (d.includes("-") && d.length >= 10) {
-      const sessionDateStr = d.slice(0, 10);
-      return sessionDateStr === todayStr;
-    }
-    try {
-      const parsed = new Date(d);
-      return !isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === todayStr;
-    } catch {
-      return false;
-    }
-  };
-
   // ===========================================================
-  // ⭐ LOAD REAL SESSIONS FROM BACKEND - Today's upcoming/live only
+  // ⭐ LOAD REAL SESSIONS FROM BACKEND - Next 24h upcoming/live only
   // ===========================================================
   useEffect(() => {
     const loadSessions = async () => {
       const allSessions = await sessionService.getAllSessions();
       const filtered = allSessions.filter(
-        s => (s.status === "upcoming" || s.status === "live") && isSessionToday(s)
+        s => (s.status === "upcoming" || s.status === "live") && isWithinNext24Hours(s)
       );
       const sorted = [...filtered].sort((a, b) => {
         const tA = `${a.date}T${a.time || "00:00"}`;
@@ -394,7 +377,7 @@ export const StudentDashboard = () => {
         <div className="space-y-4">
           {/* Header with View All Link */}
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium text-gray-900">Today&apos;s Upcoming Meetings</h3>
+            <h3 className="text-lg font-medium text-gray-900">Upcoming Meetings (next 24 hours)</h3>
             <Link to="/dashboard/sessions">
               <span className="text-sm hover:opacity-80" style={{ color: '#3B82F6' }}>Join from Meetings →</span>
             </Link>
@@ -436,7 +419,7 @@ export const StudentDashboard = () => {
 
           {sessions.length === 0 ? (
             <div className="bg-white shadow rounded-lg px-4 py-8 text-center text-gray-500">
-              <p className="text-sm">No meetings today</p>
+              <p className="text-sm">No meetings in the next 24 hours</p>
               <Link to="/dashboard/sessions" className="text-sm text-blue-600 hover:underline mt-2 inline-block">Go to Meetings</Link>
             </div>
           ) : (
