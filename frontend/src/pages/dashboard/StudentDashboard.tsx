@@ -413,10 +413,27 @@ export const StudentDashboard = () => {
       
       // Show success notification
       toast.success(`✅ Joined "${session.title}" - Network monitoring started`);
+      
+      // 🔄 Send keepalive ping every 30 seconds to prevent connection timeout
+      const pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send('ping');
+        } else {
+          clearInterval(pingInterval);
+        }
+      }, 30000);
+      
+      // Store interval ID to clear it later
+      (ws as any).pingInterval = pingInterval;
     };
     
     ws.onclose = () => {
       console.log(`🔌 Session ${sessionKey} WebSocket closed`);
+      
+      // Clear ping interval if it exists
+      if ((ws as any).pingInterval) {
+        clearInterval((ws as any).pingInterval);
+      }
       
       // 🎯 STOP NETWORK MONITORING when WebSocket closes (student left meeting)
       if (networkMonitoringEnabled) {
@@ -425,44 +442,11 @@ export const StudentDashboard = () => {
         console.log('📶 Network monitoring stopped - student left meeting');
       }
       
-      // Clear connection state
+      // Clear connection state only if we're leaving this specific session
       if (connectedSessionId === sessionKey) {
         setConnectedSessionId(null);
         localStorage.removeItem('connectedSessionId');
-      }
-      
-      // Auto-reconnect logic for maintaining real-time consistency (only if still in session)
-      if (connectedSessionId === sessionKey) {
-        console.log('🔄 Attempting to reconnect WebSocket...');
-        
-        // Attempt reconnection after 1 second
-        setTimeout(() => {
-          if (connectedSessionId === sessionKey) { // Only reconnect if still supposed to be connected
-            console.log('🔄 Reconnecting to session WebSocket...');
-            const reconnectWs = new WebSocket(sessionWsUrl);
-            
-            reconnectWs.onopen = () => {
-              console.log(`✅ Reconnected to session ${sessionKey} WebSocket`);
-              setSessionWs(reconnectWs);
-              
-              // Re-enable network monitoring on successful reconnect
-              setNetworkMonitoringEnabled(true);
-              
-              // Re-register with server
-              reconnectWs.send(JSON.stringify({
-                type: "reconnect",
-                sessionId: sessionKey,
-                studentId: studentId,
-                studentName: studentName,
-                studentEmail: studentEmail
-              }));
-            };
-            
-            reconnectWs.onmessage = ws.onmessage; // Reuse same message handler
-            reconnectWs.onerror = ws.onerror;
-            reconnectWs.onclose = ws.onclose; // Will trigger cleanup again if needed
-          }
-        }, 1000);
+        toast.info("Disconnected from session");
       }
     };
     

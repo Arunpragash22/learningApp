@@ -314,31 +314,49 @@ export const SessionList = () => {
     const ws = new WebSocket(sessionWsUrl);
 
     ws.onopen = () => {
-        console.log(`✅ [SessionList] Connected to session ${sessionKey} WebSocket`);
-        setConnectedSessionId(sessionKey);
-        localStorage.setItem('connectedSessionId', sessionKey);
+      console.log(`✅ [SessionList] Connected to session ${sessionKey} WebSocket`);
+      setConnectedSessionId(sessionKey);
+      localStorage.setItem('connectedSessionId', sessionKey);
 
-        // 🎯 START NETWORK MONITORING ONLY AFTER SUCCESSFUL WEBSOCKET CONNECTION
-        setNetworkMonitoringEnabled(true);
+      // 🎯 START NETWORK MONITORING ONLY AFTER SUCCESSFUL WEBSOCKET CONNECTION
+      setNetworkMonitoringEnabled(true);
 
-        toast.success(`✅ Joined "${session.title}" - Network monitoring started`);
-      };
-
-      ws.onclose = () => {
-        console.log(`🔌 [SessionList] Session ${sessionKey} WebSocket closed`);
-
-        // 🎯 STOP NETWORK MONITORING when WebSocket closes (student left meeting)
-        if (networkMonitoringEnabled) {
-          stopMonitoring();
-          setNetworkMonitoringEnabled(false);
-          console.log('📶 [SessionList] Network monitoring stopped - student left meeting');
+      toast.success(`✅ Joined "${session.title}" - Network monitoring started`);
+      
+      // 🔄 Send keepalive ping every 30 seconds to prevent connection timeout
+      const pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send('ping');
+        } else {
+          clearInterval(pingInterval);
         }
+      }, 30000);
+      
+      // Store interval ID to clear it later
+      (ws as any).pingInterval = pingInterval;
+    };
 
-        if (connectedSessionId === sessionKey) {
-          setConnectedSessionId(null);
-          localStorage.removeItem('connectedSessionId');
-        }
-      };
+    ws.onclose = () => {
+      console.log(`🔌 [SessionList] Session ${sessionKey} WebSocket closed`);
+      
+      // Clear ping interval if it exists
+      if ((ws as any).pingInterval) {
+        clearInterval((ws as any).pingInterval);
+      }
+
+      // 🎯 STOP NETWORK MONITORING when WebSocket closes (student left meeting)
+      if (networkMonitoringEnabled) {
+        stopMonitoring();
+        setNetworkMonitoringEnabled(false);
+        console.log('📶 [SessionList] Network monitoring stopped - student left meeting');
+      }
+
+      if (connectedSessionId === sessionKey) {
+        setConnectedSessionId(null);
+        localStorage.removeItem('connectedSessionId');
+        toast.info("Disconnected from session");
+      }
+    };
 
     ws.onerror = (err) => {
       console.error("[SessionList] Session WS ERROR:", err);
