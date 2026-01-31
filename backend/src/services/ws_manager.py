@@ -365,13 +365,24 @@ class WebSocketManager:
                 return entry.get("message")
         return None
 
-    async def send_missed_quiz_if_any(self, session_id: str, student_id: str, websocket: WebSocket) -> bool:
+    async def send_missed_quiz_if_any(
+        self,
+        session_id: str,
+        student_id: str,
+        websocket: WebSocket,
+        answered_question_ids: Optional[set] = None,
+    ) -> bool:
         """
         If a quiz was sent to this session in the last 2 minutes, send it to this websocket
         (so students who reconnect get the quiz they missed). Returns True if sent.
+        If answered_question_ids is provided and the quiz's questionId is in it, do not send
+        (student already answered — avoids duplicate delivery on reconnect).
         """
         quiz = self.get_recent_quiz_for_student(session_id, student_id, max_age_seconds=120)
         if not quiz:
+            return False
+        question_id = quiz.get("questionId") or quiz.get("question_id")
+        if answered_question_ids is not None and question_id and question_id in answered_question_ids:
             return False
         try:
             await websocket.send_json(quiz)

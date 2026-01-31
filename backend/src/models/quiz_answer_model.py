@@ -54,7 +54,7 @@ class QuizAnswerModel:
         database = get_database()
         if database is None:
             return []
-        
+
         answers = []
         async for answer in database.quiz_answers.find({
             "questionId": question_id,
@@ -64,6 +64,84 @@ class QuizAnswerModel:
             del answer["_id"]
             answers.append(answer)
         return answers
+
+    @staticmethod
+    async def find_one_by_student_question_session(
+        student_id: str, question_id: str, session_id: str
+    ) -> Optional[dict]:
+        """Find one answer by student + question + session (for idempotent submit check)."""
+        database = get_database()
+        if database is None:
+            return None
+        session_ids = [session_id]
+        try:
+            if database.sessions is not None:
+                if session_id.isdigit():
+                    doc = await database.sessions.find_one({"zoomMeetingId": int(session_id)})
+                else:
+                    doc = await database.sessions.find_one({"zoomMeetingId": session_id})
+                if not doc:
+                    try:
+                        doc = await database.sessions.find_one({"_id": ObjectId(session_id)})
+                    except Exception:
+                        pass
+                if doc:
+                    mongo_id = str(doc["_id"])
+                    zoom_id = doc.get("zoomMeetingId")
+                    if mongo_id not in session_ids:
+                        session_ids.append(mongo_id)
+                    if zoom_id is not None and str(zoom_id) not in session_ids:
+                        session_ids.append(str(zoom_id))
+        except Exception:
+            pass
+        doc = await database.quiz_answers.find_one({
+            "studentId": student_id,
+            "questionId": question_id,
+            "sessionId": {"$in": session_ids},
+        })
+        if not doc:
+            return None
+        doc["id"] = str(doc["_id"])
+        del doc["_id"]
+        return doc
+
+    @staticmethod
+    async def get_answered_question_ids(student_id: str, session_id: str) -> List[str]:
+        """Return list of question IDs this student has already answered in this session."""
+        database = get_database()
+        if database is None:
+            return []
+        session_ids = [session_id]
+        try:
+            if database.sessions is not None:
+                if session_id.isdigit():
+                    doc = await database.sessions.find_one({"zoomMeetingId": int(session_id)})
+                else:
+                    doc = await database.sessions.find_one({"zoomMeetingId": session_id})
+                if not doc:
+                    try:
+                        doc = await database.sessions.find_one({"_id": ObjectId(session_id)})
+                    except Exception:
+                        pass
+                if doc:
+                    mongo_id = str(doc["_id"])
+                    zoom_id = doc.get("zoomMeetingId")
+                    if mongo_id not in session_ids:
+                        session_ids.append(mongo_id)
+                    if zoom_id is not None and str(zoom_id) not in session_ids:
+                        session_ids.append(str(zoom_id))
+        except Exception:
+            pass
+        cursor = database.quiz_answers.find(
+            {"studentId": student_id, "sessionId": {"$in": session_ids}},
+            {"questionId": 1},
+        )
+        ids = []
+        async for doc in cursor:
+            qid = doc.get("questionId")
+            if qid and qid not in ids:
+                ids.append(qid)
+        return ids
 
     @staticmethod
     async def delete_by_question_and_session(question_id: str, session_id: str) -> int:
@@ -129,10 +207,14 @@ class QuizAnswerModel:
         cursor = database.quiz_answers.find(student_filter)
         questions_answered = 0
         correct_answers = 0
+        answered_question_ids = []
         async for doc in cursor:
             questions_answered += 1
             if doc.get("isCorrect") is True:
                 correct_answers += 1
+            qid = doc.get("questionId")
+            if qid and qid not in answered_question_ids:
+                answered_question_ids.append(qid)
 
         distinct = await database.quiz_answers.distinct("questionId", session_filter)
         questions_received = len(distinct)
@@ -141,5 +223,6 @@ class QuizAnswerModel:
             "questionsAnswered": questions_answered,
             "correctAnswers": correct_answers,
             "questionsReceived": max(questions_received, questions_answered),
+            "answeredQuestionIds": answered_question_ids,
         }
 

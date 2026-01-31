@@ -66,9 +66,18 @@ class QuizService:
         })
 
     async def submit_answer(self, answer: QuizAnswer) -> Dict:
-        """Store answer in MongoDB"""
+        """Store answer in MongoDB. Idempotent: same student+question+session counted once."""
         await self._initialize_mock_data()
-        
+
+        # Idempotent: if student already answered this question in this session, return existing result
+        existing = await QuizAnswerModel.find_one_by_student_question_session(
+            answer.studentId, answer.questionId, answer.sessionId
+        )
+        if existing is not None:
+            return {
+                "success": True,
+                "isCorrect": existing.get("isCorrect") is True,
+            }
         # Get question to check correctness before storing
         question = await Question.find_by_id(answer.questionId)
         is_correct = question and answer.answerIndex == question.get("correctAnswer")

@@ -227,7 +227,8 @@ async def get_all_stats():
 async def get_latest_quiz_for_student(session_id: str, user: dict = Depends(get_current_user)):
     """
     If a quiz was sent to this session in the last 2 minutes, return it so the student
-    can see the quiz popup on the website (e.g. after clicking the push notification).
+    can see the quiz popup (e.g. after clicking the push notification).
+    Does not return a quiz the student has already answered (avoids duplicate on refresh).
     """
     student_id = user.get("id") or user.get("_id")
     if not student_id:
@@ -235,4 +236,12 @@ async def get_latest_quiz_for_student(session_id: str, user: dict = Depends(get_
     quiz = ws_manager.get_recent_quiz_for_student(session_id, str(student_id), max_age_seconds=120)
     if not quiz:
         return {"success": True, "quiz": None, "message": "No recent quiz"}
+    question_id = quiz.get("questionId") or quiz.get("question_id")
+    if question_id:
+        from ..models.quiz_answer_model import QuizAnswerModel
+        existing = await QuizAnswerModel.find_one_by_student_question_session(
+            str(student_id), question_id, session_id
+        )
+        if existing is not None:
+            return {"success": True, "quiz": None, "alreadyAnswered": True, "message": "Already answered"}
     return {"success": True, "quiz": quiz, "message": "Recent quiz found"}

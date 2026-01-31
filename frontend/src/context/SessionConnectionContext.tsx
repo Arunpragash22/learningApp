@@ -3,10 +3,12 @@
  * - Single WebSocket per student per session (app-wide, not page-dependent).
  * - Questions delivered regardless of which tab/page the user is on.
  * - Deduplication: same question is not re-triggered when switching tabs.
+ * - Rehydration: answered question IDs from backend so refresh does not re-deliver or double-count.
  */
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
 import type { Session } from "../services/sessionService";
+import { quizService } from "../services/quizService";
 import { toast } from "sonner";
 
 const STORAGE_KEY = "connectedSessionId";
@@ -20,6 +22,10 @@ interface SessionConnectionContextType {
   leaveSession: () => void;
   /** Push quiz from poll/fetch into same dedupe flow so no duplicate popup */
   receiveQuizFromPoll: (data: any) => void;
+  /** Mark a question as answered (so it is not re-shown or double-counted after refresh). */
+  markQuestionAnswered: (questionId: string) => void;
+  /** Increments when an answer is submitted; use as dependency to refetch session stats. */
+  sessionStatsInvalidated: number;
 }
 
 const SessionConnectionContext = createContext<SessionConnectionContextType | undefined>(undefined);
@@ -34,8 +40,16 @@ export function SessionConnectionProvider({ children }: { children: React.ReactN
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastShownQuestionIdRef = useRef<string | null>(null);
   const currentSessionKeyRef = useRef<string | null>(null);
+  /** Rehydrated + local: question IDs already answered in this session (no re-deliver, no double-count). */
+  const answeredQuestionIdsRef = useRef<Set<string>>(new Set());
 
   const clearIncomingQuiz = useCallback(() => setIncomingQuizState(null), []);
+
+  const [sessionStatsInvalidated, setSessionStatsInvalidated] = useState(0);
+  const markQuestionAnswered = useCallback((questionId: string) => {
+    answeredQuestionIdsRef.current.add(questionId);
+    setSessionStatsInvalidated((n) => n + 1);
+  }, []);
 
   const setConnectedSessionId = useCallback((id: string | null) => {
     setConnectedSessionIdState(id);
@@ -63,12 +77,14 @@ export function SessionConnectionProvider({ children }: { children: React.ReactN
     closeWs();
     setConnectedSessionId(null);
     setIncomingQuizState(null);
+    answeredQuestionIdsRef.current.clear();
     toast.info("Disconnected from session");
   }, [closeWs, setConnectedSessionId]);
 
   const showQuizIfNew = useCallback((data: any) => {
     const qid = data?.questionId ?? data?.question_id ?? null;
     if (!qid) return;
+    if (answeredQuestionIdsRef.current.has(qid)) return;
     if (lastShownQuestionIdRef.current === qid) return;
     lastShownQuestionIdRef.current = qid;
     setIncomingQuizState(data);
@@ -217,6 +233,8 @@ export function SessionConnectionProvider({ children }: { children: React.ReactN
     joinSession,
     leaveSession,
     receiveQuizFromPoll,
+    markQuestionAnswered,
+    sessionStatsInvalidated,
   };
 
   return (

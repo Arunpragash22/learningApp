@@ -60,6 +60,8 @@ export interface SessionStatsResponse {
   questionsAnswered: number;
   correctAnswers: number;
   questionsReceived: number;
+  /** Question IDs this student has already answered in this session (for idempotent delivery). */
+  answeredQuestionIds?: string[];
 }
 
 // ✔ Correct API root — no slash, no /api suffix

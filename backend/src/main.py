@@ -9,6 +9,7 @@ from src.database.mysql_connection import connect_to_mysql_backup, close_mysql_b
 
 # Correct WS manager
 from src.services.ws_manager import ws_manager
+from src.models.quiz_answer_model import QuizAnswerModel
 
 
 # --------------------------------------------------------
@@ -255,7 +256,11 @@ async def websocket_session(
         })
         
         # 📬 If a quiz was sent in the last 2 minutes, send it now (catch-up for reconnecting students)
-        await ws_manager.send_missed_quiz_if_any(session_id, student_id, websocket)
+        # Skip re-sending if student already answered (avoids duplicate on reconnect)
+        answered_ids = await QuizAnswerModel.get_answered_question_ids(student_id, session_id)
+        await ws_manager.send_missed_quiz_if_any(
+            session_id, student_id, websocket, answered_question_ids=set(answered_ids)
+        )
         
         # Infinite receive loop: keep connection alive; only exit on disconnect
         while True:
@@ -293,8 +298,11 @@ async def websocket_session(
                                 "participantCount": result.get("participantCount", 0),
                                 "timestamp": datetime.now().isoformat()
                             })
-                            # 📬 Send any quiz they missed while disconnected
-                            await ws_manager.send_missed_quiz_if_any(session_id, student_id, websocket)
+                            # 📬 Send any quiz they missed while disconnected (skip if already answered)
+                            answered_ids = await QuizAnswerModel.get_answered_question_ids(student_id, session_id)
+                            await ws_manager.send_missed_quiz_if_any(
+                                session_id, student_id, websocket, answered_question_ids=set(answered_ids)
+                            )
                     except Exception:
                         pass
             except WebSocketDisconnect:

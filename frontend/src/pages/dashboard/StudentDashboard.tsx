@@ -87,7 +87,7 @@ const showBrowserNotification = (title: string, body: string) => {
 // --------------------------------------
 export const StudentDashboard = () => {
   const { user } = useAuth();
-  const { connectedSessionId, incomingQuiz, receiveQuizFromPoll } = useSessionConnection();
+  const { connectedSessionId, incomingQuiz, receiveQuizFromPoll, sessionStatsInvalidated } = useSessionConnection();
   const [sessions, setSessions] = useState<Session[]>([]);
   const lastCountedQuestionIdRef = useRef<string | null>(null);
 
@@ -139,7 +139,7 @@ export const StudentDashboard = () => {
   }, []);
 
   // ===========================================================
-  // 📊 REHYDRATE: Load persisted session stats on mount/refresh (no reset to zero)
+  // 📊 REHYDRATE: Load persisted session stats on mount/refresh and after submit (no double-count)
   // ===========================================================
   useEffect(() => {
     const sessionId = connectedSessionId || localStorage.getItem("connectedSessionId");
@@ -155,7 +155,7 @@ export const StudentDashboard = () => {
     };
 
     loadStats();
-  }, [connectedSessionId, user?.id]);
+  }, [connectedSessionId, user?.id, sessionStatsInvalidated]);
 
   // ===========================================================
   // 📊 REAL-TIME: Increment "Questions Given" when new quiz arrives (no refresh)

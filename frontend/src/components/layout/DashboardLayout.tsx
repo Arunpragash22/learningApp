@@ -9,7 +9,7 @@ export const DashboardLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isAuthenticated, isLoading } = useAuth();
-  const { incomingQuiz, clearIncomingQuiz } = useSessionConnection();
+  const { incomingQuiz, clearIncomingQuiz, markQuestionAnswered } = useSessionConnection();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -316,6 +316,10 @@ export const DashboardLayout = () => {
         <QuizPopup
           quiz={incomingQuiz}
           onClose={clearIncomingQuiz}
+          onAnswerSubmitted={() => {
+            const qid = incomingQuiz?.questionId ?? incomingQuiz?.question_id;
+            if (qid) markQuestionAnswered(qid);
+          }}
         />
       )}
 

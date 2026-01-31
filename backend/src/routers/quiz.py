@@ -328,6 +328,7 @@ async def get_session_stats(
                 "questionsAnswered": 0,
                 "correctAnswers": 0,
                 "questionsReceived": 0,
+                "answeredQuestionIds": [],
             }
 
         from ..models.quiz_answer_model import QuizAnswerModel
