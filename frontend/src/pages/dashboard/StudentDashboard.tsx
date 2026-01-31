@@ -10,6 +10,9 @@ import {
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { useAuth } from "../../context/AuthContext";
+import { useSessionConnection } from "../../context/SessionConnectionContext";
+import { useLatencyMonitor } from "../../hooks/useLatencyMonitor";
+import { ConnectionQualityBadge } from "../../components/engagement/ConnectionQualityIndicator";
 import { sessionService, Session } from "../../services/sessionService";
 import { toast } from "sonner";
 
@@ -233,36 +236,36 @@ const QuizPopup = ({ quiz, onClose, onAnswerSubmitted, networkStrength }: QuizPo
 // --------------------------------------
 export const StudentDashboard = () => {
   const { user } = useAuth();
-  const [incomingQuiz, setIncomingQuiz] = useState<any | null>(null);
+  const { connectedSessionId, incomingQuiz, clearIncomingQuiz, receiveQuizFromPoll } = useSessionConnection();
   const [sessions, setSessions] = useState<Session[]>([]);
-  
-  // Connection state read from localStorage (joining only happens on Meetings page)
-  const [connectedSessionId, setConnectedSessionId] = useState<string | null>(
-    () => localStorage.getItem('connectedSessionId')
-  );
+  const lastCountedQuestionIdRef = useRef<string | null>(null);
 
-  // 📊 Session quiz tracking - resets each session
   const [sessionQuizStats, setSessionQuizStats] = useState({
-    questionsReceived: 0,    // Questions sent by instructor
-    questionsAnswered: 0,    // Total questions student answered
-    correctAnswers: 0,       // Correct answers count
+    questionsReceived: 0,
+    questionsAnswered: 0,
+    correctAnswers: 0,
   });
 
-  // Track last quiz we showed (so polling doesn't show the same one twice)
-  const lastShownQuestionIdRef = useRef<string | null>(null);
+  const studentDisplayName = user
+    ? (user.firstName && user.lastName
+        ? `${user.firstName} ${user.lastName}`.trim()
+        : user.firstName || user.lastName || user.email?.split("@")[0] || "Student")
+    : "Student";
 
-  // Sync connectedSessionId from localStorage (e.g. after joining from Meetings page)
-  useEffect(() => {
-    const sync = () => setConnectedSessionId(localStorage.getItem('connectedSessionId'));
-    sync();
-    window.addEventListener('storage', sync);
-    const onFocus = () => sync();
-    window.addEventListener('focus', onFocus);
-    return () => {
-      window.removeEventListener('storage', sync);
-      window.removeEventListener('focus', onFocus);
-    };
-  }, []);
+  const {
+    currentRtt,
+    quality: connectionQuality,
+    stats: latencyStats,
+    isMonitoring: isLatencyMonitoring,
+  } = useLatencyMonitor({
+    sessionId: connectedSessionId,
+    studentId: user?.id,
+    studentName: studentDisplayName,
+    userRole: "student",
+    enabled: !!connectedSessionId && !!user?.id,
+    pingInterval: 3000,
+    reportInterval: 5000,
+  });
 
   // Helper: true if session date is today (dashboard shows only today's sessions)
   const isSessionToday = (session: Session): boolean => {
@@ -289,25 +292,34 @@ export const StudentDashboard = () => {
     const loadSessions = async () => {
       const allSessions = await sessionService.getAllSessions();
       const filtered = allSessions.filter(
-        s => (s.status === 'upcoming' || s.status === 'live') && isSessionToday(s)
+        s => (s.status === "upcoming" || s.status === "live") && isSessionToday(s)
       );
-      // Sort by date+time so soonest first
       const sorted = [...filtered].sort((a, b) => {
-        const tA = `${a.date}T${a.time || '00:00'}`;
-        const tB = `${b.date}T${b.time || '00:00'}`;
+        const tA = `${a.date}T${a.time || "00:00"}`;
+        const tB = `${b.date}T${b.time || "00:00"}`;
         return new Date(tA).getTime() - new Date(tB).getTime();
       });
       setSessions(sorted.slice(0, 10));
     };
 
     loadSessions();
-  }, []); // Only load once on mount
+  }, []);
+
+  // ===========================================================
+  // 📊 REAL-TIME: Increment "Questions Given" when new quiz arrives (no refresh)
+  // ===========================================================
+  useEffect(() => {
+    const qid = incomingQuiz?.questionId ?? incomingQuiz?.question_id ?? null;
+    if (!qid || lastCountedQuestionIdRef.current === qid) return;
+    lastCountedQuestionIdRef.current = qid;
+    setSessionQuizStats(prev => ({ ...prev, questionsReceived: prev.questionsReceived + 1 }));
+  }, [incomingQuiz?.questionId, incomingQuiz?.question_id]);
 
   // ===========================================================
   // 📬 FETCH MISSED QUIZ WHEN DASHBOARD LOADS (e.g. after clicking push notification)
   // ===========================================================
   useEffect(() => {
-    const sessionId = localStorage.getItem("connectedSessionId");
+    const sessionId = connectedSessionId || localStorage.getItem("connectedSessionId");
     if (!sessionId || !user?.id) return;
 
     const fetchLatestQuiz = async () => {
@@ -317,30 +329,21 @@ export const StudentDashboard = () => {
           headers: { Authorization: `Bearer ${localStorage.getItem("access_token") || ""}` },
         });
         const data = await res.json();
-        if (data.success && data.quiz) {
-          const qid = data.quiz.questionId || data.quiz.question_id;
-          if (qid !== lastShownQuestionIdRef.current) {
-            lastShownQuestionIdRef.current = qid;
-            console.log("📬 [StudentDashboard] Fetched missed quiz – showing on website");
-            setIncomingQuiz(data.quiz);
-          }
-        }
+        if (data.success && data.quiz) receiveQuizFromPoll(data.quiz);
       } catch (e) {
         console.error("Failed to fetch latest quiz:", e);
       }
     };
 
     fetchLatestQuiz();
-
-    // Also fetch when page becomes visible (e.g. user clicked notification to focus tab)
     const onVisible = () => {
-      if (document.visibilityState === "visible" && localStorage.getItem("connectedSessionId")) {
+      if (document.visibilityState === "visible" && (connectedSessionId || localStorage.getItem("connectedSessionId"))) {
         fetchLatestQuiz();
       }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [user?.id]);
+  }, [user?.id, connectedSessionId, receiveQuizFromPoll]);
 
   // ===========================================================
   // 📬 POLL FOR QUIZ EVERY 15s WHILE CONNECTED (fallback if WebSocket misses)
@@ -356,56 +359,62 @@ export const StudentDashboard = () => {
           headers: { Authorization: `Bearer ${localStorage.getItem("access_token") || ""}` },
         });
         const data = await res.json();
-        if (data.success && data.quiz) {
-          const qid = data.quiz.questionId || data.quiz.question_id;
-          if (qid !== lastShownQuestionIdRef.current) {
-            lastShownQuestionIdRef.current = qid;
-            console.log("📬 [StudentDashboard] Poll: new quiz – showing on website");
-            setIncomingQuiz(data.quiz);
-          }
-        }
+        if (data.success && data.quiz) receiveQuizFromPoll(data.quiz);
       } catch (e) {
         // ignore
       }
     };
 
-    const interval = setInterval(poll, 15000); // every 15 seconds
+    const interval = setInterval(poll, 15000);
     return () => clearInterval(interval);
-  }, [connectedSessionId, user?.id]);
+  }, [connectedSessionId, user?.id, receiveQuizFromPoll]);
 
   // ===========================================================
   // 🎯 JOINING IS ONLY VIA MEETINGS PAGE — Dashboard is view-only
   // ===========================================================
 
   // ===========================================================
-  // ⭐ GLOBAL WebSocket — Receive Notifications (fallback)
+  // ⭐ GLOBAL WebSocket — Real-time session list + announcements (no refresh)
   // ===========================================================
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
 
-    const studentId = user?.id || `STUDENT_${Date.now()}`;
-    const wsBase = import.meta.env.VITE_WS_URL;
-    const socketUrl = `${wsBase}/ws/global/${studentId}`;
-
-    console.log("Connecting Global WS:", socketUrl);
+    const wsBase =
+      import.meta.env.VITE_WS_URL ||
+      (import.meta.env.VITE_API_URL || "").replace("/api", "").replace("http", "ws") ||
+      "ws://localhost:8000";
+    const socketUrl = `${wsBase}/ws/global/${user.id}`;
 
     const ws = new WebSocket(socketUrl);
 
-    ws.onopen = () => console.log("🌍 Global WS CONNECTED");
-    ws.onclose = () => console.log("❌ Global WS CLOSED");
+    ws.onopen = () => console.log("🌍 [StudentDashboard] Global WS connected");
+    ws.onclose = () => console.log("❌ [StudentDashboard] Global WS closed");
     ws.onerror = (err) => console.error("Global WS ERROR:", err);
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log("Global WS message:", data);
 
-        // Note: Session-specific quizzes now come via session WebSocket
-        // This global WS is kept for announcements and fallback
-        if (data.type === "quiz" && !connectedSessionId) {
-          // Only show global quizzes if not connected to a session
-          console.log("⚠️ Received global quiz (no session connected)");
-          // Optionally show: setIncomingQuiz(data);
+        if (data.type === "session_started") {
+          setSessions(prev =>
+            prev.map(s =>
+              s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId || s.zoomMeetingId === data.sessionId
+                ? { ...s, status: "live" as const }
+                : s
+            )
+          );
+          toast.success("Meeting is now live!");
+        }
+
+        if (data.type === "meeting_ended") {
+          setSessions(prev =>
+            prev.map(s =>
+              s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId
+                ? { ...s, status: "completed" as const }
+                : s
+            ).filter(s => s.status === "upcoming" || s.status === "live")
+          );
+          toast.info("Meeting has ended");
         }
       } catch (e) {
         console.error("Global WS JSON ERROR:", e);
@@ -422,15 +431,20 @@ export const StudentDashboard = () => {
     <div className="py-6">
       {/* QUIZ POPUP */}
       {incomingQuiz && (
-        <QuizPopup 
-          quiz={incomingQuiz} 
-          onClose={() => setIncomingQuiz(null)}
+        <QuizPopup
+          quiz={incomingQuiz}
+          onClose={clearIncomingQuiz}
           onAnswerSubmitted={(isCorrect) => {
             setSessionQuizStats(prev => ({
               ...prev,
               questionsAnswered: prev.questionsAnswered + 1,
               correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
             }));
+          }}
+          networkStrength={{
+            quality: connectionQuality,
+            rttMs: currentRtt ?? null,
+            jitterMs: latencyStats?.jitter,
           }}
         />
       )}
@@ -446,11 +460,16 @@ export const StudentDashboard = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Connected state (joined from Meetings page) — view-only; manage on Meetings */}
+          {/* Live connection state + network metrics (real-time, no refresh) */}
           {connectedSessionId && (
             <Link to="/dashboard/sessions" className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border text-blue-600 hover:opacity-90">
               <WifiIcon className="h-4 w-4" />
-              <span className="text-sm font-medium">In a meeting · Manage on Meetings</span>
+              <ConnectionQualityBadge
+                quality={connectionQuality}
+                rtt={currentRtt}
+                isMonitoring={isLatencyMonitoring}
+              />
+              <span className="text-sm font-medium">In meeting · Manage on Meetings</span>
             </Link>
           )}
           
@@ -477,13 +496,21 @@ export const StudentDashboard = () => {
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Network / session status — join only from Meetings page */}
+          {/* Live network metrics — RTT, jitter, quality (real-time) */}
           <div className="bg-white bg-opacity-10 rounded-lg p-4">
-            <WifiIcon className="h-6 w-6" style={{ color: '#b8e6d4' }} />
-            <p className="text-sm font-medium">Session Status</p>
+            <WifiIcon className="h-6 w-6" style={{ color: "#b8e6d4" }} />
+            <p className="text-sm font-medium">Connection</p>
             <p className="text-lg font-bold">
               {connectedSessionId ? (
-                <span style={{ color: '#b8e6d4' }}>In meeting</span>
+                <span style={{ color: "#b8e6d4" }} className="capitalize">
+                  {connectionQuality}
+                  {currentRtt != null && (
+                    <span className="text-sm font-normal opacity-90 ml-1">
+                      {Math.round(currentRtt)}ms
+                      {latencyStats?.jitter != null && ` · ${Math.round(latencyStats.jitter)}ms jitter`}
+                    </span>
+                  )}
+                </span>
               ) : (
                 <span className="text-gray-300">Not in session</span>
               )}
@@ -526,22 +553,33 @@ export const StudentDashboard = () => {
             View-only. Go to <Link to="/dashboard/sessions" className="text-blue-600 hover:underline">Meetings</Link> to join.
           </p>
 
-          {/* Show connection status when student joined from Meetings page */}
+          {/* Live connection status + real-time metrics */}
           {connectedSessionId && (
-            <div className="p-3 rounded-lg bg-white shadow" style={{ borderColor: '#3B82F6', borderWidth: '1px' }}>
-              <div className="flex items-center justify-between">
+            <div className="p-3 rounded-lg bg-white shadow" style={{ borderColor: "#3B82F6", borderWidth: "1px" }}>
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: '#3B82F6' }}></div>
-                  <span className="text-sm font-medium" style={{ color: '#2563eb' }}>
+                  <div
+                    className="w-2 h-2 rounded-full animate-pulse"
+                    style={{ backgroundColor: "#3B82F6" }}
+                  />
+                  <span className="text-sm font-medium" style={{ color: "#2563eb" }}>
                     Connected to session
                   </span>
+                  <ConnectionQualityBadge
+                    quality={connectionQuality}
+                    rtt={currentRtt}
+                    isMonitoring={isLatencyMonitoring}
+                    className="ml-1"
+                  />
                 </div>
                 <Link to="/dashboard/sessions" className="text-xs font-medium text-blue-600 hover:underline">
                   Go to Meetings →
                 </Link>
               </div>
               <p className="text-xs mt-1 text-gray-500">
-                View-only here. Join or leave from the Meetings page.
+                {isLatencyMonitoring && currentRtt != null
+                  ? `Live: ${Math.round(currentRtt)}ms RTT${latencyStats?.jitter != null ? ` · ${Math.round(latencyStats.jitter)}ms jitter` : ""} · ${connectionQuality}`
+                  : "View-only here. Join or leave from the Meetings page."}
               </p>
             </div>
           )}

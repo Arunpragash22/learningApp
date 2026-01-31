@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSessionConnection } from '../../context/SessionConnectionContext';
 import { toast } from 'sonner';
 import { useLatencyMonitor } from '../../hooks/useLatencyMonitor';
 
@@ -198,19 +199,18 @@ export const SessionList = () => {
   const [enrollingSession, setEnrollingSession] = useState<Session | null>(null);
   const [isEnrolling, setIsEnrolling] = useState(false);
 
-  // Track which session the user is currently connected to
-  const [connectedSessionId, setConnectedSessionId] = useState<string | null>(
-    localStorage.getItem('connectedSessionId')
-  );
-
-  // WebSocket connection for session room (ref only – cleanup runs on unmount; state would trigger effect and close WS)
-  const sessionWsRef = useRef<WebSocket | null>(null);
-
-  // Quiz popup state
-  const [incomingQuiz, setIncomingQuiz] = useState<any | null>(null);
-  const lastShownQuestionIdRef = useRef<string | null>(null);
+  const {
+    connectedSessionId: contextConnectedSessionId,
+    incomingQuiz,
+    clearIncomingQuiz,
+    joinSession: contextJoinSession,
+    leaveSession: contextLeaveSession,
+    receiveQuizFromPoll,
+  } = useSessionConnection();
 
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
+  const [instructorSessionId, setInstructorSessionId] = useState<string | null>(null);
+  const connectedSessionId = isInstructor ? instructorSessionId : contextConnectedSessionId;
 
   // 📶 Network monitoring - Initialize when connected to a session
   const studentDisplayName = user
@@ -219,32 +219,21 @@ export const SessionList = () => {
       : user.firstName || user.lastName || user.email?.split('@')[0] || 'Student')
     : 'Student';
 
-  // 📶 Network monitoring state - only enabled when student actually joins Zoom meeting
-  const [networkMonitoringEnabled, setNetworkMonitoringEnabled] = useState(false);
-
-  const {
-    stopMonitoring,
-  } = useLatencyMonitor({
-    sessionId: connectedSessionId, // Only monitor when connected to a session
+  const { stopMonitoring } = useLatencyMonitor({
+    sessionId: connectedSessionId,
     studentId: user?.id,
     studentName: studentDisplayName,
-    userRole: 'student', // Only student data is stored in database
-    enabled: networkMonitoringEnabled && !!connectedSessionId && !!user?.id && !isInstructor, // Enable ONLY when explicitly enabled
-    pingInterval: 3000, // Ping every 3 seconds for faster updates
-    reportInterval: 5000, // Report to server every 5 seconds
+    userRole: 'student',
+    enabled: !!connectedSessionId && !!user?.id && !isInstructor,
+    pingInterval: 3000,
+    reportInterval: 5000,
   });
 
-  // Cleanup WebSocket and network monitoring ONLY on unmount (do not close when sessionWs/networkMonitoringEnabled change)
   useEffect(() => {
     return () => {
       stopMonitoring();
-      setNetworkMonitoringEnabled(false);
-      if (sessionWsRef.current) {
-        sessionWsRef.current.close();
-        sessionWsRef.current = null;
-      }
     };
-  }, []);
+  }, [stopMonitoring]);
 
   // Note: Backend now handles enrollment tracking via enrolledStudents array
   // localStorage is no longer needed for tracking enrollments
@@ -257,29 +246,18 @@ export const SessionList = () => {
       const all = await sessionService.getAllSessions();
       setSessions(all);
 
-      // Check if connected session is still live/upcoming
-      const storedSessionId = localStorage.getItem('connectedSessionId');
-      if (storedSessionId) {
+      if (isInstructor) {
+        setInstructorSessionId(prev => prev ?? localStorage.getItem('connectedSessionId'));
+      }
+      // Clear instructor session state if session ended
+      if (isInstructor && instructorSessionId) {
         const connectedSession = all.find(s =>
-          (s.zoomMeetingId === storedSessionId || s.id === storedSessionId)
+          (s.zoomMeetingId === instructorSessionId || s.id === instructorSessionId)
         );
-
-        // Clear connection if session ended or doesn't exist
         if (!connectedSession || connectedSession.status === 'completed') {
           localStorage.removeItem('connectedSessionId');
-          setConnectedSessionId(null);
-          if (sessionWsRef.current) {
-            sessionWsRef.current.close();
-            sessionWsRef.current = null;
-          }
-          // Stop network monitoring if session ended
-          if (networkMonitoringEnabled) {
-            stopMonitoring();
-            setNetworkMonitoringEnabled(false);
-          }
+          setInstructorSessionId(null);
         }
-        // NOTE: We do NOT auto-restore WebSocket connections
-        // Students must explicitly click "Join Now" to start monitoring
       }
     };
 
@@ -288,7 +266,7 @@ export const SessionList = () => {
 
     // Sessions will be updated via WebSocket events (session_started, meeting_ended, etc.)
     // No polling interval - updates are event-driven
-  }, [user?.id, isInstructor]);
+  }, [user?.id, isInstructor, instructorSessionId]);
 
   // ---------------------------------------------------
   // 📬 FETCH MISSED QUIZ WHEN PAGE LOADS (e.g. after clicking push notification)
@@ -306,12 +284,7 @@ export const SessionList = () => {
         });
         const data = await res.json();
         if (data.success && data.quiz) {
-          const qid = data.quiz.questionId || data.quiz.question_id;
-          if (qid !== lastShownQuestionIdRef.current) {
-            lastShownQuestionIdRef.current = qid;
-            console.log("📬 [SessionList] Fetched missed quiz – showing on website");
-            setIncomingQuiz(data.quiz);
-          }
+          receiveQuizFromPoll(data.quiz);
         }
       } catch (e) {
         console.error("Failed to fetch latest quiz:", e);
@@ -345,12 +318,7 @@ export const SessionList = () => {
         });
         const data = await res.json();
         if (data.success && data.quiz) {
-          const qid = data.quiz.questionId || data.quiz.question_id;
-          if (qid !== lastShownQuestionIdRef.current) {
-            lastShownQuestionIdRef.current = qid;
-            console.log("📬 [SessionList] Poll: new quiz – showing on website");
-            setIncomingQuiz(data.quiz);
-          }
+          receiveQuizFromPoll(data.quiz);
         }
       } catch (e) {
         // ignore
@@ -359,7 +327,7 @@ export const SessionList = () => {
 
     const interval = setInterval(poll, 15000);
     return () => clearInterval(interval);
-  }, [connectedSessionId, user?.id, isInstructor]);
+  }, [connectedSessionId, user?.id, isInstructor, receiveQuizFromPoll]);
 
   // ---------------------------------------------------
   // ⭐ WEBSOCKET LISTENER FOR REAL-TIME SESSION STATUS UPDATES
@@ -493,168 +461,13 @@ export const SessionList = () => {
       // For instructors, open Zoom in new tab
       window.open(session.start_url, '_blank');
 
-      // Store session ID for instructor too
       const sessionKey = session.zoomMeetingId || session.id;
       localStorage.setItem('connectedSessionId', sessionKey);
-      setConnectedSessionId(sessionKey);
+      setInstructorSessionId(sessionKey);
       return;
     }
 
-    // 🎯 STUDENTS: Direct join (same as Dashboard)
-    // If the meeting is visible in their list, they're already enrolled
-    
-    // 🎯 STEP 1: Open Zoom meeting
-    if (!session.join_url) {
-      toast.error("❌ Zoom join URL missing");
-      return;
-    }
-
-    window.open(session.join_url, '_blank');
-
-    // 🎯 STEP 2: Connect to WebSocket (same as StudentDashboard)
-    const sessionKey = session.zoomMeetingId || session.id;
-    const studentId = user?.id || `STUDENT_${Date.now()}`;
-    const studentName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown Student';
-    const studentEmail = user?.email || '';
-    const wsBase = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL?.replace('/api', '').replace('http', 'ws') || 'ws://localhost:8000';
-
-    const encodedName = encodeURIComponent(studentName);
-    const encodedEmail = encodeURIComponent(studentEmail);
-    const sessionWsUrl = `${wsBase}/ws/session/${sessionKey}/${studentId}?student_name=${encodedName}&student_email=${encodedEmail}`;
-
-    console.log(`🔗 [SessionList] Connecting to session WebSocket: ${sessionWsUrl}`);
-
-    // Close any previous session WebSocket and stop monitoring
-    if (sessionWsRef.current) {
-      console.log("🔌 [SessionList] Closing previous session WebSocket");
-      sessionWsRef.current.close();
-      sessionWsRef.current = null;
-    }
-    if (networkMonitoringEnabled) {
-      stopMonitoring();
-      setNetworkMonitoringEnabled(false);
-    }
-
-    // Create new session WebSocket
-    const ws = new WebSocket(sessionWsUrl);
-
-    ws.onopen = () => {
-      console.log(`✅ [SessionList] Connected to session ${sessionKey} WebSocket`);
-      setConnectedSessionId(sessionKey);
-      localStorage.setItem('connectedSessionId', sessionKey);
-
-      // 🎯 START NETWORK MONITORING ONLY AFTER SUCCESSFUL WEBSOCKET CONNECTION
-      setNetworkMonitoringEnabled(true);
-
-      toast.success(`✅ Joined "${session.title}" - Network monitoring started`);
-      
-      // 🔄 Send keepalive ping immediately, then every 15 seconds to prevent connection timeout
-      const sendPing = () => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send('ping');
-          console.log('📡 [SessionList] Sent keepalive ping');
-        }
-      };
-      
-      // Send first ping immediately
-      sendPing();
-      
-      // Then send ping every 15 seconds
-      const pingInterval = setInterval(sendPing, 15000);
-      
-      // Store interval ID to clear it later
-      (ws as any).pingInterval = pingInterval;
-    };
-
-    ws.onclose = () => {
-      console.log(`🔌 [SessionList] Session ${sessionKey} WebSocket closed`);
-      if (sessionWsRef.current === ws) {
-        sessionWsRef.current = null;
-      }
-      // Clear ping interval if it exists
-      if ((ws as any).pingInterval) {
-        clearInterval((ws as any).pingInterval);
-      }
-      // 🎯 STOP NETWORK MONITORING when WebSocket closes (student left meeting)
-      if (networkMonitoringEnabled) {
-        stopMonitoring();
-        setNetworkMonitoringEnabled(false);
-        console.log('📶 [SessionList] Network monitoring stopped - student left meeting');
-      }
-      if (connectedSessionId === sessionKey) {
-        setConnectedSessionId(null);
-        localStorage.removeItem('connectedSessionId');
-        toast.info("Disconnected from session");
-      }
-    };
-
-    ws.onerror = (err) => {
-      console.error("[SessionList] Session WS ERROR:", err);
-      toast.error("Failed to connect to session");
-    };
-
-      ws.onmessage = (event) => {
-        // Backend sends "pong" as plain text for keepalive - don't parse as JSON
-        if (event.data === 'pong') return;
-        try {
-          const data = JSON.parse(event.data);
-          console.log("📬 [SessionList] Session WS message:", data);
-
-          if (data.type === "quiz") {
-            console.log("🎯 [SessionList] Quiz received from session room!");
-            
-            // 🔔 1) Show toast notification (visible in-app message)
-            toast.success("📝 New Quiz Question!", {
-              description: data.question || "Answer the quiz now!",
-              duration: 10000, // Show for 10 seconds
-              position: "top-center",
-            });
-            
-            // 2) Show quiz popup (and track so polling doesn't show again)
-            lastShownQuestionIdRef.current = data.questionId || data.question_id;
-            setIncomingQuiz(data);
-          } else if (data.type === "session_joined") {
-            console.log("✅ [SessionList] Session join confirmed:", data);
-          } else if (data.type === "meeting_ended") {
-            console.log("🔴 [SessionList] Meeting ended event received:", data);
-            toast.info("🔴 Meeting has ended", {
-              description: "The host has ended the meeting",
-              duration: 5000,
-            });
-            // Stop network monitoring
-            if (networkMonitoringEnabled) {
-              stopMonitoring();
-              setNetworkMonitoringEnabled(false);
-            }
-            // Clear connection state
-            setConnectedSessionId(null);
-            localStorage.removeItem('connectedSessionId');
-            // Close WebSocket
-            if (sessionWsRef.current) {
-              sessionWsRef.current.close();
-              sessionWsRef.current = null;
-            }
-            // Update sessions list (event-driven, no API call needed)
-            setSessions(prev => prev.map(s =>
-              (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId)
-                ? { ...s, status: 'completed' as const }
-                : s
-            ));
-          } else if (data.type === "session_started") {
-            console.log("🟢 [SessionList] Session started event received:", data);
-            // Update sessions list (event-driven, no API call needed)
-            setSessions(prev => prev.map(s =>
-              (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId)
-                ? { ...s, status: 'live' as const }
-                : s
-            ));
-          }
-        } catch (e) {
-          console.error("[SessionList] Session WS JSON ERROR:", e);
-        }
-      };
-
-      sessionWsRef.current = ws;
+    contextJoinSession(session);
   };
 
   // ---------------------------------------------------
@@ -662,42 +475,21 @@ export const SessionList = () => {
   // ---------------------------------------------------
   const handleLeaveSession = async (session: Session) => {
     const sessionKey = session.zoomMeetingId || session.id;
-
-    // Only allow leaving if currently in this session
-    if (connectedSessionId !== sessionKey) {
-      return;
-    }
+    if (connectedSessionId !== sessionKey) return;
 
     try {
-      // 🎯 STEP 1: Call backend leave endpoint
-      const leaveResult = await sessionService.leaveSession(session.id);
-
-      if (leaveResult.success) {
-        console.log("✅ [SessionList] Backend leave successful");
-        toast.success("Left session successfully");
-      }
-
-      // 🎯 STEP 2: Stop network monitoring
-      if (networkMonitoringEnabled) {
-        stopMonitoring();
-        setNetworkMonitoringEnabled(false);
-        console.log('📶 [SessionList] Network monitoring stopped');
-      }
-
-      // 🎯 STEP 3: Close WebSocket connection
-      if (sessionWsRef.current) {
-        sessionWsRef.current.close();
-        sessionWsRef.current = null;
-        console.log('🔌 [SessionList] WebSocket closed');
-      }
-
-      // 🎯 STEP 4: Clear localStorage and state
-      localStorage.removeItem('connectedSessionId');
-      setConnectedSessionId(null);
-
+      await sessionService.leaveSession(session.id);
+      toast.success("Left session successfully");
     } catch (error) {
       console.error("Error leaving session:", error);
       toast.error("Failed to leave session");
+    }
+
+    if (isInstructor) {
+      localStorage.removeItem('connectedSessionId');
+      setInstructorSessionId(null);
+    } else {
+      contextLeaveSession();
     }
   };
 
@@ -1342,7 +1134,7 @@ export const SessionList = () => {
       {incomingQuiz && (
         <QuizPopup
           quiz={incomingQuiz}
-          onClose={() => setIncomingQuiz(null)}
+          onClose={clearIncomingQuiz}
         />
       )}
     </div>

@@ -3,6 +3,7 @@ import './index.css';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { AuthProvider } from './context/AuthContext';
+import { SessionConnectionProvider } from './context/SessionConnectionContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { Toaster } from 'sonner';
 
@@ -13,8 +14,10 @@ if (container) {
     <React.StrictMode>
       <ThemeProvider>
         <AuthProvider>
-          <App />
-          <Toaster position="top-right" richColors />
+          <SessionConnectionProvider>
+            <App />
+            <Toaster position="top-right" richColors />
+          </SessionConnectionProvider>
         </AuthProvider>
       </ThemeProvider>
     </React.StrictMode>

@@ -210,7 +210,9 @@ class WebSocketManager:
             # Broadcast to all participants in this session
             await self.broadcast_to_session(session_id, leave_event)
             
-            print(f"👋 Student left session room: session={session_id}, student={student_id}")
+            # Fully remove from room so they are offline and never receive questions
+            self.remove_from_session_room(session_id, student_id)
+            print(f"👋 Student left session room: session={session_id}, student={student_id} (removed)")
             return True
         return False
 
@@ -392,68 +394,54 @@ class WebSocketManager:
         sent = 0
         dead_connections = []
         
-        # Use asyncio.gather for parallel sending to ensure instant delivery
+        # Build ordered list of (student_id, task) for JOINED only so results align with student_id
         import asyncio
+        joined_student_ids: List[str] = []
         send_tasks = []
 
         for student_id, data in self.session_rooms[session_id].items():
-            # Only send to JOINED students (not "left")
             if data.get("status") != "joined":
                 continue
-
             websocket = data.get("websocket")
             if not websocket:
                 continue
 
-            # Create async task for each send operation (parallel execution)
             async def send_to_student(ws, sid, name):
                 try:
-                    # Check if WebSocket is still open before sending
                     try:
-                        if hasattr(ws, 'client_state'):
-                            if ws.client_state.name != 'CONNECTED':
-                                print(f"   ⚠️ WebSocket for {sid} is not connected (state: {ws.client_state.name})")
-                                return False
-                        elif hasattr(ws, 'application_state'):
-                            if ws.application_state.name != 'CONNECTED':
-                                print(f"   ⚠️ WebSocket for {sid} is not connected (state: {ws.application_state.name})")
-                                return False
+                        if hasattr(ws, 'client_state') and ws.client_state.name != 'CONNECTED':
+                            return False
+                        if hasattr(ws, 'application_state') and ws.application_state.name != 'CONNECTED':
+                            return False
                     except (AttributeError, Exception):
-                        # If state checking fails, proceed with send attempt (will be caught by outer try-except)
                         pass
-                    
                     await ws.send_json(message)
                     print(f"   ✅ Sent to {name or sid}")
                     return True
                 except Exception as e:
                     error_msg = str(e)
-                    # Check for common closed connection errors
                     if 'websocket.close' in error_msg or 'closed' in error_msg.lower() or '1005' in error_msg:
                         print(f"   ⚠️ WebSocket for {sid} is closed")
                     else:
                         print(f"   ❌ Failed to send to {sid}: {e}")
                     return False
 
+            joined_student_ids.append(student_id)
             send_tasks.append(send_to_student(websocket, student_id, data.get('studentName')))
 
-        # Send to all students in parallel for instant delivery
         if send_tasks:
             results = await asyncio.gather(*send_tasks, return_exceptions=True)
             sent = sum(1 for r in results if r is True)
-            
-            # Track dead connections for cleanup
-            for i, (student_id, data) in enumerate(self.session_rooms[session_id].items()):
-                if data.get("status") == "joined" and i < len(results):
-                    if results[i] is False or isinstance(results[i], Exception):
-                        dead_connections.append(student_id)
+            for i, sid in enumerate(joined_student_ids):
+                if i < len(results) and (results[i] is False or isinstance(results[i], Exception)):
+                    dead_connections.append(sid)
 
-        # Clean up dead connections
         for student_id in dead_connections:
             try:
                 await self.leave_session_room(session_id, student_id)
+                self.remove_from_session_room(session_id, student_id)
             except Exception as cleanup_error:
                 print(f"   ⚠️ Error cleaning up dead connection for {student_id}: {cleanup_error}")
-                # Force remove from session room if leave fails
                 self.remove_from_session_room(session_id, student_id)
 
         # 📬 Store last quiz for this session so reconnecting students can receive it

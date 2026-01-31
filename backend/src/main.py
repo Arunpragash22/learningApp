@@ -304,9 +304,10 @@ async def websocket_session(
                 # Continue loop; do not break – keep connection alive
 
     except WebSocketDisconnect:
-        # Mark student as left when they disconnect
+        # Immediately mark student offline and remove from room so they receive no further questions
         await ws_manager.leave_session_room(session_id, student_id)
-        print(f"👋 Student {student_id} disconnected from session {session_id}")
+        ws_manager.remove_from_session_room(session_id, student_id)
+        print(f"👋 Student {student_id} disconnected from session {session_id} (removed from room)")
 
 
 # --------------------------------------------------------
