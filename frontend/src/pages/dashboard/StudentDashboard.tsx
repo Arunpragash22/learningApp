@@ -1,22 +1,17 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   BellIcon,
   TrendingUpIcon,
-  CheckCircleIcon,
   ActivityIcon,
-  PlayIcon,
   CalendarIcon,
   WifiIcon,
-  XIcon,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { useAuth } from "../../context/AuthContext";
 import { sessionService, Session } from "../../services/sessionService";
 import { toast } from "sonner";
-import { useLatencyMonitor, ConnectionQuality } from "../../hooks/useLatencyMonitor";
-import { ConnectionQualityBadge } from "../../components/engagement/ConnectionQualityIndicator";
 
 // =====================================================
 // 🔔 NOTIFICATION HELPERS
@@ -241,11 +236,9 @@ export const StudentDashboard = () => {
   const [incomingQuiz, setIncomingQuiz] = useState<any | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   
-  // 🎯 Session WebSocket state - only joined sessions receive quizzes
-  const [sessionWs, setSessionWs] = useState<WebSocket | null>(null);
-  const sessionWsRef = useRef<WebSocket | null>(null);
+  // Connection state read from localStorage (joining only happens on Meetings page)
   const [connectedSessionId, setConnectedSessionId] = useState<string | null>(
-    localStorage.getItem('connectedSessionId')
+    () => localStorage.getItem('connectedSessionId')
   );
 
   // 📊 Session quiz tracking - resets each session
@@ -258,74 +251,56 @@ export const StudentDashboard = () => {
   // Track last quiz we showed (so polling doesn't show the same one twice)
   const lastShownQuestionIdRef = useRef<string | null>(null);
 
-  // 📶 WebRTC-aware Connection Latency Monitoring
-  // This monitors network quality when student joins a session
-  const handleConnectionQualityChange = useCallback((quality: ConnectionQuality) => {
-    if (quality === 'poor' || quality === 'critical') {
-      toast.warning(`⚠️ Your connection quality is ${quality}. This may affect your session.`);
-    }
+  // Sync connectedSessionId from localStorage (e.g. after joining from Meetings page)
+  useEffect(() => {
+    const sync = () => setConnectedSessionId(localStorage.getItem('connectedSessionId'));
+    sync();
+    window.addEventListener('storage', sync);
+    const onFocus = () => sync();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
-  // Build display name with fallbacks
-  const studentDisplayName = user 
-    ? (user.firstName && user.lastName 
-        ? `${user.firstName} ${user.lastName}`.trim()
-        : user.firstName || user.lastName || user.email?.split('@')[0] || 'Student')
-    : 'Student';
-
-  // 📶 Network monitoring state - only enabled when student actually joins Zoom meeting
-  const [networkMonitoringEnabled, setNetworkMonitoringEnabled] = useState(false);
-  
-  const {
-    isMonitoring: isLatencyMonitoring,
-    currentRtt,
-    quality: connectionQuality,
-    stats: latencyStats,
-    stopMonitoring,
-  } = useLatencyMonitor({
-    sessionId: connectedSessionId, // Only monitor when connected to a session
-    studentId: user?.id,
-    studentName: studentDisplayName, // Use proper display name
-    userRole: 'student', // Only student data is stored in database
-    enabled: networkMonitoringEnabled && !!connectedSessionId && !!user?.id, // Enable ONLY when explicitly enabled AND in a session
-    pingInterval: 3000, // Ping every 3 seconds for faster updates
-    reportInterval: 5000, // Report to server every 5 seconds
-    onQualityChange: handleConnectionQualityChange
-  });
-  
-  // Notify when monitoring starts (only when explicitly enabled)
-  useEffect(() => {
-    if (isLatencyMonitoring && connectedSessionId && networkMonitoringEnabled) {
-      console.log('📶 Network monitoring ACTIVE:', {
-        sessionId: connectedSessionId,
-        studentId: user?.id,
-        studentName: studentDisplayName
-      });
+  // Helper: true if session date is today (dashboard shows only today's sessions)
+  const isSessionToday = (session: Session): boolean => {
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10); // YYYY-MM-DD
+    const d = session.date;
+    if (!d) return false;
+    if (d.includes("-") && d.length >= 10) {
+      const sessionDateStr = d.slice(0, 10);
+      return sessionDateStr === todayStr;
     }
-  }, [isLatencyMonitoring, networkMonitoringEnabled]); // Only trigger when monitoring status changes
+    try {
+      const parsed = new Date(d);
+      return !isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === todayStr;
+    } catch {
+      return false;
+    }
+  };
 
   // ===========================================================
-  // 🎯 REMOVED: AUTO-CONNECT TO LIVE SESSION
-  // Network monitoring must start ONLY when student clicks "Join Now"
-  // Students must explicitly join meetings - no automatic connections
-  // ===========================================================
-
-  // ===========================================================
-  // ⭐ LOAD REAL SESSIONS FROM BACKEND - Event-driven updates via WebSocket
+  // ⭐ LOAD REAL SESSIONS FROM BACKEND - Today's upcoming/live only
   // ===========================================================
   useEffect(() => {
     const loadSessions = async () => {
       const allSessions = await sessionService.getAllSessions();
-      // Show only upcoming and live sessions
-      const filtered = allSessions.filter(s => s.status === 'upcoming' || s.status === 'live');
-      setSessions(filtered.slice(0, 5)); // Show max 5
+      const filtered = allSessions.filter(
+        s => (s.status === 'upcoming' || s.status === 'live') && isSessionToday(s)
+      );
+      // Sort by date+time so soonest first
+      const sorted = [...filtered].sort((a, b) => {
+        const tA = `${a.date}T${a.time || '00:00'}`;
+        const tB = `${b.date}T${b.time || '00:00'}`;
+        return new Date(tA).getTime() - new Date(tB).getTime();
+      });
+      setSessions(sorted.slice(0, 10));
     };
-    
-    // Initial load only - no polling
+
     loadSessions();
-    
-    // Sessions will be updated via WebSocket events (session_started, meeting_ended, etc.)
-    // No polling interval - updates are event-driven
   }, []); // Only load once on mount
 
   // ===========================================================
@@ -399,267 +374,8 @@ export const StudentDashboard = () => {
   }, [connectedSessionId, user?.id]);
 
   // ===========================================================
-  // 🎯 JOIN ZOOM MEETING + CONNECT TO SESSION WEBSOCKET
-  // Only students who click Join will receive quiz questions
+  // 🎯 JOINING IS ONLY VIA MEETINGS PAGE — Dashboard is view-only
   // ===========================================================
-  const handleJoinSession = (session: Session) => {
-    const sessionKey = session.zoomMeetingId || session.id;
-    
-    // If already connected to this session, treat as leave action
-    if (connectedSessionId === sessionKey) {
-      handleLeaveSession(session);
-      return;
-    }
-    
-    if (!session.join_url) {
-      toast.error("❌ Zoom join URL missing");
-      return;
-    }
-    
-    // Open Zoom meeting
-    window.open(session.join_url, '_blank');
-    
-    // 🎯 Connect to session-specific WebSocket
-    const studentId = user?.id || `STUDENT_${Date.now()}`;
-    const studentName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown Student';
-    const studentEmail = user?.email || '';
-    const wsBase = import.meta.env.VITE_WS_URL;
-    
-    console.log('🎯 Joining session:', {
-      sessionTitle: session.title,
-      sessionKey: sessionKey,
-      zoomMeetingId: session.zoomMeetingId,
-      sessionId: session.id,
-      studentId: studentId,
-      studentName: studentName,
-      wsBase: wsBase
-    });
-    
-    console.log(`🔑 SESSION KEY USED: ${sessionKey}`);
-    console.log(`🔑 ZOOM ID: ${session.zoomMeetingId}`);
-    console.log(`🔑 SESSION ID: ${session.id}`);
-    
-    // Include student name and email as query parameters for report generation
-    const encodedName = encodeURIComponent(studentName);
-    const encodedEmail = encodeURIComponent(studentEmail);
-    const sessionWsUrl = `${wsBase}/ws/session/${sessionKey}/${studentId}?student_name=${encodedName}&student_email=${encodedEmail}`;
-    
-    console.log(`🔗 Connecting to session WebSocket: ${sessionWsUrl}`);
-    console.log(`🔗 WS Base URL: ${wsBase}`);
-    console.log(`🔗 Session Key: ${sessionKey}`);
-    console.log(`🔗 Student ID: ${studentId}`);
-    
-    // Show toast to indicate connection attempt
-    toast.info(`Connecting to session...`);
-    
-    // Close any previous session WebSocket
-    if (sessionWsRef.current) {
-      console.log("🔌 Closing previous session WebSocket");
-      sessionWsRef.current.close();
-      sessionWsRef.current = null;
-      setSessionWs(null);
-    }
-    
-    // Create new session WebSocket
-    const ws = new WebSocket(sessionWsUrl);
-    
-    ws.onopen = () => {
-      console.log(`✅ Connected to session ${sessionKey} WebSocket`);
-      setConnectedSessionId(sessionKey);
-      localStorage.setItem('connectedSessionId', sessionKey);
-      
-      // 🎯 START NETWORK MONITORING ONLY AFTER SUCCESSFUL WEBSOCKET CONNECTION
-      // This ensures monitoring starts only when student actually joins
-      setNetworkMonitoringEnabled(true);
-      
-      // 📊 Reset session quiz stats for new session
-      setSessionQuizStats({
-        questionsReceived: 0,
-        questionsAnswered: 0,
-        correctAnswers: 0,
-      });
-      
-      // 🔔 Request notification permission
-      if ("Notification" in window && Notification.permission === "default") {
-        Notification.requestPermission();
-      }
-      
-      // Play a subtle sound to confirm connection
-      playNotificationSound();
-      
-      // Show success notification
-      toast.success(`✅ Joined "${session.title}" - Network monitoring started`);
-      
-      // 🔄 Send keepalive ping immediately, then every 15 seconds to prevent connection timeout
-      const sendPing = () => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send('ping');
-          console.log('📡 Sent keepalive ping');
-        }
-      };
-      
-      // Send first ping immediately
-      sendPing();
-      
-      // Then send ping every 15 seconds
-      const pingInterval = setInterval(sendPing, 15000);
-      
-      // Store interval ID to clear it later
-      (ws as any).pingInterval = pingInterval;
-    };
-    
-    ws.onclose = () => {
-      console.log(`🔌 Session ${sessionKey} WebSocket closed`);
-      if (sessionWsRef.current === ws) {
-        sessionWsRef.current = null;
-        setSessionWs(null);
-      }
-      // Clear ping interval if it exists
-      if ((ws as any).pingInterval) {
-        clearInterval((ws as any).pingInterval);
-      }
-      // 🎯 STOP NETWORK MONITORING when WebSocket closes (student left meeting)
-      if (networkMonitoringEnabled) {
-        stopMonitoring();
-        setNetworkMonitoringEnabled(false);
-        console.log('📶 Network monitoring stopped - student left meeting');
-      }
-      // Clear connection state only if we're leaving this specific session
-      if (connectedSessionId === sessionKey) {
-        setConnectedSessionId(null);
-        localStorage.removeItem('connectedSessionId');
-        toast.info("Disconnected from session");
-      }
-    };
-    
-    ws.onerror = (err) => {
-      console.error("❌ Session WebSocket ERROR:", err);
-      toast.error(`Failed to connect to session. Please try again.`);
-      // Error will trigger onclose, which handles cleanup
-    };
-    
-    ws.onmessage = (event) => {
-      // Backend sends "pong" as plain text for keepalive - don't parse as JSON
-      if (event.data === 'pong') return;
-      try {
-        const data = JSON.parse(event.data);
-        console.log("📬 Session WS message:", data);
-        
-        // Handle quiz questions from session room
-        if (data.type === "quiz") {
-          console.log("🎯 Quiz received from session room!");
-          
-          // 📊 Increment questions received from instructor
-          setSessionQuizStats(prev => ({
-            ...prev,
-            questionsReceived: prev.questionsReceived + 1,
-          }));
-          
-          // 🔔 1) Play notification sound
-          playNotificationSound();
-          
-          // 🔔 2) Show toast notification (visible in-app message)
-          toast.success("📝 New Quiz Question!", {
-            description: data.question || "Answer the quiz now!",
-            duration: 10000, // Show for 10 seconds
-            position: "top-center",
-          });
-          
-          // 🔔 3) Show browser/system notification (if permitted)
-          showBrowserNotification("📝 New Quiz!", data.question || "You have a new quiz question");
-          
-          // 4) Show quiz popup (and track so polling doesn't show again)
-          lastShownQuestionIdRef.current = data.questionId || data.question_id;
-          setIncomingQuiz(data);
-        } else if (data.type === "session_joined") {
-          console.log("✅ Session join confirmed:", data);
-        } else if (data.type === "participant_joined" || data.type === "participant_left") {
-          // Real-time participant status update - refresh session list to show updated participant count
-          console.log(`👥 Participant ${data.type === 'participant_joined' ? 'joined' : 'left'}:`, data.studentName || data.studentId);
-          // Optionally refresh sessions to show updated participant counts
-          // This will be handled by the auto-refresh interval already in place
-        } else if (data.type === "meeting_ended") {
-          console.log("🔴 [StudentDashboard] Meeting ended event received:", data);
-          toast.info("🔴 Meeting has ended", {
-            description: "The host has ended the meeting",
-            duration: 5000,
-          });
-          // Stop network monitoring
-          if (networkMonitoringEnabled) {
-            stopMonitoring();
-            setNetworkMonitoringEnabled(false);
-          }
-          // Clear connection state
-          setConnectedSessionId(null);
-          localStorage.removeItem('connectedSessionId');
-          // Close WebSocket
-          if (sessionWsRef.current) {
-            sessionWsRef.current.close();
-            sessionWsRef.current = null;
-            setSessionWs(null);
-          }
-          // Update sessions list (event-driven, no API call needed)
-          setSessions(prev => prev.map(s => 
-            (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId) 
-              ? { ...s, status: 'completed' as const }
-              : s
-          ).filter(s => s.status === 'upcoming' || s.status === 'live').slice(0, 5));
-        } else if (data.type === "session_started") {
-          console.log("🟢 [StudentDashboard] Session started event received:", data);
-          // Update sessions list (event-driven, no API call needed)
-          setSessions(prev => prev.map(s => 
-            (s.id === data.sessionId || s.zoomMeetingId === data.zoomMeetingId) 
-              ? { ...s, status: 'live' as const }
-              : s
-          ));
-        }
-      } catch (e) {
-        console.error("Session WS JSON ERROR:", e);
-      }
-    };
-    
-    sessionWsRef.current = ws;
-    setSessionWs(ws);
-  };
-
-  // ===========================================================
-  // 🎯 LEAVE SESSION - Disconnect WebSocket and stop monitoring
-  // ===========================================================
-  const handleLeaveSession = (session: Session) => {
-    const sessionKey = session.zoomMeetingId || session.id;
-    
-    // Close WebSocket connection
-    if (sessionWsRef.current) {
-      sessionWsRef.current.close();
-      sessionWsRef.current = null;
-      setSessionWs(null);
-    }
-    
-    // Stop network monitoring
-    if (networkMonitoringEnabled) {
-      stopMonitoring();
-      setNetworkMonitoringEnabled(false);
-    }
-    
-    // Clear connection state
-    setConnectedSessionId(null);
-    localStorage.removeItem('connectedSessionId');
-    
-    toast.info(`Left "${session.title}"`);
-    console.log('👋 Left session:', sessionKey);
-  };
-
-  // Cleanup session WebSocket and network monitoring ONLY on unmount (do not close when sessionWs/networkMonitoringEnabled change)
-  useEffect(() => {
-    return () => {
-      stopMonitoring();
-      setNetworkMonitoringEnabled(false);
-      if (sessionWsRef.current) {
-        sessionWsRef.current.close();
-        sessionWsRef.current = null;
-      }
-    };
-  }, []);
 
   // ===========================================================
   // ⭐ GLOBAL WebSocket — Receive Notifications (fallback)
@@ -716,11 +432,6 @@ export const StudentDashboard = () => {
               correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
             }));
           }}
-          networkStrength={{
-            quality: connectionQuality,
-            rttMs: currentRtt,
-            jitterMs: latencyStats?.jitter,
-          }}
         />
       )}
 
@@ -735,16 +446,12 @@ export const StudentDashboard = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* 📶 Connection Quality Badge - shows when connected to session */}
+          {/* Connected state (joined from Meetings page) — view-only; manage on Meetings */}
           {connectedSessionId && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border">
-              <WifiIcon className="h-4 w-4 text-gray-500" />
-              <ConnectionQualityBadge
-                quality={connectionQuality}
-                rtt={currentRtt}
-                isMonitoring={isLatencyMonitoring}
-              />
-            </div>
+            <Link to="/dashboard/sessions" className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border text-blue-600 hover:opacity-90">
+              <WifiIcon className="h-4 w-4" />
+              <span className="text-sm font-medium">In a meeting · Manage on Meetings</span>
+            </Link>
           )}
           
           <Link to="/dashboard/student/engagement" className="w-full sm:w-auto">
@@ -770,24 +477,13 @@ export const StudentDashboard = () => {
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Network Strength - Shows connection quality when in session */}
+          {/* Network / session status — join only from Meetings page */}
           <div className="bg-white bg-opacity-10 rounded-lg p-4">
             <WifiIcon className="h-6 w-6" style={{ color: '#b8e6d4' }} />
-            <p className="text-sm font-medium">Network Strength</p>
+            <p className="text-sm font-medium">Session Status</p>
             <p className="text-lg font-bold">
               {connectedSessionId ? (
-                <span className="capitalize" style={{ 
-                  color: connectionQuality === 'excellent' || connectionQuality === 'good' 
-                    ? '#b8e6d4' 
-                    : connectionQuality === 'fair' 
-                      ? '#fcd34d'
-                      : connectionQuality === 'poor' || connectionQuality === 'critical'
-                        ? '#fca5a5'
-                        : 'inherit'
-                }}>
-                  {connectionQuality}
-                  {currentRtt && <span className="text-xs ml-1">({Math.round(currentRtt)}ms)</span>}
-                </span>
+                <span style={{ color: '#b8e6d4' }}>In meeting</span>
               ) : (
                 <span className="text-gray-300">Not in session</span>
               )}
@@ -821,38 +517,39 @@ export const StudentDashboard = () => {
         <div className="space-y-4">
           {/* Header with View All Link */}
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium text-gray-900">Your Meetings</h3>
+            <h3 className="text-lg font-medium text-gray-900">Today&apos;s Upcoming Meetings</h3>
             <Link to="/dashboard/sessions">
-              <span className="text-sm hover:opacity-80" style={{ color: '#3B82F6' }}>View All</span>
+              <span className="text-sm hover:opacity-80" style={{ color: '#3B82F6' }}>Join from Meetings →</span>
             </Link>
           </div>
+          <p className="text-xs text-gray-500 mt-1">
+            View-only. Go to <Link to="/dashboard/sessions" className="text-blue-600 hover:underline">Meetings</Link> to join.
+          </p>
 
-          {/* 📶 Show connection status banner when connected */}
+          {/* Show connection status when student joined from Meetings page */}
           {connectedSessionId && (
             <div className="p-3 rounded-lg bg-white shadow" style={{ borderColor: '#3B82F6', borderWidth: '1px' }}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: '#3B82F6' }}></div>
-                  <span className="text-sm font-medium" style={{ color: '#4a8b73' }}>
+                  <span className="text-sm font-medium" style={{ color: '#2563eb' }}>
                     Connected to session
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <WifiIcon className="h-4 w-4" style={{ color: '#3B82F6' }} />
-                  <span className="text-xs" style={{ color: '#2563eb' }}>
-                    {currentRtt ? `${Math.round(currentRtt)}ms` : 'Measuring...'} • {connectionQuality}
-                  </span>
-                </div>
+                <Link to="/dashboard/sessions" className="text-xs font-medium text-blue-600 hover:underline">
+                  Go to Meetings →
+                </Link>
               </div>
-              <p className="text-xs mt-1" style={{ color: '#3B82F6' }}>
-                Your network quality is being monitored for engagement analysis.
+              <p className="text-xs mt-1 text-gray-500">
+                View-only here. Join or leave from the Meetings page.
               </p>
             </div>
           )}
 
           {sessions.length === 0 ? (
             <div className="bg-white shadow rounded-lg px-4 py-8 text-center text-gray-500">
-              <p className="text-sm">No upcoming meetings</p>
+              <p className="text-sm">No meetings today</p>
+              <Link to="/dashboard/sessions" className="text-sm text-blue-600 hover:underline mt-2 inline-block">Go to Meetings</Link>
             </div>
           ) : (
             <>
@@ -871,7 +568,6 @@ export const StudentDashboard = () => {
                   {sessions.filter(s => s.isStandalone === true).map((session) => {
                     const sessionKey = session.zoomMeetingId || session.id;
                     const isConnectedToThis = connectedSessionId === sessionKey;
-                    
                     return (
                       <div key={session.id} className="px-4 py-4 border-t hover:bg-gray-50" style={isConnectedToThis ? { backgroundColor: '#eff6ff' } : {}}>
                         <div className="flex items-center justify-between">
@@ -895,36 +591,9 @@ export const StudentDashboard = () => {
                               {session.date} • {session.time}
                             </p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {!isConnectedToThis ? (
-                              <Button
-                                variant={session.status === 'live' ? 'primary' : 'outline'}
-                                size="sm"
-                                leftIcon={<PlayIcon className="h-4 w-4" />}
-                                onClick={() => handleJoinSession(session)}
-                              >
-                                {session.status === 'live' ? 'Join' : 'Join'}
-                              </Button>
-                            ) : (
-                              <>
-                                <Button
-                                  variant="success"
-                                  size="sm"
-                                  leftIcon={<CheckCircleIcon className="h-4 w-4" />}
-                                >
-                                  Live
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  leftIcon={<XIcon className="h-4 w-4" />}
-                                  onClick={() => handleJoinSession(session)}
-                                >
-                                  Leave
-                                </Button>
-                              </>
-                            )}
-                          </div>
+                          <Link to="/dashboard/sessions" className="text-xs text-blue-600 hover:underline whitespace-nowrap">
+                            Join from Meetings →
+                          </Link>
                         </div>
                       </div>
                     );
@@ -947,7 +616,6 @@ export const StudentDashboard = () => {
                   {sessions.filter(s => !s.isStandalone).map((session) => {
                     const sessionKey = session.zoomMeetingId || session.id;
                     const isConnectedToThis = connectedSessionId === sessionKey;
-                    
                     return (
                       <div key={session.id} className="px-4 py-4 border-t hover:bg-gray-50" style={isConnectedToThis ? { backgroundColor: '#eff6ff' } : {}}>
                         <div className="flex items-center justify-between">
@@ -971,36 +639,9 @@ export const StudentDashboard = () => {
                               {session.date} • {session.time}
                             </p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {!isConnectedToThis ? (
-                              <Button
-                                variant={session.status === 'live' ? 'primary' : 'outline'}
-                                size="sm"
-                                leftIcon={<PlayIcon className="h-4 w-4" />}
-                                onClick={() => handleJoinSession(session)}
-                              >
-                                {session.status === 'live' ? 'Join' : 'Join'}
-                              </Button>
-                            ) : (
-                              <>
-                                <Button
-                                  variant="success"
-                                  size="sm"
-                                  leftIcon={<CheckCircleIcon className="h-4 w-4" />}
-                                >
-                                  Live
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  leftIcon={<XIcon className="h-4 w-4" />}
-                                  onClick={() => handleJoinSession(session)}
-                                >
-                                  Leave
-                                </Button>
-                              </>
-                            )}
-                          </div>
+                          <Link to="/dashboard/sessions" className="text-xs text-blue-600 hover:underline whitespace-nowrap">
+                            Join from Meetings →
+                          </Link>
                         </div>
                       </div>
                     );
