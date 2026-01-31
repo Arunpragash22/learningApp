@@ -337,7 +337,7 @@ export const StudentDashboard = () => {
     }
     
     if (!session.join_url) {
-      alert("❌ Zoom join URL missing");
+      toast.error("❌ Zoom join URL missing");
       return;
     }
     
@@ -348,7 +348,6 @@ export const StudentDashboard = () => {
     const studentId = user?.id || `STUDENT_${Date.now()}`;
     const studentName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown Student';
     const studentEmail = user?.email || '';
-    const sessionKey = session.zoomMeetingId || session.id;
     const wsBase = import.meta.env.VITE_WS_URL;
     
     console.log('🎯 Joining session:', {
@@ -357,7 +356,8 @@ export const StudentDashboard = () => {
       zoomMeetingId: session.zoomMeetingId,
       sessionId: session.id,
       studentId: studentId,
-      studentName: studentName
+      studentName: studentName,
+      wsBase: wsBase
     });
     
     // Include student name and email as query parameters for report generation
@@ -366,6 +366,12 @@ export const StudentDashboard = () => {
     const sessionWsUrl = `${wsBase}/ws/session/${sessionKey}/${studentId}?student_name=${encodedName}&student_email=${encodedEmail}`;
     
     console.log(`🔗 Connecting to session WebSocket: ${sessionWsUrl}`);
+    console.log(`🔗 WS Base URL: ${wsBase}`);
+    console.log(`🔗 Session Key: ${sessionKey}`);
+    console.log(`🔗 Student ID: ${studentId}`);
+    
+    // Show toast to indicate connection attempt
+    toast.info(`Connecting to session...`);
     
     // Close any previous session WebSocket
     if (sessionWs) {
@@ -456,8 +462,9 @@ export const StudentDashboard = () => {
     };
     
     ws.onerror = (err) => {
-      console.error("Session WS ERROR:", err);
-      // Error will trigger onclose, which handles reconnection
+      console.error("❌ Session WebSocket ERROR:", err);
+      toast.error(`Failed to connect to session. Please try again.`);
+      // Error will trigger onclose, which handles cleanup
     };
     
     ws.onmessage = (event) => {
