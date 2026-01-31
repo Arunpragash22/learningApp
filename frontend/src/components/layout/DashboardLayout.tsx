@@ -1,15 +1,19 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSessionConnection } from '../../context/SessionConnectionContext';
+import { QuizPopup } from '../quiz/QuizPopup';
 import { BookOpenIcon, CalendarIcon, MenuIcon, XIcon, HomeIcon, GraduationCapIcon, BellIcon, LogOutIcon, BarChart3Icon, ActivityIcon, TargetIcon, KeyIcon, ChevronDownIcon } from 'lucide-react';
 
 export const DashboardLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isAuthenticated, isLoading } = useAuth();
+  const { incomingQuiz, clearIncomingQuiz } = useSessionConnection();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const isStudent = user?.role === 'student';
 
   // Get dashboard route based on user role
   const getDashboardRoute = () => {
@@ -306,6 +310,14 @@ export const DashboardLayout = () => {
           </div>
         </div>
       </main>
+
+      {/* Global quiz popup: students receive instructor-triggered questions on any page */}
+      {isStudent && incomingQuiz && (
+        <QuizPopup
+          quiz={incomingQuiz}
+          onClose={clearIncomingQuiz}
+        />
+      )}
 
       {/* Logout Confirmation Modal */}
       {showLogoutModal && (
