@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
-  BellIcon,
-  TrendingUpIcon,
   ActivityIcon,
+  BellIcon,
   CalendarIcon,
+  TrendingUpIcon,
   WifiIcon,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
@@ -280,54 +280,105 @@ export const StudentDashboard = () => {
   }, [user?.id, loadSessions]);
 
   // ===========================================================
-  // UI RENDER
-  // When student has enrolled meetings: show ONLY the meeting list (dashboard = meeting list).
-  // When no meetings: show welcome + summary + empty state.
+  // UI RENDER — Student dashboard: welcome + Learning Summary + meeting details
   // ===========================================================
-  const hasMeetings = sessions.length > 0;
 
   return (
     <div className="py-6">
-      {/* When student has enrolled meetings: dashboard is only the meeting list */}
-      {hasMeetings ? (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">
-              Your meetings
-            </h1>
-            <div className="flex items-center gap-3 flex-wrap">
-              {connectedSessionId && (
-                <Link to="/dashboard/sessions" className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border text-blue-600 hover:opacity-90 text-sm">
-                  <WifiIcon className="h-4 w-4" />
-                  <ConnectionQualityBadge quality={connectionQuality} rtt={currentRtt} isMonitoring={isLatencyMonitoring} />
-                  <span className="font-medium">In meeting · Manage</span>
-                </Link>
-              )}
-              <Link to="/dashboard/sessions" className="text-sm font-medium" style={{ color: '#3B82F6' }}>
-                Join from Meetings →
-              </Link>
-              <Link to="/dashboard/student/engagement">
-                <Button variant="outline" size="sm" leftIcon={<ActivityIcon className="h-4 w-4" />}>
-                  Engagement
-                </Button>
-              </Link>
-            </div>
-          </div>
-          <p className="text-sm text-gray-500">
-            View-only. Go to <Link to="/dashboard/sessions" className="text-blue-600 hover:underline">Meetings</Link> to join.
+      {/* Welcome + meeting controls (like screenshot) */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">
+            Welcome back, {user?.firstName || "Student"}!
+          </h1>
+          <p className="mt-1 text-xs sm:text-sm text-gray-500">
+            Here&apos;s what&apos;s happening with your courses today.
           </p>
-
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
           {connectedSessionId && (
-            <div className="p-3 rounded-lg bg-white shadow border border-blue-100 flex flex-wrap items-center gap-4">
-              <span className="text-sm font-medium text-blue-700">In session:</span>
-              <span className="text-sm text-gray-600">
-                Questions: {sessionQuizStats.questionsReceived} · Correct: {sessionQuizStats.correctAnswers}/{sessionQuizStats.questionsAnswered}
-              </span>
-              <Link to="/dashboard/sessions" className="text-xs text-blue-600 hover:underline">Go to Meetings →</Link>
-            </div>
+            <Link to="/dashboard/sessions" className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border text-blue-600 hover:opacity-90">
+              <WifiIcon className="h-4 w-4" />
+              <ConnectionQualityBadge quality={connectionQuality} rtt={currentRtt} isMonitoring={isLatencyMonitoring} />
+              <span className="text-sm font-medium">In meeting</span>
+            </Link>
           )}
+          <Link to="/dashboard/sessions" className="text-sm font-medium text-gray-600 hover:underline">
+            Manage on Meetings
+          </Link>
+          <Link to="/dashboard/student/engagement" className="w-full sm:w-auto">
+            <Button variant="primary" leftIcon={<ActivityIcon className="h-4 w-4" />} fullWidth className="sm:w-auto">
+              View Engagement
+            </Button>
+          </Link>
+        </div>
+      </div>
 
-          {/* Meeting list only — no big summary block */}
+      {/* Your Learning Summary (blue card — Connection, Questions Given, Correct Answers) */}
+      <div className="mb-8 text-white rounded-xl shadow-lg p-6" style={{ background: "linear-gradient(to right, #3B82F6, #2563eb)" }}>
+        <div>
+          <h2 className="text-xl font-bold">Your Learning Summary</h2>
+          <p className="mt-1" style={{ color: "#d1f5e8" }}>
+            You are in <span className="font-semibold">Active Participants</span>
+          </p>
+        </div>
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="bg-white bg-opacity-10 rounded-lg p-4">
+            <WifiIcon className="h-6 w-6" style={{ color: "#b8e6d4" }} />
+            <p className="text-sm font-medium">Connection</p>
+            <p className="text-lg font-bold">
+              {connectedSessionId ? (
+                <span style={{ color: "#b8e6d4" }} className="capitalize">
+                  {connectionQuality}
+                  {currentRtt != null && (
+                    <span className="text-sm font-normal opacity-90 ml-1">
+                      {Math.round(currentRtt)}ms
+                      {latencyStats?.jitter != null && ` · ${Math.round(latencyStats.jitter)}ms jitter`}
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span className="text-gray-300">Not in session</span>
+              )}
+            </p>
+          </div>
+          <div className="bg-white bg-opacity-10 rounded-lg p-4">
+            <BellIcon className="h-6 w-6 text-yellow-300" />
+            <p className="text-sm font-medium">Questions Given</p>
+            <p className="text-lg font-bold">{sessionQuizStats.questionsReceived}</p>
+          </div>
+          <div className="bg-white bg-opacity-10 rounded-lg p-4">
+            <TrendingUpIcon className="h-6 w-6" style={{ color: "#b8e6d4" }} />
+            <p className="text-sm font-medium">Correct Answers</p>
+            <p className="text-lg font-bold">
+              {sessionQuizStats.correctAnswers}
+              <span className="text-sm font-normal" style={{ color: "#c5edd9" }}>
+                {" "}/ {sessionQuizStats.questionsAnswered}
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Upcoming Meetings (next 24 hours) — list or empty state */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-medium text-gray-900">Upcoming Meetings (next 24 hours)</h3>
+          <Link to="/dashboard/sessions" className="text-sm font-medium hover:opacity-80" style={{ color: "#3B82F6" }}>
+            Join from Meetings →
+          </Link>
+        </div>
+        <p className="text-sm text-gray-500">
+          View-only. Go to <Link to="/dashboard/sessions" className="text-blue-600 hover:underline">Meetings</Link> to join.
+        </p>
+
+        {/* Meeting list or empty state */}
+        {sessions.length === 0 ? (
+          <div className="bg-white shadow rounded-lg px-4 py-8 text-center text-gray-500">
+            <p className="text-sm">No meetings in the next 24 hours</p>
+            <Link to="/dashboard/sessions" className="text-sm text-blue-600 hover:underline mt-2 inline-block">Go to Meetings</Link>
+          </div>
+        ) : (
           <div className="space-y-4">
             {sessions.filter(s => s.isStandalone === true).length > 0 && (
               <div className="bg-white shadow rounded-lg">
@@ -393,84 +444,8 @@ export const StudentDashboard = () => {
               </div>
             )}
           </div>
-        </div>
-      ) : (
-        /* No enrolled meetings: show welcome + full summary + empty state */
-        <>
-          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Welcome back, {user?.firstName || "Student"}!</h1>
-              <p className="mt-1 text-xs sm:text-sm text-gray-500">Here's what's happening with your courses today.</p>
-            </div>
-            <div className="flex items-center gap-3">
-              {connectedSessionId && (
-                <Link to="/dashboard/sessions" className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border text-blue-600 hover:opacity-90">
-                  <WifiIcon className="h-4 w-4" />
-                  <ConnectionQualityBadge quality={connectionQuality} rtt={currentRtt} isMonitoring={isLatencyMonitoring} />
-                  <span className="text-sm font-medium">In meeting · Manage on Meetings</span>
-                </Link>
-              )}
-              <Link to="/dashboard/student/engagement" className="w-full sm:w-auto">
-                <Button variant="primary" leftIcon={<ActivityIcon className="h-4 w-4" />} fullWidth className="sm:w-auto">View Engagement</Button>
-              </Link>
-            </div>
-          </div>
-
-          <div className="mb-8 text-white rounded-xl shadow-lg p-6" style={{ background: 'linear-gradient(to right, #3B82F6, #2563eb)' }}>
-            <div>
-              <h2 className="text-xl font-bold">Your Learning Summary</h2>
-              <p className="mt-1" style={{ color: '#d1f5e8' }}>You are in <span className="font-semibold">Active Participants</span></p>
-            </div>
-            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="bg-white bg-opacity-10 rounded-lg p-4">
-                <WifiIcon className="h-6 w-6" style={{ color: "#b8e6d4" }} />
-                <p className="text-sm font-medium">Connection</p>
-                <p className="text-lg font-bold">
-                  {connectedSessionId ? (
-                    <span style={{ color: "#b8e6d4" }} className="capitalize">{connectionQuality}{currentRtt != null && <span className="text-sm font-normal opacity-90 ml-1">{Math.round(currentRtt)}ms{latencyStats?.jitter != null && ` · ${Math.round(latencyStats.jitter)}ms jitter`}</span>}</span>
-                  ) : (
-                    <span className="text-gray-300">Not in session</span>
-                  )}
-                </p>
-              </div>
-              <div className="bg-white bg-opacity-10 rounded-lg p-4">
-                <BellIcon className="h-6 w-6 text-yellow-300" />
-                <p className="text-sm font-medium">Questions Given</p>
-                <p className="text-lg font-bold">{sessionQuizStats.questionsReceived}</p>
-              </div>
-              <div className="bg-white bg-opacity-10 rounded-lg p-4">
-                <TrendingUpIcon className="h-6 w-6" style={{ color: '#b8e6d4' }} />
-                <p className="text-sm font-medium">Correct Answers</p>
-                <p className="text-lg font-bold">{sessionQuizStats.correctAnswers}<span className="text-sm font-normal" style={{ color: '#c5edd9' }}> / {sessionQuizStats.questionsAnswered}</span></p>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-medium text-gray-900">Upcoming Meetings (next 24 hours)</h3>
-              <Link to="/dashboard/sessions"><span className="text-sm hover:opacity-80" style={{ color: '#3B82F6' }}>Join from Meetings →</span></Link>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">View-only. Go to <Link to="/dashboard/sessions" className="text-blue-600 hover:underline">Meetings</Link> to join.</p>
-            {connectedSessionId && (
-              <div className="p-3 rounded-lg bg-white shadow mt-4" style={{ borderColor: "#3B82F6", borderWidth: "1px" }}>
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: "#3B82F6" }} />
-                    <span className="text-sm font-medium" style={{ color: "#2563eb" }}>Connected to session</span>
-                    <ConnectionQualityBadge quality={connectionQuality} rtt={currentRtt} isMonitoring={isLatencyMonitoring} className="ml-1" />
-                  </div>
-                  <Link to="/dashboard/sessions" className="text-xs font-medium text-blue-600 hover:underline">Go to Meetings →</Link>
-                </div>
-              </div>
-            )}
-            <div className="bg-white shadow rounded-lg px-4 py-8 text-center text-gray-500 mt-4">
-              <p className="text-sm">No meetings in the next 24 hours</p>
-              <Link to="/dashboard/sessions" className="text-sm text-blue-600 hover:underline mt-2 inline-block">Go to Meetings</Link>
-            </div>
-          </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 };
