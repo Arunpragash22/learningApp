@@ -222,41 +222,7 @@ class QuizScheduler:
             # Mark as sent
             self.sent_questions[session_id].add(question_id)
             
-            # Determine effective meeting ID for broadcast
-            effective_id = zoom_meeting_id or session_id
-            
-            # Get participants to check if anyone is connected
-            participants = ws_manager.get_session_participants(effective_id)
-            
-            if not participants and zoom_meeting_id:
-                # Try with session_id if zoom_meeting_id has no participants
-                participants = ws_manager.get_session_participants(session_id)
-                if participants:
-                    effective_id = session_id
-            
-            if not participants:
-                # Try to get participants from both IDs
-                all_ids = [session_id]
-                if zoom_meeting_id:
-                    all_ids.append(zoom_meeting_id)
-                participants = ws_manager.get_session_participants_by_multiple_ids(all_ids)
-                
-                if participants:
-                    # Use the ID that has the most participants
-                    for p in participants:
-                        sid = p.get("sessionId")
-                        if sid:
-                            effective_id = sid
-                            break
-            
-            if not participants:
-                return {
-                    "success": False, 
-                    "message": "No students connected to session",
-                    "sentTo": 0
-                }
-            
-            # Build quiz message
+            # Build quiz message once (sessionId will be set per broadcast so students get correct key)
             message = {
                 "type": "quiz",
                 "questionId": question_id,
@@ -264,20 +230,24 @@ class QuizScheduler:
                 "question": question["question"],
                 "options": question.get("options", []),
                 "timeLimit": question.get("timeLimit", 30),
-                "sessionId": effective_id,
+                "sessionId": session_id,
                 "triggeredAt": datetime.utcnow().isoformat(),
-                "autoTriggered": True  # Flag to indicate this was auto-triggered
+                "autoTriggered": True,
             }
             
-            # Broadcast to all students
-            sent_count = await ws_manager.broadcast_to_session(effective_id, message)
+            # Always broadcast to BOTH session_id and zoom_meeting_id so we never miss students.
+            # Students may join with either key depending on frontend; both rooms must receive.
+            sent_count = 0
+            ids_to_try = [session_id]
+            if zoom_meeting_id and str(zoom_meeting_id) != str(session_id):
+                ids_to_try.append(str(zoom_meeting_id))
             
-            # Also try broadcasting to alternate ID if available
-            if zoom_meeting_id and effective_id != zoom_meeting_id:
-                sent_count += await ws_manager.broadcast_to_session(zoom_meeting_id, message)
-            elif effective_id != session_id:
-                sent_count += await ws_manager.broadcast_to_session(session_id, message)
+            for room_id in ids_to_try:
+                msg = {**message, "sessionId": room_id}
+                n = await ws_manager.broadcast_to_session(room_id, msg)
+                sent_count += n
             
+            # Consider success if we sent to at least one student (or attempted both rooms)
             return {
                 "success": True,
                 "message": f"Question sent to {sent_count} students",
