@@ -225,4 +225,3 @@ class QuizAnswerModel:
             "questionsReceived": max(questions_received, questions_answered),
             "answeredQuestionIds": answered_question_ids,
         }
-

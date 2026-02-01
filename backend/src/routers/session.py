@@ -12,6 +12,7 @@ from src.models.course import CourseModel
 from src.models.session_report_model import SessionReportModel
 from src.services.email_service import email_service
 from src.services.ws_manager import ws_manager
+from src.services.quiz_scheduler import quiz_scheduler
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
 
@@ -513,6 +514,10 @@ async def end_session(
             }
         )
         
+        # 🛑 Stop quiz automation if running
+        automation_stopped = await quiz_scheduler.stop_automation(session_id)
+        print(f"🛑 Quiz automation stop result: {automation_stopped}")
+        
         # Get zoomMeetingId for participant lookup
         zoom_meeting_id = session.get("zoomMeetingId")
         
@@ -602,7 +607,9 @@ async def end_session(
             "participantCount": participant_count,
             "reportGenerated": report is not None,
             "reportId": report.get("id") if report else None,
-            "emailsSent": emails_sent
+            "emailsSent": emails_sent,
+            "automationStopped": automation_stopped.get("success", False),
+            "questionsAutoTriggered": automation_stopped.get("questions_triggered", 0)
         }
         
     except HTTPException:
@@ -612,12 +619,29 @@ async def end_session(
         raise HTTPException(status_code=500, detail="Failed to end session")
 
 
+class StartSessionRequest(BaseModel):
+    """Request body for starting a session with optional automation config"""
+    enableAutomation: Optional[bool] = True  # Auto-trigger questions (default: enabled)
+    firstDelaySeconds: Optional[int] = 120   # Delay before first question (2 minutes)
+    intervalSeconds: Optional[int] = 600     # Interval between questions (10 minutes)
+    maxQuestions: Optional[int] = None       # Max questions to auto-trigger (None = unlimited)
+
+
 @router.post("/{session_id}/start")
 async def start_session(
     session_id: str,
+    request: Optional[StartSessionRequest] = None,
     user: dict = Depends(require_instructor)
 ):
-    """Start a session (mark as live)"""
+    """
+    Start a session (mark as live)
+    
+    Optional automation configuration:
+    - enableAutomation: Enable auto-triggering questions (default: True)
+    - firstDelaySeconds: Seconds before first question (default: 120 = 2 minutes)
+    - intervalSeconds: Seconds between questions (default: 600 = 10 minutes)
+    - maxQuestions: Maximum questions to auto-trigger (default: None = unlimited)
+    """
     try:
         session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
         if not session:
@@ -626,13 +650,23 @@ async def start_session(
         if session.get("instructorId") != user["id"]:
             raise HTTPException(status_code=403, detail="You can only start your own sessions")
         
+        # Use default config if none provided
+        if request is None:
+            request = StartSessionRequest()
+        
         await db.database.sessions.update_one(
             {"_id": ObjectId(session_id)},
             {
                 "$set": {
                     "status": "live",
                     "actualStartTime": datetime.utcnow(),
-                    "startedAt": datetime.utcnow()
+                    "startedAt": datetime.utcnow(),
+                    "automationEnabled": request.enableAutomation,
+                    "automationConfig": {
+                        "firstDelaySeconds": request.firstDelaySeconds,
+                        "intervalSeconds": request.intervalSeconds,
+                        "maxQuestions": request.maxQuestions
+                    }
                 }
             }
         )
@@ -646,7 +680,8 @@ async def start_session(
             "zoomMeetingId": str(zoom_meeting_id) if zoom_meeting_id else None,
             "status": "live",
             "message": "Session has started",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
+            "automationEnabled": request.enableAutomation
         }
         
         # Broadcast using zoomMeetingId if available
@@ -657,13 +692,178 @@ async def start_session(
         
         print(f"📢 Session started event broadcasted: session={session_id}, zoom={zoom_meeting_id}")
         
-        return {"success": True, "message": "Session started", "status": "live"}
+        # 🤖 Start quiz automation if enabled
+        automation_result = None
+        if request.enableAutomation:
+            automation_result = await quiz_scheduler.start_automation(
+                session_id=session_id,
+                zoom_meeting_id=str(zoom_meeting_id) if zoom_meeting_id else None,
+                first_delay_seconds=request.firstDelaySeconds,
+                interval_seconds=request.intervalSeconds,
+                max_questions=request.maxQuestions
+            )
+            print(f"🤖 Quiz automation started: {automation_result}")
+        
+        return {
+            "success": True, 
+            "message": "Session started", 
+            "status": "live",
+            "automationEnabled": request.enableAutomation,
+            "automation": automation_result
+        }
         
     except HTTPException:
         raise
     except Exception as e:
         print(f"Error starting session: {e}")
         raise HTTPException(status_code=500, detail="Failed to start session")
+
+
+@router.post("/{session_id}/join")
+async def join_session(
+    session_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Student joins a session - tracks participation and broadcasts event.
+    This endpoint should be called when a student clicks 'Join' button.
+    Returns session details and confirms participation.
+    """
+    try:
+        # Verify session exists
+        session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        user_role = user.get("role", "student")
+        user_id = user.get("id")
+        
+        # Verify access based on role
+        if user_role == "student":
+            # Check if student has access to this session
+            is_standalone = session.get("isStandalone", False)
+            if is_standalone:
+                # For standalone sessions, check if student is enrolled
+                enrolled_students = session.get("enrolledStudents", [])
+                if user_id not in enrolled_students:
+                    raise HTTPException(status_code=403, detail="You are not enrolled in this session")
+            else:
+                # For course-based sessions, check course enrollment
+                course_id = session.get("courseId")
+                if course_id:
+                    is_enrolled = await CourseModel.is_student_enrolled(course_id, user_id)
+                    if not is_enrolled:
+                        raise HTTPException(status_code=403, detail="You are not enrolled in this course")
+        
+        # Track participation using WebSocket manager
+        # This will save to MongoDB and broadcast to all participants
+        student_name = f"{user.get('firstName', '')} {user.get('lastName', '')}".strip() or user.get("email", "Student")
+        student_email = user.get("email", "")
+        
+        # Use zoomMeetingId as session key for WebSocket rooms
+        session_key = session.get("zoomMeetingId") or str(session["_id"])
+        
+        # Note: Actual WebSocket join happens when student connects via WebSocket
+        # This endpoint just confirms they have permission and returns session details
+        
+        # Broadcast student join intent event
+        join_event = {
+            "type": "student_join_intent",
+            "sessionId": session_id,
+            "zoomMeetingId": str(session.get("zoomMeetingId")) if session.get("zoomMeetingId") else None,
+            "studentId": user_id,
+            "studentName": student_name,
+            "studentEmail": student_email,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        # Broadcast to session room
+        zoom_meeting_id = session.get("zoomMeetingId")
+        if zoom_meeting_id:
+            await ws_manager.broadcast_to_session(str(zoom_meeting_id), join_event)
+        await ws_manager.broadcast_to_session(session_id, join_event)
+        
+        print(f"✅ Student join intent: session={session_id}, student={user_id}, name={student_name}")
+        
+        return {
+            "success": True,
+            "message": "Ready to join session",
+            "sessionId": session_id,
+            "sessionKey": session_key,
+            "sessionTitle": session.get("title"),
+            "status": session.get("status", "upcoming"),
+            "join_url": session.get("join_url"),
+            "studentId": user_id,
+            "studentName": student_name
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error joining session: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to join session")
+
+
+@router.post("/{session_id}/leave")
+async def leave_session(
+    session_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Student leaves a session - updates participation status and broadcasts event.
+    This endpoint should be called when a student clicks 'Leave Session' button.
+    """
+    try:
+        # Verify session exists
+        session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        user_id = user.get("id")
+        student_name = f"{user.get('firstName', '')} {user.get('lastName', '')}".strip() or user.get("email", "Student")
+        
+        # Use both session_id and zoomMeetingId for WebSocket room cleanup
+        zoom_meeting_id = session.get("zoomMeetingId")
+        session_key = str(zoom_meeting_id) if zoom_meeting_id else session_id
+        
+        # Leave session room in WebSocket manager
+        # This will update MongoDB and broadcast to all participants
+        if zoom_meeting_id:
+            await ws_manager.leave_session_room(str(zoom_meeting_id), user_id)
+        await ws_manager.leave_session_room(session_id, user_id)
+        
+        # Broadcast student left event
+        leave_event = {
+            "type": "student_left",
+            "sessionId": session_id,
+            "zoomMeetingId": str(zoom_meeting_id) if zoom_meeting_id else None,
+            "studentId": user_id,
+            "studentName": student_name,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        # Broadcast to session room
+        if zoom_meeting_id:
+            await ws_manager.broadcast_to_session(str(zoom_meeting_id), leave_event)
+        await ws_manager.broadcast_to_session(session_id, leave_event)
+        
+        print(f"✅ Student left session: session={session_id}, student={user_id}")
+        
+        return {
+            "success": True,
+            "message": "Left session successfully",
+            "sessionId": session_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error leaving session: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to leave session")
 
 
 @router.post("/sync-zoom-meetings")

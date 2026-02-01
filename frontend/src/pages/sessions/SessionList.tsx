@@ -21,7 +21,10 @@ import {
   CheckCircleIcon,
   KeyIcon,
   XIcon,
-  LockIcon
+  LockIcon,
+  ZapIcon,
+  ZapOffIcon,
+  SettingsIcon
 } from 'lucide-react';
 
 import { Card } from '../../components/ui/Card';
@@ -48,6 +51,14 @@ export const SessionList = () => {
   const [enrollmentKey, setEnrollmentKey] = useState('');
   const [enrollingSession, setEnrollingSession] = useState<Session | null>(null);
   const [isEnrolling, setIsEnrolling] = useState(false);
+
+  // Automation configuration modal state (for instructors)
+  const [showStartModal, setShowStartModal] = useState(false);
+  const [startingSession, setStartingSession] = useState<Session | null>(null);
+  const [automationEnabled, setAutomationEnabled] = useState(true);
+  const [firstDelayMinutes, setFirstDelayMinutes] = useState(2);   // 2 minutes default
+  const [intervalMinutes, setIntervalMinutes] = useState(10);       // 10 minutes default
+  const [maxQuestions, setMaxQuestions] = useState<number | null>(null);
 
   const {
     connectedSessionId: contextConnectedSessionId,
@@ -344,27 +355,69 @@ export const SessionList = () => {
   // ---------------------------------------------------
   // ⭐ START SESSION (Instructor only) - Opens Zoom directly
   // ---------------------------------------------------
-  const handleStartSession = async (session: Session) => {
-    setStartingSessionId(session.id);
-    const result = await sessionService.startSession(session.id);
+  const handleOpenStartModal = (session: Session) => {
+    setStartingSession(session);
+    setAutomationEnabled(true);
+    setFirstDelayMinutes(2);
+    setIntervalMinutes(10);
+    setMaxQuestions(null);
+    setShowStartModal(true);
+  };
+
+  const handleStartSession = async () => {
+    if (!startingSession) return;
+    
+    setStartingSessionId(startingSession.id);
+    setShowStartModal(false);
+    
+    const result = await sessionService.startSession(startingSession.id, {
+      enableAutomation: automationEnabled,
+      firstDelaySeconds: firstDelayMinutes * 60,
+      intervalSeconds: intervalMinutes * 60,
+      maxQuestions: maxQuestions || undefined
+    });
+    
     if (result.success) {
-      toast.success('Session started successfully!');
+      if (automationEnabled) {
+        toast.success(
+          <div>
+            <p className="font-medium">Session started with auto-questions!</p>
+            <p className="text-sm text-gray-500">
+              First question in {firstDelayMinutes} min, then every {intervalMinutes} min
+            </p>
+          </div>
+        );
+      } else {
+        toast.success('Session started successfully!');
+      }
 
       // Reload sessions to update status
       const all = await sessionService.getAllSessions();
       setSessions(all);
 
       // 🎯 Open Zoom directly after starting session
-      if (session.start_url) {
-        window.open(session.start_url, '_blank');
-        toast.info('🚀 Opening Zoom meeting...');
+      if (startingSession.start_url) {
+        window.open(startingSession.start_url, '_blank');
+        toast.info('Opening Zoom meeting...');
       } else {
-        toast.warning('⚠️ Zoom start URL not available');
+        toast.warning('Zoom start URL not available');
       }
     } else {
       toast.error(result.message || 'Failed to start session');
     }
+    
     setStartingSessionId(null);
+    setStartingSession(null);
+  };
+  
+  // Quick start without showing modal (for "Join Live" on already live sessions)
+  const handleQuickJoin = async (session: Session) => {
+    if (session.start_url) {
+      window.open(session.start_url, '_blank');
+      toast.info('Opening Zoom meeting...');
+    } else {
+      toast.warning('Zoom start URL not available');
+    }
   };
 
   // ---------------------------------------------------
@@ -484,6 +537,160 @@ export const SessionList = () => {
           </Button>
         )}
       </div>
+
+      {/* Start Session Modal with Automation Config (Instructors) */}
+      {showStartModal && startingSession && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Start Meeting</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{startingSession.title}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowStartModal(false);
+                    setStartingSession(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                >
+                  <XIcon className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Automation Toggle */}
+              <div className="mb-6 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <ZapIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    <span className="font-medium text-gray-900 dark:text-white">Auto-Trigger Questions</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAutomationEnabled(!automationEnabled)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      automationEnabled ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        automationEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {automationEnabled 
+                    ? 'Questions will be automatically sent to students during the session'
+                    : 'You will need to manually trigger questions'
+                  }
+                </p>
+              </div>
+
+              {/* Automation Settings (only if enabled) */}
+              {automationEnabled && (
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      First Question After (minutes)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={firstDelayMinutes}
+                      onChange={(e) => setFirstDelayMinutes(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      First question triggers {firstDelayMinutes} minute(s) after session starts
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Question Interval (minutes)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={intervalMinutes}
+                      onChange={(e) => setIntervalMinutes(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      After the first, questions sent every {intervalMinutes} minute(s)
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Max Questions (optional)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={maxQuestions || ''}
+                      onChange={(e) => setMaxQuestions(e.target.value ? Number(e.target.value) : null)}
+                      placeholder="Unlimited"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Leave empty for unlimited questions
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="mb-6 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm">
+                <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                  <SettingsIcon className="h-4 w-4" />
+                  <span className="font-medium">Summary:</span>
+                </div>
+                <ul className="mt-2 space-y-1 text-gray-600 dark:text-gray-400 ml-6">
+                  <li>• Session will be marked as LIVE</li>
+                  <li>• Zoom meeting will open automatically</li>
+                  {automationEnabled ? (
+                    <>
+                      <li>• First question after {firstDelayMinutes} min</li>
+                      <li>• Then every {intervalMinutes} min</li>
+                      <li>• {maxQuestions ? `Maximum ${maxQuestions} questions` : 'Unlimited questions'}</li>
+                    </>
+                  ) : (
+                    <li>• Manual question triggering only</li>
+                  )}
+                </ul>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowStartModal(false);
+                    setStartingSession(null);
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleStartSession}
+                  leftIcon={startingSessionId ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <PlayIcon className="h-4 w-4" />}
+                  disabled={!!startingSessionId}
+                  className="flex-1"
+                >
+                  {startingSessionId ? 'Starting...' : 'Start Meeting'}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Enrollment Key Modal for Students */}
       {showEnrollModal && (
@@ -721,7 +928,7 @@ export const SessionList = () => {
                                 ? <Loader2Icon className="h-4 w-4 animate-spin" />
                                 : <PlayIcon className="h-4 w-4" />
                             }
-                            onClick={() => handleStartSession(session)}
+                            onClick={() => handleOpenStartModal(session)}
                             disabled={startingSessionId === session.id}
                           >
                             {startingSessionId === session.id ? 'Starting...' : 'Start Meeting'}
@@ -770,7 +977,7 @@ export const SessionList = () => {
                             <Button
                               variant="primary"
                               leftIcon={<VideoIcon className="h-4 w-4" />}
-                              onClick={() => handleStartSession(session)}
+                              onClick={() => handleQuickJoin(session)}
                             >
                               Join Live
                             </Button>
@@ -881,7 +1088,7 @@ export const SessionList = () => {
                                 ? <Loader2Icon className="h-4 w-4 animate-spin" />
                                 : <PlayIcon className="h-4 w-4" />
                             }
-                            onClick={() => handleStartSession(session)}
+                            onClick={() => handleOpenStartModal(session)}
                             disabled={startingSessionId === session.id}
                           >
                             {startingSessionId === session.id ? 'Starting...' : 'Start Meeting'}
@@ -930,7 +1137,7 @@ export const SessionList = () => {
                             <Button
                               variant="primary"
                               leftIcon={<VideoIcon className="h-4 w-4" />}
-                              onClick={() => handleStartSession(session)}
+                              onClick={() => handleQuickJoin(session)}
                             >
                               Join Live
                             </Button>

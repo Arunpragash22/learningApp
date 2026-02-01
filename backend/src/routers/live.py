@@ -4,9 +4,12 @@ Trigger questions → Sent ONLY to students who JOINED the session via WebSocket
 🎯 Session-based delivery: Only students connected to /ws/session/<meetingId>/<studentId> receive quizzes
 """
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+from typing import Optional
 from bson import ObjectId
 from src.services.ws_manager import ws_manager
 from src.services.push_service import push_service
+from src.services.quiz_scheduler import quiz_scheduler
 from src.database.connection import db
 from src.middleware.auth import get_current_user, require_instructor
 import random
@@ -334,3 +337,99 @@ async def get_latest_quiz_for_student(session_id: str, user: dict = Depends(get_
         if existing is not None:
             return {"success": True, "quiz": None, "alreadyAnswered": True, "message": "Already answered"}
     return {"success": True, "quiz": quiz, "message": "Recent quiz found"}
+
+
+# ================================================================
+# 🤖 AUTOMATION CONTROL ENDPOINTS
+# ================================================================
+
+class AutomationConfigRequest(BaseModel):
+    """Request body for updating automation configuration"""
+    intervalSeconds: Optional[int] = None
+    maxQuestions: Optional[int] = None
+    enabled: Optional[bool] = None
+
+
+@router.get("/automation/{session_id}")
+async def get_automation_status(session_id: str, user: dict = Depends(require_instructor)):
+    """
+    Get current automation status for a session.
+    Returns whether automation is active and current configuration.
+    """
+    status = quiz_scheduler.get_automation_status(session_id)
+    return {"success": True, "automation": status}
+
+
+@router.post("/automation/{session_id}/start")
+async def start_automation(
+    session_id: str,
+    first_delay_seconds: int = 120,
+    interval_seconds: int = 600,
+    max_questions: Optional[int] = None,
+    user: dict = Depends(require_instructor)
+):
+    """
+    Start quiz automation for a session.
+    
+    Parameters:
+    - first_delay_seconds: Seconds before first question (default: 120 = 2 minutes)
+    - interval_seconds: Seconds between questions (default: 600 = 10 minutes)
+    - max_questions: Maximum questions to auto-trigger (default: None = unlimited)
+    """
+    # Get session to find zoomMeetingId
+    session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
+    if not session:
+        return {"success": False, "message": "Session not found"}
+    
+    zoom_meeting_id = session.get("zoomMeetingId")
+    
+    result = await quiz_scheduler.start_automation(
+        session_id=session_id,
+        zoom_meeting_id=str(zoom_meeting_id) if zoom_meeting_id else None,
+        first_delay_seconds=first_delay_seconds,
+        interval_seconds=interval_seconds,
+        max_questions=max_questions
+    )
+    return result
+
+
+@router.post("/automation/{session_id}/stop")
+async def stop_automation(session_id: str, user: dict = Depends(require_instructor)):
+    """
+    Stop quiz automation for a session.
+    """
+    result = await quiz_scheduler.stop_automation(session_id)
+    return result
+
+
+@router.put("/automation/{session_id}/config")
+async def update_automation_config(
+    session_id: str,
+    request: AutomationConfigRequest,
+    user: dict = Depends(require_instructor)
+):
+    """
+    Update automation configuration for a running session.
+    
+    Can update:
+    - intervalSeconds: Change interval between questions
+    - maxQuestions: Change max questions limit
+    - enabled: Enable/disable automation
+    """
+    result = await quiz_scheduler.update_config(
+        session_id=session_id,
+        interval_seconds=request.intervalSeconds,
+        max_questions=request.maxQuestions,
+        enabled=request.enabled
+    )
+    return result
+
+
+@router.get("/automation/all")
+async def get_all_automations(user: dict = Depends(require_instructor)):
+    """
+    Get all active automations across all sessions.
+    Useful for admin monitoring.
+    """
+    automations = quiz_scheduler.get_all_active_sessions()
+    return {"success": True, "automations": automations, "count": len(automations)}

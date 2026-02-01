@@ -250,13 +250,24 @@ export const sessionService = {
   },
 
   // Start a session (instructor only)
-  async startSession(sessionId: string): Promise<{ success: boolean; message: string; status?: string }> {
+  // Supports optional quiz automation configuration
+  async startSession(
+    sessionId: string, 
+    automationConfig?: {
+      enableAutomation?: boolean;      // Default: true - auto-trigger questions
+      firstDelaySeconds?: number;      // Default: 120 (2 minutes) - delay before first question
+      intervalSeconds?: number;        // Default: 600 (10 minutes) - interval between questions
+      maxQuestions?: number;           // Default: null (unlimited)
+    }
+  ): Promise<StartSessionResponse> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/start`, {
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
         },
+        body: automationConfig ? JSON.stringify(automationConfig) : undefined,
       });
 
       if (!res.ok) {
@@ -267,6 +278,78 @@ export const sessionService = {
     } catch (error) {
       console.error('Error starting session:', error);
       return { success: false, message: "Failed to start session" };
+    }
+  },
+
+  // Get automation status for a session
+  async getAutomationStatus(sessionId: string): Promise<AutomationStatus | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/live/automation/${sessionId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+        },
+      });
+
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.automation;
+    } catch (error) {
+      console.error('Error fetching automation status:', error);
+      return null;
+    }
+  },
+
+  // Start automation for a session
+  async startAutomation(
+    sessionId: string,
+    config?: {
+      first_delay_seconds?: number;
+      interval_seconds?: number;
+      max_questions?: number;
+    }
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const params = new URLSearchParams();
+      if (config?.first_delay_seconds) params.set('first_delay_seconds', config.first_delay_seconds.toString());
+      if (config?.interval_seconds) params.set('interval_seconds', config.interval_seconds.toString());
+      if (config?.max_questions) params.set('max_questions', config.max_questions.toString());
+
+      const res = await fetch(`${API_BASE_URL}/api/live/automation/${sessionId}/start?${params}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+        },
+      });
+
+      if (!res.ok) {
+        return { success: false, message: "Failed to start automation" };
+      }
+
+      return await res.json();
+    } catch (error) {
+      console.error('Error starting automation:', error);
+      return { success: false, message: "Failed to start automation" };
+    }
+  },
+
+  // Stop automation for a session
+  async stopAutomation(sessionId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/live/automation/${sessionId}/stop`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+        },
+      });
+
+      if (!res.ok) {
+        return { success: false, message: "Failed to stop automation" };
+      }
+
+      return await res.json();
+    } catch (error) {
+      console.error('Error stopping automation:', error);
+      return { success: false, message: "Failed to stop automation" };
     }
   },
 
@@ -434,4 +517,31 @@ export interface QuizAnswer {
   questionId: string;
   answerIndex: number;
   timeTaken?: number;
+}
+
+// Types for session start with automation
+export interface StartSessionResponse {
+  success: boolean;
+  message: string;
+  status?: string;
+  automationEnabled?: boolean;
+  automation?: {
+    success: boolean;
+    message: string;
+    session_id: string;
+    first_trigger_in_seconds?: number;
+    interval_seconds?: number;
+  };
+}
+
+// Types for automation status
+export interface AutomationStatus {
+  active: boolean;
+  session_id: string;
+  started_at?: string;
+  questions_sent?: number;
+  first_delay_seconds?: number;
+  interval_seconds?: number;
+  max_questions?: number;
+  sent_question_ids?: string[];
 }
