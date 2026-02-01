@@ -421,31 +421,46 @@ class WebSocketManager:
                 try:
                     try:
                         if hasattr(ws, 'client_state') and ws.client_state.name != 'CONNECTED':
-                            return False
+                            return False, "not_connected"
                         if hasattr(ws, 'application_state') and ws.application_state.name != 'CONNECTED':
-                            return False
+                            return False, "not_connected"
                     except (AttributeError, Exception):
                         pass
                     await ws.send_json(message)
                     print(f"   ✅ Sent to {name or sid}")
-                    return True
+                    return True, None
                 except Exception as e:
-                    error_msg = str(e)
-                    if 'websocket.close' in error_msg or 'closed' in error_msg.lower() or '1005' in error_msg:
+                    error_msg = str(e).lower()
+                    # Only treat as dead if connection is clearly closed (don't remove on serialization/timeout)
+                    is_closed = (
+                        "websocket" in error_msg and ("close" in error_msg or "closed" in error_msg)
+                        or "1005" in error_msg or "1006" in error_msg or "connection closed" in error_msg
+                    )
+                    if is_closed:
                         print(f"   ⚠️ WebSocket for {sid} is closed")
                     else:
                         print(f"   ❌ Failed to send to {sid}: {e}")
-                    return False
+                    return False, "closed" if is_closed else "error"
 
             joined_student_ids.append(student_id)
             send_tasks.append(send_to_student(websocket, student_id, data.get('studentName')))
 
         if send_tasks:
             results = await asyncio.gather(*send_tasks, return_exceptions=True)
-            sent = sum(1 for r in results if r is True)
+            sent = 0
             for i, sid in enumerate(joined_student_ids):
-                if i < len(results) and (results[i] is False or isinstance(results[i], Exception)):
+                if i >= len(results):
+                    continue
+                r = results[i]
+                if isinstance(r, Exception):
+                    print(f"   ⚠️ Send exception for {sid}: {r}")
+                    continue
+                ok, reason = r if isinstance(r, tuple) else (r, None)
+                if ok:
+                    sent += 1
+                elif reason == "closed":
                     dead_connections.append(sid)
+                # else: transient error, don't remove connection
 
         for student_id in dead_connections:
             try:

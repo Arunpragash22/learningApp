@@ -134,20 +134,18 @@ class QuizScheduler:
     async def _run_schedule(self, config: dict):
         """
         Background task that runs the scheduled question delivery.
+        First question after first_delay_seconds, then every interval_seconds.
         """
         session_id = config["session_id"]
         zoom_meeting_id = config.get("zoom_meeting_id")
         first_delay = config["first_delay_seconds"]
-        interval = config["interval_seconds"]
         max_questions = config.get("max_questions")
         
         try:
-            # Wait for first delay (2 minutes by default)
             print(f"⏰ Session {session_id}: Waiting {first_delay}s for first question...")
             await asyncio.sleep(first_delay)
             
             while True:
-                # Check if still enabled
                 if session_id not in self.active_schedules:
                     print(f"🛑 Session {session_id}: Automation stopped externally")
                     break
@@ -155,26 +153,27 @@ class QuizScheduler:
                 schedule_info = self.active_schedules.get(session_id, {})
                 current_config = schedule_info.get("config", {})
                 
-                if not current_config.get("enabled", False):
+                if not current_config.get("enabled", True):
                     print(f"🛑 Session {session_id}: Automation disabled")
                     break
                 
-                # Check max questions limit
                 questions_sent = current_config.get("questions_sent", 0)
-                if max_questions and questions_sent >= max_questions:
+                if max_questions is not None and questions_sent >= max_questions:
                     print(f"🏁 Session {session_id}: Reached max questions ({max_questions})")
                     break
                 
-                # Trigger a question
+                # Re-read interval from config each time (e.g. 300s = 5 min)
+                interval = current_config.get("interval_seconds", 600)
+                
+                print(f"📤 Session {session_id}: Triggering question #{questions_sent + 1}...")
                 result = await self._trigger_question(session_id, zoom_meeting_id)
                 
                 if result.get("success"):
                     current_config["questions_sent"] = questions_sent + 1
-                    print(f"✅ Session {session_id}: Auto-triggered question #{questions_sent + 1}")
+                    print(f"✅ Session {session_id}: Auto-triggered question #{questions_sent + 1} → {result.get('sentTo', 0)} students")
                 else:
-                    print(f"⚠️ Session {session_id}: Failed to trigger question - {result.get('message')}")
+                    print(f"⚠️ Session {session_id}: Trigger failed - {result.get('message')} (will retry in {interval}s)")
                 
-                # Wait for next interval (10 minutes by default)
                 print(f"⏰ Session {session_id}: Next question in {interval}s...")
                 await asyncio.sleep(interval)
                 
@@ -222,38 +221,42 @@ class QuizScheduler:
             # Mark as sent
             self.sent_questions[session_id].add(question_id)
             
-            # Build quiz message once (sessionId will be set per broadcast so students get correct key)
+            # Build quiz message with JSON-safe types only (no BSON/ObjectId)
+            opts = question.get("options") or []
+            if not isinstance(opts, list):
+                opts = list(opts) if opts else []
+            opts = [str(o) for o in opts]
             message = {
                 "type": "quiz",
                 "questionId": question_id,
                 "question_id": question_id,
-                "question": question["question"],
-                "options": question.get("options", []),
-                "timeLimit": question.get("timeLimit", 30),
+                "question": str(question.get("question", "")),
+                "options": opts,
+                "timeLimit": int(question.get("timeLimit", 30)),
                 "sessionId": session_id,
                 "triggeredAt": datetime.utcnow().isoformat(),
                 "autoTriggered": True,
             }
             
             # Always broadcast to BOTH session_id and zoom_meeting_id so we never miss students.
-            # Students may join with either key depending on frontend; both rooms must receive.
-            sent_count = 0
-            ids_to_try = [session_id]
-            if zoom_meeting_id and str(zoom_meeting_id) != str(session_id):
-                ids_to_try.append(str(zoom_meeting_id))
+            ids_to_try = [str(session_id)]
+            zoom_str = str(zoom_meeting_id).strip() if zoom_meeting_id else None
+            if zoom_str and zoom_str not in ids_to_try:
+                ids_to_try.append(zoom_str)
             
+            sent_count = 0
             for room_id in ids_to_try:
                 msg = {**message, "sessionId": room_id}
                 n = await ws_manager.broadcast_to_session(room_id, msg)
+                print(f"   📤 Auto-trigger broadcast room [{room_id}] → {n} students")
                 sent_count += n
             
-            # Consider success if we sent to at least one student (or attempted both rooms)
             return {
                 "success": True,
                 "message": f"Question sent to {sent_count} students",
                 "sentTo": sent_count,
                 "questionId": question_id,
-                "question": question["question"][:50] + "..."
+                "question": str(question.get("question", ""))[:50] + "..."
             }
             
         except Exception as e:
