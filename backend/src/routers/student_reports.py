@@ -38,6 +38,7 @@ def require_student(user: dict = Depends(get_current_user)):
 # 1. ATTENDANCE REPORT - Student's own attendance
 # ============================================================
 @router.get("/attendance")
+
 async def get_my_attendance_report(user: dict = Depends(require_student)):
     """
     Get student's attendance report across all sessions.
