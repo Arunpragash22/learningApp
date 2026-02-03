@@ -1,18 +1,21 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
-import { EngagementIndicator } from '../../components/engagement/EngagementIndicator';
 import { toast } from 'sonner';
+import {
+  courseService,
+  type Course,
+} from '../../services/courseService';
 import { 
   BookOpenIcon, UsersIcon, CalendarIcon, ClockIcon, 
-  FileTextIcon, VideoIcon, DownloadIcon, TrendingUpIcon,
+  FileTextIcon,
   ActivityIcon, BarChart3Icon, PlayIcon, CheckCircleIcon,
-  PlusIcon, XIcon, EditIcon
+  PlusIcon, XIcon, EditIcon, Loader2Icon
 } from 'lucide-react';
 
 interface CourseSession {
@@ -27,7 +30,6 @@ interface CourseSession {
 export const CourseDetail = () => {
   const { courseId } = useParams();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<'overview' | 'sessions' | 'materials' | 'analytics'>('overview');
   const [showCreateSession, setShowCreateSession] = useState(false);
@@ -42,72 +44,72 @@ export const CourseDetail = () => {
   });
   const [sessionErrors, setSessionErrors] = useState<Record<string, string>>({});
 
+  const [course, setCourse] = useState<Course | null>(null);
+  const [courseLoading, setCourseLoading] = useState(true);
+  const [courseError, setCourseError] = useState<string | null>(null);
+
   // VITE_API_URL already includes /api, so we check for that
   const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
   const API_BASE = API_URL?.endsWith('/api') ? API_URL.slice(0, -4) : API_URL;
+
+  // Fetch course from API
+  useEffect(() => {
+    if (!courseId) return;
+    let cancelled = false;
+    setCourseLoading(true);
+    setCourseError(null);
+    courseService
+      .getCourseById(courseId)
+      .then((res) => {
+        if (!cancelled && res.success && res.course) {
+          setCourse(res.course);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setCourseError(err.message || 'Failed to load course');
+          toast.error(err.message || 'Failed to load course');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCourseLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId]);
 
   // Handle URL parameters to auto-open session creation
   useEffect(() => {
     const tab = searchParams.get('tab');
     const action = searchParams.get('action');
-    
     if (tab === 'sessions') {
       setActiveTab('sessions');
       if (action === 'create') {
         setShowCreateSession(true);
-        // Clear the action parameter from URL
         searchParams.delete('action');
         setSearchParams(searchParams, { replace: true });
       }
     }
   }, [searchParams, setSearchParams]);
 
-  // Mock course data with detailed analytics
-  const course = {
-    id: courseId,
-    title: 'Machine Learning Fundamentals',
-    code: 'CS301',
-    instructor: 'Dr. Jane Smith',
-    description: 'An introduction to machine learning concepts and algorithms. This course covers supervised and unsupervised learning, neural networks, and practical applications.',
-    startDate: '2023-09-01',
-    endDate: '2023-12-15',
-    totalSessions: 12,
-    completedSessions: 8,
-    students: 45,
-    progress: 67,
-    engagement: 85,
-    engagementLevel: 'high' as const,
-    averageScore: 88,
-    attendanceRate: 92,
-    materials: [
-      { id: 1, title: 'Introduction to ML', type: 'pdf', size: '2.4 MB', downloads: 42 },
-      { id: 2, title: 'Supervised Learning', type: 'pdf', size: '3.1 MB', downloads: 38 },
-      { id: 3, title: 'Neural Networks Overview', type: 'video', size: '125 MB', views: 35 },
-      { id: 4, title: 'Assignment 1: Linear Regression', type: 'pdf', size: '1.2 MB', downloads: 40 }
-    ],
-    upcomingSessions: [
-      { id: '1', title: 'Neural Networks', date: '2023-10-15', time: '14:00-15:30', status: 'upcoming' as const },
-      { id: '2', title: 'Reinforcement Learning', date: '2023-10-22', time: '14:00-15:30', status: 'upcoming' as const }
-    ],
-    pastSessions: [
-      { id: '3', title: 'Deep Learning Basics', date: '2023-10-08', time: '14:00-15:30', status: 'completed' as const, engagement: 88 },
-      { id: '4', title: 'CNN Architectures', date: '2023-10-01', time: '14:00-15:30', status: 'completed' as const, engagement: 82 }
-    ],
-    analytics: {
-      totalQuestions: 45,
-      averageResponseTime: 8.5,
-      participationRate: 85,
-      quizAverage: 88
-    }
-  };
-
   const [courseSessions, setCourseSessions] = useState<{
     upcoming: CourseSession[];
     past: CourseSession[];
   }>({
-    upcoming: course.upcomingSessions,
-    past: course.pastSessions
+    upcoming: [],
+    past: [],
   });
+
+  const formatDate = (iso?: string) => {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      return isNaN(d.getTime()) ? iso : d.toLocaleDateString();
+    } catch {
+      return iso;
+    }
+  };
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: BookOpenIcon },
@@ -152,8 +154,8 @@ export const CourseDetail = () => {
 
       const payload = {
         title: newSession.title,
-        course: course.title,
-        courseCode: course.code,
+        course: course?.title ?? '',
+        courseCode: course?.id ?? courseId ?? '',
         courseId: courseId,
         date: newSession.date,
         time: newSession.startTime,
@@ -221,6 +223,36 @@ export const CourseDetail = () => {
     }
   };
 
+  if (courseLoading) {
+    return (
+      <div className="py-6 flex items-center justify-center min-h-[200px]">
+        <Loader2Icon className="h-10 w-10 text-blue-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (courseError || !course) {
+    return (
+      <div className="py-6">
+        <Link
+          to="/dashboard/courses"
+          className="text-blue-600 hover:text-blue-800 text-sm font-medium mb-4 inline-block"
+        >
+          ← Back to Courses
+        </Link>
+        <Card className="p-6">
+          <p className="text-gray-600">{courseError ?? 'Course not found.'}</p>
+        </Card>
+      </div>
+    );
+  }
+
+  const durationDisplay =
+    course.duration ||
+    (course.startDate && course.endDate
+      ? `${formatDate(course.startDate)} – ${formatDate(course.endDate)}`
+      : '—');
+
   return (
     <div className="py-6">
       {/* Header */}
@@ -236,59 +268,31 @@ export const CourseDetail = () => {
               </Link>
             </div>
             <h1 className="text-3xl font-bold text-gray-900">{course.title}</h1>
-            <p className="mt-1 text-lg text-gray-600">Course Code: {course.code}</p>
-            <p className="mt-2 text-sm text-gray-500">Instructor: {course.instructor}</p>
+            <p className="mt-1 text-lg text-gray-600">Course Code: {course.id ?? '—'}</p>
+            <p className="mt-2 text-sm text-gray-500">Instructor: {course.instructorName}</p>
           </div>
         </div>
-        </div>
 
-        {/* Progress and Engagement */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Course Progress</p>
-                <p className="text-2xl font-bold text-gray-900">{course.progress}%</p>
+        {/* Course details: instructor, description, duration from database */}
+        <Card className="p-6 mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Course details</h3>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Instructor</p>
+              <p className="text-gray-900">{course.instructorName}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600">Description</p>
+              <p className="text-gray-700 leading-relaxed">{course.description || '—'}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600">Duration</p>
+              <p className="text-gray-900">{durationDisplay}</p>
+            </div>
+          </div>
+        </Card>
       </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <TrendingUpIcon className="h-6 w-6 text-blue-600" />
-        </div>
-            </div>
-            <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-blue-600 h-2 rounded-full"
-                style={{ width: `${course.progress}%` }}
-              />
-            </div>
-          </Card>
 
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-sm text-gray-600">Your Engagement</p>
-              </div>
-            </div>
-            <EngagementIndicator
-              engagementLevel={course.engagementLevel}
-              engagementScore={course.engagement}
-              showCluster={false}
-            />
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Average Score</p>
-                <p className="text-2xl font-bold text-gray-900">{course.averageScore}%</p>
-              </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <CheckCircleIcon className="h-6 w-6 text-blue-600" />
-            </div>
-            </div>
-          </Card>
-        </div>
-
-      {/* Tabs */}
       <div className="mb-6 border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
           {tabs.map((tab) => {
@@ -321,30 +325,27 @@ export const CourseDetail = () => {
             <Card>
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Course Description</h3>
-                <p className="text-gray-700 leading-relaxed">{course.description}</p>
-                
+                <p className="text-gray-700 leading-relaxed">{course.description || '—'}</p>
                 <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Start Date</p>
-                    <p className="text-sm font-medium text-gray-900">{course.startDate}</p>
+                    <p className="text-sm font-medium text-gray-900">{formatDate(course.startDate)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">End Date</p>
-                    <p className="text-sm font-medium text-gray-900">{course.endDate}</p>
+                    <p className="text-sm font-medium text-gray-900">{formatDate(course.endDate)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Total Sessions</p>
-                    <p className="text-sm font-medium text-gray-900">{course.totalSessions}</p>
+                    <p className="text-sm font-medium text-gray-900">—</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Enrolled Students</p>
-                    <p className="text-sm font-medium text-gray-900">{course.students}</p>
+                    <p className="text-sm font-medium text-gray-900">{course.enrolledStudents?.length ?? 0}</p>
                   </div>
                 </div>
               </div>
             </Card>
-
-            {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card className="p-4">
                 <div className="flex items-center">
@@ -353,7 +354,7 @@ export const CourseDetail = () => {
                   </div>
                   <div>
                     <p className="text-xs text-gray-600">Attendance</p>
-                    <p className="text-lg font-bold text-gray-900">{course.attendanceRate}%</p>
+                    <p className="text-lg font-bold text-gray-900">—</p>
                   </div>
                 </div>
               </Card>
@@ -364,7 +365,7 @@ export const CourseDetail = () => {
                   </div>
                   <div>
                     <p className="text-xs text-gray-600">Quiz Average</p>
-                    <p className="text-lg font-bold text-gray-900">{course.analytics.quizAverage}%</p>
+                    <p className="text-lg font-bold text-gray-900">—</p>
                   </div>
                 </div>
               </Card>
@@ -375,9 +376,9 @@ export const CourseDetail = () => {
                   </div>
                   <div>
                     <p className="text-xs text-gray-600">Response Time</p>
-                    <p className="text-lg font-bold text-gray-900">{course.analytics.averageResponseTime}s</p>
-          </div>
-                    </div>
+                    <p className="text-lg font-bold text-gray-900">—</p>
+                  </div>
+                </div>
               </Card>
               <Card className="p-4">
                 <div className="flex items-center">
@@ -386,7 +387,7 @@ export const CourseDetail = () => {
                   </div>
                   <div>
                     <p className="text-xs text-gray-600">Participation</p>
-                    <p className="text-lg font-bold text-gray-900">{course.analytics.participationRate}%</p>
+                    <p className="text-lg font-bold text-gray-900">—</p>
                   </div>
                 </div>
               </Card>
@@ -668,40 +669,28 @@ export const CourseDetail = () => {
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Course Materials</h3>
             <div className="space-y-3">
-              {course.materials.map(material => (
-                <Card key={material.id} className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4 flex-1">
-                      <div className={`p-3 rounded-lg ${
-                        material.type === 'pdf' ? 'bg-red-100' : 'bg-blue-100'
-                      }`}>
-                        {material.type === 'pdf' ? (
-                          <FileTextIcon className={`h-6 w-6 ${
-                            material.type === 'pdf' ? 'text-red-600' : 'text-blue-600'
-                          }`} />
-                        ) : (
-                          <VideoIcon className="h-6 w-6 text-blue-600" />
-                        )}
+              {course.syllabus && course.syllabus.length > 0 ? (
+                course.syllabus.map((item, index) => (
+                  <Card key={index} className="p-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-3 rounded-lg bg-blue-100">
+                        <FileTextIcon className="h-6 w-6 text-blue-600" />
                       </div>
                       <div className="flex-1">
-                        <h4 className="text-lg font-semibold text-gray-900">{material.title}</h4>
-                        <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
-                          <span>{material.size}</span>
-                          <span>•</span>
-                          <span>
-                            {material.type === 'pdf' 
-                              ? `${material.downloads} downloads`
-                              : `${material.views} views`}
-                          </span>
-                        </div>
+                        <h4 className="text-lg font-semibold text-gray-900">{item.title}</h4>
+                        {item.description && (
+                          <p className="mt-1 text-sm text-gray-600">{item.description}</p>
+                        )}
                       </div>
                     </div>
-                    <button className="ml-4 p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                      <DownloadIcon className="h-5 w-5" />
-                    </button>
-                  </div>
+                  </Card>
+                ))
+              ) : (
+                <Card className="p-8 text-center">
+                  <FileTextIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-500">No materials or syllabus added yet.</p>
                 </Card>
-              ))}
+              )}
             </div>
           </div>
         )}
@@ -716,13 +705,10 @@ export const CourseDetail = () => {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Overall Engagement</span>
-                      <span className="text-sm font-semibold text-gray-900">{course.engagement}%</span>
+                      <span className="text-sm font-semibold text-gray-900">—</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full"
-                        style={{ width: `${course.engagement}%` }}
-                      />
+                      <div className="bg-gray-300 h-2 rounded-full" style={{ width: '0%' }} />
                     </div>
                   </div>
                 </div>
@@ -731,15 +717,15 @@ export const CourseDetail = () => {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Questions Answered</span>
-                      <span className="font-semibold text-gray-900">{course.analytics.totalQuestions}</span>
+                      <span className="font-semibold text-gray-900">—</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Participation Rate</span>
-                      <span className="font-semibold text-gray-900">{course.analytics.participationRate}%</span>
+                      <span className="font-semibold text-gray-900">—</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Avg Response Time</span>
-                      <span className="font-semibold text-gray-900">{course.analytics.averageResponseTime}s</span>
+                      <span className="font-semibold text-gray-900">—</span>
                     </div>
                   </div>
                 </div>
