@@ -46,7 +46,7 @@ export const CourseDetail = () => {
   const [sessionErrors, setSessionErrors] = useState<Record<string, string>>({});
 
   const [showAddMaterial, setShowAddMaterial] = useState(false);
-  const [newMaterial, setNewMaterial] = useState({ title: '', description: '', url: '' });
+  const [newMaterial, setNewMaterial] = useState<{ title: string; description: string; file: File | null }>({ title: '', description: '', file: null });
   const [isAddingMaterial, setIsAddingMaterial] = useState(false);
 
   const [course, setCourse] = useState<Course | null>(null);
@@ -132,6 +132,24 @@ export const CourseDetail = () => {
     } catch {
       return iso;
     }
+  };
+
+  const downloadMaterialUrl = (url: string, filename?: string) => {
+    const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
+    const token = localStorage.getItem('access_token');
+    fetch(fullUrl, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then((res) => {
+        if (!res.ok) throw new Error('Download failed');
+        return res.blob();
+      })
+      .then((blob) => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename || 'material.pdf';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      })
+      .catch(() => toast.error('Failed to download'));
   };
 
   const tabs = [
@@ -266,23 +284,42 @@ export const CourseDetail = () => {
       toast.error('Material title is required');
       return;
     }
+    if (!newMaterial.file) {
+      toast.error('Please select a PDF file');
+      return;
+    }
+    if (!newMaterial.file.name.toLowerCase().endsWith('.pdf')) {
+      toast.error('Only PDF files are allowed');
+      return;
+    }
     if (!courseId || !course) return;
     setIsAddingMaterial(true);
     try {
+      const uploadRes = await courseService.uploadCourseMaterial(
+        courseId,
+        newMaterial.file,
+        newMaterial.title.trim(),
+        newMaterial.description.trim() || undefined,
+      );
+      if (!uploadRes.success || !uploadRes.url) {
+        toast.error('Upload failed');
+        return;
+      }
+      const fileUrl = uploadRes.url.startsWith('http') ? uploadRes.url : `${API_BASE}${uploadRes.url}`;
       const updatedSyllabus = [
         ...(course.syllabus || []),
         {
           title: newMaterial.title.trim(),
           ...(newMaterial.description.trim() && { description: newMaterial.description.trim() }),
-          ...(newMaterial.url.trim() && { url: newMaterial.url.trim() }),
+          url: fileUrl,
         },
       ];
       const res = await courseService.updateCourse(courseId, { syllabus: updatedSyllabus });
       if (res.success && res.course) {
         setCourse(res.course);
-        setNewMaterial({ title: '', description: '', url: '' });
+        setNewMaterial({ title: '', description: '', file: null });
         setShowAddMaterial(false);
-        toast.success('Material added. Students can view and download it.');
+        toast.success('Material added. Students can download the PDF.');
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to add material');
@@ -668,7 +705,7 @@ export const CourseDetail = () => {
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Course Materials</h3>
-                  <p className="text-sm text-gray-500">Add materials (PDFs, links, etc.) that enrolled students can view and download.</p>
+                  <p className="text-sm text-gray-500">Add PDF materials that enrolled students can download.</p>
                 </div>
                 <Button
                   variant="primary"
@@ -686,9 +723,9 @@ export const CourseDetail = () => {
             {showAddMaterial && isInstructor && (
               <Card className="border-2 border-indigo-200 p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-lg font-semibold text-gray-900">Add New Material</h4>
+                  <h4 className="text-lg font-semibold text-gray-900">Add New Material (PDF)</h4>
                   <button
-                    onClick={() => { setShowAddMaterial(false); setNewMaterial({ title: '', description: '', url: '' }); }}
+                    onClick={() => { setShowAddMaterial(false); setNewMaterial({ title: '', description: '', file: null }); }}
                     className="p-1 rounded-full hover:bg-gray-100"
                   >
                     <XIcon className="h-5 w-5 text-gray-500" />
@@ -714,19 +751,23 @@ export const CourseDetail = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Link / file URL (optional)</label>
-                    <Input
-                      value={newMaterial.url}
-                      onChange={(e) => setNewMaterial({ ...newMaterial, url: e.target.value })}
-                      placeholder="https://... (students can open or download)"
+                    <label className="block text-sm font-medium text-gray-700 mb-1">PDF file *</label>
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      onChange={(e) => setNewMaterial({ ...newMaterial, file: e.target.files?.[0] ?? null })}
+                      className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                     />
+                    {newMaterial.file && (
+                      <p className="mt-1 text-sm text-gray-500">{newMaterial.file.name}</p>
+                    )}
                   </div>
                   <div className="flex justify-end space-x-3">
-                    <Button variant="outline" onClick={() => { setShowAddMaterial(false); setNewMaterial({ title: '', description: '', url: '' }); }}>
+                    <Button variant="outline" onClick={() => { setShowAddMaterial(false); setNewMaterial({ title: '', description: '', file: null }); }}>
                       Cancel
                     </Button>
                     <Button variant="primary" onClick={handleAddMaterial} disabled={isAddingMaterial}>
-                      {isAddingMaterial ? 'Adding...' : 'Add Material'}
+                      {isAddingMaterial ? 'Uploading...' : 'Add Material'}
                     </Button>
                   </div>
                 </div>
@@ -750,15 +791,14 @@ export const CourseDetail = () => {
                         </div>
                       </div>
                       {item.url && (
-                        <a
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => downloadMaterialUrl(item.url!, item.title + '.pdf')}
                           className="ml-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
                         >
                           <DownloadIcon className="h-4 w-4" />
-                          Download / Open
-                        </a>
+                          Download PDF
+                        </button>
                       )}
                     </div>
                   </Card>

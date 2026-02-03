@@ -54,6 +54,9 @@ dist/
 *.sqlite
 *.sqlite3
 
+# Uploaded course materials (PDFs)
+uploads/
+
 # Certificates
 *.pem
 *.key

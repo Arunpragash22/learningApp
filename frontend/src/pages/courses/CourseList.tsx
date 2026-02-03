@@ -194,14 +194,6 @@ export const CourseList = () => {
               />
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={fetchCourses}
-                leftIcon={<RefreshCwIcon className="h-4 w-4" />}
-              >
-                Refresh
-              </Button>
               <button
                 type="button"
                 onClick={() => setFilterActive(!filterActive)}
@@ -219,8 +211,8 @@ export const CourseList = () => {
 
           {/* Filter Options */}
           {filterActive && (
-            <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="max-w-xs">
                 <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
                   Status
                 </label>
@@ -234,34 +226,6 @@ export const CourseList = () => {
                   <option value="published">Published</option>
                   {isInstructor && <option value="draft">Draft</option>}
                 </select>
-              </div>
-              <div>
-                <label htmlFor="sort" className="block text-sm font-medium text-gray-700 mb-1">
-                  Sort By
-                </label>
-                <select
-                  id="sort"
-                  value={sortBy}
-                  onChange={e => setSortBy(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                >
-                  <option value="recent">Most Recent</option>
-                  <option value="title">Title</option>
-                  <option value="students">Students</option>
-                </select>
-              </div>
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStatusFilter('all');
-                    setSortBy('recent');
-                    setSearchTerm('');
-                  }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Clear Filters
-                </button>
               </div>
             </div>
           )}

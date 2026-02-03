@@ -129,6 +129,28 @@ export const courseService = {
   },
 
   /**
+   * Upload a PDF material for a course (instructor only). Returns URL to store in syllabus.
+   */
+  async uploadCourseMaterial(
+    courseId: string,
+    file: File,
+    title: string,
+    description?: string,
+  ): Promise<{ success: boolean; url: string; filename: string; title: string; description: string }> {
+    const token = localStorage.getItem('access_token');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('title', title);
+    if (description) formData.append('description', description);
+    const response = await fetch(`${API_BASE_URL}/api/courses/${courseId}/materials/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    return handleResponse(response);
+  },
+
+  /**
    * Update a course (instructor only)
    */
   async updateCourse(courseId: string, data: UpdateCourseData): Promise<{ success: boolean; course: Course }> {

@@ -1,11 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+from pathlib import Path
+import uuid
+import os
 from ..models.course import CourseModel
 from ..models.user import UserModel
 from ..middleware.auth import get_current_user, require_instructor
 from ..database.connection import get_database
+
+# Directory for uploaded course materials (PDFs)
+UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "course_materials"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 router = APIRouter(prefix="/api/courses", tags=["courses"])
@@ -413,6 +421,71 @@ async def update_course(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update course"
         )
+
+
+@router.post("/{course_id}/materials/upload")
+async def upload_course_material(
+    course_id: str,
+    file: UploadFile = File(...),
+    title: str = Form(...),
+    description: Optional[str] = Form(None),
+    current_user: dict = Depends(require_instructor),
+):
+    """Upload a PDF material for a course (instructor only). Returns URL to store in syllabus."""
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only PDF files are allowed")
+    course = await CourseModel.find_by_id(course_id)
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    if course["instructorId"] != current_user["id"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only add materials to your own courses")
+    course_dir = UPLOAD_DIR / course_id
+    course_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = f"{uuid.uuid4().hex}_{file.filename}"
+    file_path = course_dir / safe_name
+    try:
+        contents = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(contents)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to save file: {str(e)}")
+    # URL the frontend can use to download (same origin)
+    file_url = f"/api/courses/{course_id}/materials/files/{safe_name}"
+    # Optionally add to course syllabus in one go (frontend can also update course after)
+    return {
+        "success": True,
+        "url": file_url,
+        "filename": safe_name,
+        "title": title,
+        "description": description or "",
+    }
+
+
+@router.get("/{course_id}/materials/files/{filename}")
+async def get_course_material_file(
+    course_id: str,
+    filename: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Serve a course material file. Access: instructor of course or enrolled student."""
+    course = await CourseModel.find_by_id(course_id)
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    user_id = current_user.get("id")
+    role = current_user.get("role", "")
+    if role == "admin":
+        pass
+    elif role == "instructor":
+        if course.get("instructorId") != user_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    else:
+        enrolled = await CourseModel.is_student_enrolled(course_id, user_id)
+        if not enrolled:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You must be enrolled to download materials")
+    file_path = UPLOAD_DIR / course_id / filename
+    if not file_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return FileResponse(path=str(file_path), filename=filename.split("_", 1)[-1] if "_" in filename else filename, media_type="application/pdf")
 
 
 @router.delete("/{course_id}")
