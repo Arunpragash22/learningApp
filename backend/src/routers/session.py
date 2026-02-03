@@ -779,7 +779,6 @@ async def join_session(
         
         # Broadcast to session room
         zoom_meeting_id = session.get("zoomMeetingId")
-        
         if zoom_meeting_id:
             await ws_manager.broadcast_to_session(str(zoom_meeting_id), join_event)
         await ws_manager.broadcast_to_session(session_id, join_event)
