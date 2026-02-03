@@ -276,7 +276,7 @@ export const SessionReports = () => {
                           onClick={() => handleDownload(session.id, session.title)}
                           disabled={downloadingId === session.id}
                         >
-                          {downloadingId === session.id ? 'Downloading...' : 'Download'}
+                          {downloadingId === session.id ? 'Downloading...' : 'Download report'}
                         </Button>
                       </div>
                     </div>
@@ -370,7 +370,7 @@ export const SessionReports = () => {
                           onClick={() => handleDownload(report.sessionId, report.sessionTitle)}
                           disabled={downloadingId === report.sessionId}
                         >
-                          {downloadingId === report.sessionId ? 'Downloading...' : 'Download'}
+                          {downloadingId === report.sessionId ? 'Downloading...' : 'Download report'}
                         </Button>
                       </div>
                     </div>

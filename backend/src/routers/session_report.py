@@ -132,9 +132,9 @@ async def get_session_report(
 ):
     """
     Generate and return session report.
-    - ONLY Instructors can view reports
-    - Shows ALL student details (names, scores, answers, connection quality)
-    - For sessions not yet ended, generates live/preview report
+    - Instructors: full report with all student details.
+    - Students: personal report with only their own data (if they participated).
+    - For sessions not yet ended, generates live/preview report.
     """
     try:
         # Verify session exists
@@ -145,13 +145,6 @@ async def get_session_report(
         user_role = user.get("role", "student")
         user_id = user.get("id")
         
-        # ONLY INSTRUCTORS CAN VIEW REPORTS
-        if user_role == "student":
-            raise HTTPException(
-                status_code=403, 
-                detail="Only instructors can view session reports"
-            )
-        
         # Instructors can only view reports for their own sessions
         if user_role == "instructor":
             if session.get("instructorId") != user_id:
@@ -160,12 +153,19 @@ async def get_session_report(
                     detail="You can only view reports for your own sessions"
                 )
         
-        # FIRST: Try to get stored report from MongoDB (for completed sessions)
+        # Get report (instructor: full; student: filtered to their data)
         report = await SessionReportModel.get_report_for_user(session_id, user_id, user_role)
         
         if not report:
             # No stored report - generate fresh report (live or preview)
             report = await SessionReportModel.generate_report(session_id, user_id, user_role)
+        
+        # Students may only view report if they participated (have data in report)
+        if user_role == "student" and report and len(report.get("students", [])) == 0:
+            raise HTTPException(
+                status_code=403,
+                detail="You did not participate in this session"
+            )
         
         if not report:
             # Create a minimal report with session info if no data available
@@ -207,18 +207,12 @@ async def download_session_report(
 ):
     """
     Generate and return downloadable HTML report.
-    ONLY Instructors can download reports.
+    - Instructors: full session report.
+    - Students: personal report (only their data) for sessions they participated in.
     """
     try:
         user_role = user.get("role", "student")
         user_id = user.get("id")
-        
-        # ONLY INSTRUCTORS CAN DOWNLOAD REPORTS
-        if user_role == "student":
-            raise HTTPException(
-                status_code=403, 
-                detail="Only instructors can download session reports"
-            )
         
         session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
         if not session:
@@ -231,14 +225,21 @@ async def download_session_report(
                     detail="You can only download reports for your own sessions"
                 )
         
-        # Get report from MongoDB (or generate if not stored) - always full instructor view
-        report = await SessionReportModel.get_report_for_user(session_id, user_id, "instructor")
+        # Get report (instructor: full; student: filtered to their data)
+        report = await SessionReportModel.get_report_for_user(session_id, user_id, user_role)
         if not report:
-            report = await SessionReportModel.generate_report(session_id, user_id, "instructor")
+            report = await SessionReportModel.generate_report(session_id, user_id, user_role)
         if not report:
             raise HTTPException(status_code=404, detail="Could not generate report")
         
-        # Generate HTML
+        # Students may only download if they participated
+        if user_role == "student" and len(report.get("students", [])) == 0:
+            raise HTTPException(
+                status_code=403,
+                detail="You did not participate in this session"
+            )
+        
+        # Generate HTML (instructor: full table; student: personal quiz details)
         html_content = _generate_report_html(report, user_role)
         
         return HTMLResponse(

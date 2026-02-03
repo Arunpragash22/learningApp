@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   FileTextIcon,
@@ -12,11 +13,13 @@ import {
   BookOpenIcon,
   AwardIcon,
   TimerIcon,
-  DownloadIcon
+  DownloadIcon,
+  EyeIcon
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { sessionService } from '../../services/sessionService';
 import { toast } from 'sonner';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -92,9 +95,11 @@ interface MyStoredReport {
 
 export const StudentReports = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'stored' | 'attendance' | 'quiz' | 'history'>('stored');
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
   
   // Data states
   const [storedReports, setStoredReports] = useState<MyStoredReport[]>([]);
@@ -150,31 +155,28 @@ export const StudentReports = () => {
     }
   };
 
-  // Download personal report as CSV
-  const downloadPersonalReport = (report: MyStoredReport) => {
-    const csvContent = `MY SESSION REPORT
-Session,${report.sessionTitle}
-Course,${report.courseName}
-Date,${report.sessionDate}
-Generated,${new Date(report.generatedAt).toLocaleString()}
-
-MY PERFORMANCE
-Total Questions,${report.myTotalQuestions}
-Correct Answers,${report.myCorrectAnswers}
-Score,${report.myScore !== null ? `${report.myScore}%` : 'N/A'}
-Attendance Duration,${report.myAttendanceDuration !== null ? `${report.myAttendanceDuration} minutes` : 'N/A'}
-`;
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `my_report_${report.sessionTitle.replace(/\s+/g, '_')}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast.success('Report downloaded!');
+  // Download session report as HTML (same format as instructor report, personal data only)
+  const handleDownloadReport = async (report: MyStoredReport) => {
+    setDownloadingReportId(report.sessionId);
+    try {
+      const blob = await sessionService.downloadReport(report.sessionId);
+      if (blob) {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `report_${report.sessionTitle.replace(/\s+/g, '_')}.html`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success('Report downloaded!');
+      } else {
+        toast.error('Failed to download report');
+      }
+    } catch {
+      toast.error('Failed to download report');
+    }
+    setDownloadingReportId(null);
   };
 
   const fetchAttendance = async () => {
@@ -536,14 +538,25 @@ Attendance Duration,${report.myAttendanceDuration !== null ? `${report.myAttenda
                               {report.myAttendanceDuration !== null ? `${report.myAttendanceDuration} min` : '-'}
                             </td>
                             <td className="px-4 py-3">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                leftIcon={<DownloadIcon className="h-3 w-3" />}
-                                onClick={() => downloadPersonalReport(report)}
-                              >
-                                Download
-                              </Button>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  leftIcon={<EyeIcon className="h-3 w-3" />}
+                                  onClick={() => navigate(`/dashboard/sessions/${report.sessionId}/report`)}
+                                >
+                                  View
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  leftIcon={downloadingReportId === report.sessionId ? <Loader2Icon className="h-3 w-3 animate-spin" /> : <DownloadIcon className="h-3 w-3" />}
+                                  onClick={() => handleDownloadReport(report)}
+                                  disabled={downloadingReportId === report.sessionId}
+                                >
+                                  {downloadingReportId === report.sessionId ? 'Downloading...' : 'Download report'}
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         ))}
