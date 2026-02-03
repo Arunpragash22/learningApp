@@ -11,10 +11,11 @@ import {
   courseService,
   type Course,
 } from '../../services/courseService';
+import { sessionService, type Session } from '../../services/sessionService';
 import { 
-  BookOpenIcon, UsersIcon, CalendarIcon, ClockIcon, 
+  CalendarIcon, ClockIcon, 
   FileTextIcon,
-  ActivityIcon, BarChart3Icon, PlayIcon, CheckCircleIcon,
+  ActivityIcon, PlayIcon,
   PlusIcon, XIcon, EditIcon, Loader2Icon
 } from 'lucide-react';
 
@@ -31,7 +32,7 @@ export const CourseDetail = () => {
   const { courseId } = useParams();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'overview' | 'sessions' | 'materials' | 'analytics'>('overview');
+  const [activeTab, setActiveTab] = useState<'sessions' | 'materials'>('sessions');
   const [showCreateSession, setShowCreateSession] = useState(false);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [newSession, setNewSession] = useState({
@@ -101,6 +102,24 @@ export const CourseDetail = () => {
     past: [],
   });
 
+  // Fetch sessions for this course from API
+  useEffect(() => {
+    if (!courseId) return;
+    sessionService.getSessionsByCourse(courseId).then((sessions: Session[]) => {
+      const toCourseSession = (s: Session): CourseSession => ({
+        id: s.id,
+        title: s.title,
+        date: s.date,
+        time: s.time,
+        status: s.status === 'completed' ? 'completed' : 'upcoming',
+        engagement: s.engagement,
+      });
+      const upcoming = sessions.filter(s => s.status !== 'completed').map(toCourseSession);
+      const past = sessions.filter(s => s.status === 'completed').map(toCourseSession);
+      setCourseSessions({ upcoming, past });
+    });
+  }, [courseId]);
+
   const formatDate = (iso?: string) => {
     if (!iso) return '—';
     try {
@@ -112,10 +131,8 @@ export const CourseDetail = () => {
   };
 
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: BookOpenIcon },
     { id: 'sessions', label: 'Sessions', icon: CalendarIcon },
     { id: 'materials', label: 'Materials', icon: FileTextIcon },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3Icon }
   ];
 
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
@@ -198,10 +215,27 @@ export const CourseDetail = () => {
         status: 'upcoming'
       };
 
-      setCourseSessions(prev => ({
-        ...prev,
-        upcoming: [...prev.upcoming, newSessionData]
-      }));
+      // Refresh session list from API so the new session appears
+      if (courseId) {
+        sessionService.getSessionsByCourse(courseId).then((sessions: Session[]) => {
+          const toCourseSession = (s: Session): CourseSession => ({
+            id: s.id,
+            title: s.title,
+            date: s.date,
+            time: s.time,
+            status: s.status === 'completed' ? 'completed' : 'upcoming',
+            engagement: s.engagement,
+          });
+          const upcoming = sessions.filter(s => s.status !== 'completed').map(toCourseSession);
+          const past = sessions.filter(s => s.status === 'completed').map(toCourseSession);
+          setCourseSessions({ upcoming, past });
+        });
+      } else {
+        setCourseSessions(prev => ({
+          ...prev,
+          upcoming: [...prev.upcoming, newSessionData]
+        }));
+      }
 
       // Reset form
       setNewSession({
@@ -289,6 +323,10 @@ export const CourseDetail = () => {
               <p className="text-sm font-medium text-gray-600">Duration</p>
               <p className="text-gray-900">{durationDisplay}</p>
             </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600">Number of enrolled students</p>
+              <p className="text-gray-900">{course.enrolledStudents?.length ?? 0}</p>
+            </div>
           </div>
         </Card>
       </div>
@@ -320,81 +358,6 @@ export const CourseDetail = () => {
 
       {/* Tab Content */}
       <div>
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            <Card>
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Course Description</h3>
-                <p className="text-gray-700 leading-relaxed">{course.description || '—'}</p>
-                <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Start Date</p>
-                    <p className="text-sm font-medium text-gray-900">{formatDate(course.startDate)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">End Date</p>
-                    <p className="text-sm font-medium text-gray-900">{formatDate(course.endDate)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Total Sessions</p>
-                    <p className="text-sm font-medium text-gray-900">—</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Enrolled Students</p>
-                    <p className="text-sm font-medium text-gray-900">{course.enrolledStudents?.length ?? 0}</p>
-                  </div>
-                </div>
-              </div>
-            </Card>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="p-4">
-                <div className="flex items-center">
-                  <div className="p-2 bg-blue-100 rounded-lg mr-3">
-                    <ActivityIcon className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Attendance</p>
-                    <p className="text-lg font-bold text-gray-900">—</p>
-                  </div>
-                </div>
-              </Card>
-              <Card className="p-4">
-                <div className="flex items-center">
-                  <div className="p-2 bg-purple-100 rounded-lg mr-3">
-                    <CheckCircleIcon className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Quiz Average</p>
-                    <p className="text-lg font-bold text-gray-900">—</p>
-                  </div>
-                </div>
-              </Card>
-              <Card className="p-4">
-                <div className="flex items-center">
-                  <div className="p-2 bg-blue-100 rounded-lg mr-3">
-                    <ClockIcon className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Response Time</p>
-                    <p className="text-lg font-bold text-gray-900">—</p>
-                  </div>
-                </div>
-              </Card>
-              <Card className="p-4">
-                <div className="flex items-center">
-                  <div className="p-2 bg-orange-100 rounded-lg mr-3">
-                    <UsersIcon className="h-5 w-5 text-orange-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Participation</p>
-                    <p className="text-lg font-bold text-gray-900">—</p>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </div>
-        )}
-
         {activeTab === 'sessions' && (
           <div className="space-y-6">
             {/* Create Session Button - Instructor Only */}
@@ -695,44 +658,6 @@ export const CourseDetail = () => {
           </div>
         )}
 
-        {activeTab === 'analytics' && (
-          <div className="space-y-6">
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Analytics</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-3">Engagement Metrics</h4>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Overall Engagement</span>
-                      <span className="text-sm font-semibold text-gray-900">—</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-gray-300 h-2 rounded-full" style={{ width: '0%' }} />
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-3">Participation Stats</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Questions Answered</span>
-                      <span className="font-semibold text-gray-900">—</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Participation Rate</span>
-                      <span className="font-semibold text-gray-900">—</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Avg Response Time</span>
-                      <span className="font-semibold text-gray-900">—</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        )}
       </div>
     </div>
   );

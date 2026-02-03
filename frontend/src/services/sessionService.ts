@@ -57,6 +57,21 @@ export const sessionService = {
     return await res.json();
   },
 
+  async getSessionsByCourse(courseId: string): Promise<Session[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/sessions/course/${courseId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+        },
+      });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (err) {
+      console.error("Sessions by course fetch error:", err);
+      return [];
+    }
+  },
+
   async createSession(payload: {
     title: string;
     course: string;
