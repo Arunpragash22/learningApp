@@ -225,39 +225,18 @@ export const CourseDetail = () => {
     <div className="py-6">
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-2">
-              <Link
-                to="/dashboard/courses"
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-              >
-                ← Back to Courses
-              </Link>
-            </div>
-            <h1 className="text-3xl font-bold text-gray-900">{course.title}</h1>
-            <p className="mt-1 text-lg text-gray-600">Course Code: {course.code}</p>
-            <p className="mt-2 text-sm text-gray-500">Instructor: {course.instructor}</p>
+        <div className="mb-4">
+          <div className="flex items-center space-x-3 mb-2">
+            <Link
+              to="/dashboard/courses"
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+            >
+              ← Back to Courses
+            </Link>
           </div>
-          <div className="flex space-x-3">
-            {courseSessions.upcoming.length > 0 && (
-              <Button
-                variant="primary"
-                leftIcon={<PlayIcon className="h-4 w-4" />}
-                onClick={() => navigate(`/dashboard/sessions/${courseSessions.upcoming[0].id}`)}
-              >
-                Join Next Session
-              </Button>
-            )}
-            {isInstructor && (
-              <Button
-                variant="outline"
-                leftIcon={<BarChart3Icon className="h-4 w-4" />}
-                onClick={() => navigate(`/dashboard/instructor/analytics`)}
-              >
-                View Analytics
-              </Button>
-            )}
+          <h1 className="text-3xl font-bold text-gray-900">{course.title}</h1>
+          <p className="mt-1 text-lg text-gray-600">Course Code: {course.code}</p>
+          <p className="mt-2 text-sm text-gray-500">Instructor: {course.instructor}</p>
         </div>
         </div>
 
