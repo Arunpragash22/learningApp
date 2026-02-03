@@ -88,6 +88,23 @@ class Question:
         return questions
 
     @staticmethod
+    async def find_by_instructor(instructor_id: str, course_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Find questions by instructor (instructorId or legacy createdBy), optionally by courseId."""
+        database = get_database()
+        if database is None:
+            return []
+        query = {"$or": [{"instructorId": instructor_id}, {"createdBy": instructor_id}]}
+        if course_id:
+            query["courseId"] = course_id
+        questions = []
+        async for question in database.questions.find(query):
+            q = dict(question)
+            q["id"] = str(q["_id"])
+            del q["_id"]
+            questions.append(q)
+        return questions
+
+    @staticmethod
     async def update(question_id: str, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update question"""
         database = get_database()

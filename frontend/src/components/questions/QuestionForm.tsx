@@ -209,9 +209,9 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
               onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as any })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             >
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
+              <option value="easy">Passive</option>
+              <option value="medium">Moderate</option>
+              <option value="hard">Active</option>
             </select>
           </div>
         </div>

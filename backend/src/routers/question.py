@@ -17,6 +17,7 @@ class QuestionOption(BaseModel):
     category: str
     tags: Optional[List[str]] = []
     timeLimit: Optional[int] = 30
+    courseId: Optional[str] = None  # Optional: which course this question belongs to
 
 
 class QuestionResponse(BaseModel):
@@ -29,6 +30,8 @@ class QuestionResponse(BaseModel):
     tags: List[str]
     timeLimit: Optional[int] = 30
     createdAt: Optional[str] = None
+    instructorId: Optional[str] = None
+    courseId: Optional[str] = None
 
 
 @router.post("/", response_model=QuestionResponse)
@@ -36,23 +39,22 @@ async def create_question(
     question_data: QuestionOption,
     user: dict = Depends(require_instructor)
 ):
-    """Create a new question (instructor only)"""
+    """Create a new question (instructor only). Stored per instructor; optional courseId for course-specific question set."""
     try:
-        print(f"📝 Creating question by user: {user.get('email', 'unknown')}")
-        print(f"📝 Question data: {question_data.dict()}")
+        instructor_id = user.get("id", "")
+        print(f"📝 Creating question by instructor: {user.get('email', 'unknown')} ({instructor_id})")
         
-        # MongoDB will automatically create the database and collection
-        # when the first document is inserted
         question_dict = question_data.dict()
         question_dict["createdAt"] = datetime.now().isoformat()
-        question_dict["createdBy"] = user.get("id", "")
+        question_dict["createdBy"] = instructor_id
         question_dict["createdByEmail"] = user.get("email", "")
+        question_dict["instructorId"] = instructor_id
+        if question_data.courseId:
+            question_dict["courseId"] = question_data.courseId
         
-        print(f"📝 Attempting to save question to MongoDB...")
         created_question = await Question.create(question_dict)
-        print(f"✅ Question created successfully with ID: {created_question.get('id', '')}")
+        print(f"✅ Question created with ID: {created_question.get('id', '')}")
         
-        # Convert to response format
         response = QuestionResponse(
             id=created_question.get("id", ""),
             question=created_question.get("question", ""),
@@ -62,7 +64,9 @@ async def create_question(
             category=created_question.get("category", ""),
             tags=created_question.get("tags", []),
             timeLimit=created_question.get("timeLimit", 30),
-            createdAt=created_question.get("createdAt")
+            createdAt=created_question.get("createdAt"),
+            instructorId=instructor_id,
+            courseId=question_dict.get("courseId"),
         )
         
         return response
@@ -81,13 +85,19 @@ async def create_question(
 
 @router.get("/", response_model=List[QuestionResponse])
 async def get_all_questions(
-    user: dict = Depends(get_current_user)
+    course_id: Optional[str] = None,
+    user: dict = Depends(get_current_user),
 ):
-    """Get all questions"""
+    """Get questions: instructors see only their own; optional filter by courseId."""
     try:
-        questions = await Question.find_all()
+        role = user.get("role", "student")
+        user_id = user.get("id", "")
         
-        # Convert to response format
+        if role in ("instructor", "admin"):
+            questions = await Question.find_by_instructor(user_id, course_id=course_id)
+        else:
+            questions = []
+        
         response = []
         for q in questions:
             response.append(QuestionResponse(
@@ -99,7 +109,9 @@ async def get_all_questions(
                 category=q.get("category", ""),
                 tags=q.get("tags", []),
                 timeLimit=q.get("timeLimit", 30),
-                createdAt=q.get("createdAt")
+                createdAt=q.get("createdAt"),
+                instructorId=q.get("instructorId"),
+                courseId=q.get("courseId"),
             ))
         
         return response
@@ -111,12 +123,20 @@ async def get_all_questions(
         )
 
 
+def _question_owned_by(question: dict, user: dict) -> bool:
+    """True if user owns this question (instructorId/createdBy) or is admin."""
+    if user.get("role") == "admin":
+        return True
+    uid = user.get("id", "")
+    return question.get("instructorId") == uid or question.get("createdBy") == uid
+
+
 @router.get("/{question_id}", response_model=QuestionResponse)
 async def get_question_by_id(
     question_id: str,
     user: dict = Depends(get_current_user)
 ):
-    """Get a specific question by ID"""
+    """Get a specific question by ID (instructor sees only their own)."""
     try:
         question = await Question.find_by_id(question_id)
         
@@ -125,6 +145,8 @@ async def get_question_by_id(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Question not found"
             )
+        if user.get("role") in ("instructor", "admin") and not _question_owned_by(question, user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only view your own questions")
         
         return QuestionResponse(
             id=question.get("id", ""),
@@ -135,7 +157,9 @@ async def get_question_by_id(
             category=question.get("category", ""),
             tags=question.get("tags", []),
             timeLimit=question.get("timeLimit", 30),
-            createdAt=question.get("createdAt")
+            createdAt=question.get("createdAt"),
+            instructorId=question.get("instructorId"),
+            courseId=question.get("courseId"),
         )
     except HTTPException:
         raise
@@ -153,9 +177,17 @@ async def update_question(
     question_data: QuestionOption,
     user: dict = Depends(require_instructor)
 ):
-    """Update a question (instructor only)"""
+    """Update a question (instructor only, own questions only)."""
     try:
+        existing = await Question.find_by_id(question_id)
+        if not existing:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+        if not _question_owned_by(existing, user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only update your own questions")
+        
         update_dict = question_data.dict()
+        if question_data.courseId is not None:
+            update_dict["courseId"] = question_data.courseId
         updated_question = await Question.update(question_id, update_dict)
         
         if not updated_question:
@@ -173,7 +205,9 @@ async def update_question(
             category=updated_question.get("category", ""),
             tags=updated_question.get("tags", []),
             timeLimit=updated_question.get("timeLimit", 30),
-            createdAt=updated_question.get("createdAt")
+            createdAt=updated_question.get("createdAt"),
+            instructorId=updated_question.get("instructorId"),
+            courseId=updated_question.get("courseId"),
         )
     except HTTPException:
         raise
@@ -190,8 +224,14 @@ async def delete_question(
     question_id: str,
     user: dict = Depends(require_instructor)
 ):
-    """Delete a question (instructor only)"""
+    """Delete a question (instructor only, own questions only)."""
     try:
+        existing = await Question.find_by_id(question_id)
+        if not existing:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+        if not _question_owned_by(existing, user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own questions")
+        
         success = await Question.delete(question_id)
         
         if not success:

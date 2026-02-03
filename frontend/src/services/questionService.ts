@@ -10,6 +10,8 @@ export interface Question {
   tags: string[];
   timeLimit?: number;
   createdAt?: string;
+  instructorId?: string;
+  courseId?: string;
 }
 
 export interface CreateQuestionData {
@@ -20,6 +22,7 @@ export interface CreateQuestionData {
   category: string;
   tags?: string[];
   timeLimit?: number;
+  courseId?: string;
 }
 
 // ✔ Correct API root — no slash, no /api suffix
@@ -96,10 +99,13 @@ export const questionService = {
     }
   },
 
-  // Get all questions
-  async getAllQuestions(): Promise<Question[]> {
+  // Get all questions (instructor: only their own; optional courseId filter)
+  async getAllQuestions(courseId?: string): Promise<Question[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/questions/`, {
+      const url = courseId
+        ? `${API_BASE_URL}/api/questions/?course_id=${encodeURIComponent(courseId)}`
+        : `${API_BASE_URL}/api/questions/`;
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
