@@ -25,7 +25,7 @@ export interface Course {
   duration?: string;
   level?: 'Beginner' | 'Intermediate' | 'Advanced';
   thumbnail?: string;
-  syllabus?: Array<{ title: string; description?: string }>;
+  syllabus?: Array<{ title: string; description?: string; url?: string }>;
   enrolledStudents?: string[];
   enrolledStudentDetails?: EnrolledStudent[];
   enrollmentKey?: string;
@@ -52,7 +52,7 @@ export interface CreateCourseData {
   duration?: string;
   level?: 'Beginner' | 'Intermediate' | 'Advanced';
   thumbnail?: string;
-  syllabus?: Array<{ title: string; description?: string }>;
+  syllabus?: Array<{ title: string; description?: string; url?: string }>;
   maxStudents?: number;
   status?: 'draft' | 'published' | 'archived';
   startDate?: string;

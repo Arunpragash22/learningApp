@@ -14,7 +14,7 @@ import {
 import { sessionService, type Session } from '../../services/sessionService';
 import { 
   CalendarIcon, ClockIcon, 
-  FileTextIcon,
+  FileTextIcon, DownloadIcon,
   ActivityIcon, PlayIcon,
   PlusIcon, XIcon, EditIcon, Loader2Icon
 } from 'lucide-react';
@@ -44,6 +44,10 @@ export const CourseDetail = () => {
     description: ''
   });
   const [sessionErrors, setSessionErrors] = useState<Record<string, string>>({});
+
+  const [showAddMaterial, setShowAddMaterial] = useState(false);
+  const [newMaterial, setNewMaterial] = useState({ title: '', description: '', url: '' });
+  const [isAddingMaterial, setIsAddingMaterial] = useState(false);
 
   const [course, setCourse] = useState<Course | null>(null);
   const [courseLoading, setCourseLoading] = useState(true);
@@ -254,6 +258,36 @@ export const CourseDetail = () => {
       toast.error(err.message || "Failed to create session");
     } finally {
       setIsCreatingSession(false);
+    }
+  };
+
+  const handleAddMaterial = async () => {
+    if (!newMaterial.title.trim()) {
+      toast.error('Material title is required');
+      return;
+    }
+    if (!courseId || !course) return;
+    setIsAddingMaterial(true);
+    try {
+      const updatedSyllabus = [
+        ...(course.syllabus || []),
+        {
+          title: newMaterial.title.trim(),
+          ...(newMaterial.description.trim() && { description: newMaterial.description.trim() }),
+          ...(newMaterial.url.trim() && { url: newMaterial.url.trim() }),
+        },
+      ];
+      const res = await courseService.updateCourse(courseId, { syllabus: updatedSyllabus });
+      if (res.success && res.course) {
+        setCourse(res.course);
+        setNewMaterial({ title: '', description: '', url: '' });
+        setShowAddMaterial(false);
+        toast.success('Material added. Students can view and download it.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to add material');
+    } finally {
+      setIsAddingMaterial(false);
     }
   };
 
@@ -629,29 +663,112 @@ export const CourseDetail = () => {
         )}
 
         {activeTab === 'materials' && (
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Course Materials</h3>
+          <div className="space-y-6">
+            {isInstructor && (
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Course Materials</h3>
+                  <p className="text-sm text-gray-500">Add materials (PDFs, links, etc.) that enrolled students can view and download.</p>
+                </div>
+                <Button
+                  variant="primary"
+                  leftIcon={<PlusIcon className="h-4 w-4" />}
+                  onClick={() => setShowAddMaterial(true)}
+                >
+                  Add Material
+                </Button>
+              </div>
+            )}
+            {!isInstructor && (
+              <h3 className="text-lg font-semibold text-gray-900">Course Materials</h3>
+            )}
+
+            {showAddMaterial && isInstructor && (
+              <Card className="border-2 border-indigo-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-lg font-semibold text-gray-900">Add New Material</h4>
+                  <button
+                    onClick={() => { setShowAddMaterial(false); setNewMaterial({ title: '', description: '', url: '' }); }}
+                    className="p-1 rounded-full hover:bg-gray-100"
+                  >
+                    <XIcon className="h-5 w-5 text-gray-500" />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                    <Input
+                      value={newMaterial.title}
+                      onChange={(e) => setNewMaterial({ ...newMaterial, title: e.target.value })}
+                      placeholder="e.g., Week 1 Lecture Notes"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+                    <textarea
+                      value={newMaterial.description}
+                      onChange={(e) => setNewMaterial({ ...newMaterial, description: e.target.value })}
+                      placeholder="Brief description of the material"
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Link / file URL (optional)</label>
+                    <Input
+                      value={newMaterial.url}
+                      onChange={(e) => setNewMaterial({ ...newMaterial, url: e.target.value })}
+                      placeholder="https://... (students can open or download)"
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-3">
+                    <Button variant="outline" onClick={() => { setShowAddMaterial(false); setNewMaterial({ title: '', description: '', url: '' }); }}>
+                      Cancel
+                    </Button>
+                    <Button variant="primary" onClick={handleAddMaterial} disabled={isAddingMaterial}>
+                      {isAddingMaterial ? 'Adding...' : 'Add Material'}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             <div className="space-y-3">
               {course.syllabus && course.syllabus.length > 0 ? (
                 course.syllabus.map((item, index) => (
                   <Card key={index} className="p-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 rounded-lg bg-blue-100">
-                        <FileTextIcon className="h-6 w-6 text-blue-600" />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4 flex-1">
+                        <div className="p-3 rounded-lg bg-blue-100">
+                          <FileTextIcon className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-lg font-semibold text-gray-900">{item.title}</h4>
+                          {item.description && (
+                            <p className="mt-1 text-sm text-gray-600">{item.description}</p>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h4 className="text-lg font-semibold text-gray-900">{item.title}</h4>
-                        {item.description && (
-                          <p className="mt-1 text-sm text-gray-600">{item.description}</p>
-                        )}
-                      </div>
+                      {item.url && (
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+                        >
+                          <DownloadIcon className="h-4 w-4" />
+                          Download / Open
+                        </a>
+                      )}
                     </div>
                   </Card>
                 ))
               ) : (
                 <Card className="p-8 text-center">
                   <FileTextIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-500">No materials or syllabus added yet.</p>
+                  <p className="text-gray-500">
+                    {isInstructor ? 'No materials yet. Click "Add Material" to add one.' : 'No materials have been added for this course yet.'}
+                  </p>
                 </Card>
               )}
             </div>
