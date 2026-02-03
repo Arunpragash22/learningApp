@@ -287,7 +287,6 @@ export const CourseDetail = () => {
             </div>
           </Card>
         </div>
-      </div>
 
       {/* Tabs */}
       <div className="mb-6 border-b border-gray-200">
