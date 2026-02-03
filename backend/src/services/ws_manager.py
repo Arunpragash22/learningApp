@@ -282,6 +282,11 @@ class WebSocketManager:
         """Get count of active participants in session"""
         return len(self.get_session_participants(session_id))
 
+    def get_meeting_stats(self, meeting_id: str) -> dict:
+        """Get stats for a session/meeting (participant count). Used by live stats API."""
+        count = self.get_session_participant_count(meeting_id)
+        return {"participantCount": count, "sessionId": meeting_id}
+
     async def send_to_student_in_session(self, session_id: str, student_id: str, message: dict) -> bool:
         """
         Send a message to a SPECIFIC student in a session room.

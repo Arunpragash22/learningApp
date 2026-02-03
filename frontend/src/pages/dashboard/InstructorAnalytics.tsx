@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Card, CardHeader, CardContent } from '../../components/ui/Card';
 import { ClusterVisualization } from '../../components/clustering/ClusterVisualization';
-import { Users, AlertCircle, Target, Radio } from 'lucide-react';
+import { Users, AlertCircle, Target, Radio, Download, FileText, Loader2 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { sessionService } from '../../services/sessionService';
+import { toast } from 'sonner';
 
 interface EngagementData {
   averageEngagement: number;
@@ -33,91 +37,90 @@ interface Session {
   averageEngagement: number;
 }
 
+const POLL_INTERVAL_MS = 4000;
+
 export const InstructorAnalytics = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [selectedTimeRange, setSelectedTimeRange] = useState<'live' | 'session' | 'week'>('live');
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const [isLive, setIsLive] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+  const [liveParticipantCount, setLiveParticipantCount] = useState<number | null>(null);
+  const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
 
-  // Mock sessions data
-  const sessions: Session[] = [
-    {
-      id: '1',
-      title: 'Machine Learning: Neural Networks',
-      date: '2023-10-15',
-      time: '14:00-15:30',
-      status: 'live',
-      studentCount: 32,
-      averageEngagement: 78
-    },
-    {
-      id: '2',
-      title: 'Database Design: Normalization',
-      date: '2023-10-14',
-      time: '10:00-11:30',
-      status: 'completed',
-      studentCount: 28,
-      averageEngagement: 72
-    },
-    {
-      id: '3',
-      title: 'Web Development: React Fundamentals',
-      date: '2023-10-13',
-      time: '14:00-15:30',
-      status: 'completed',
-      studentCount: 35,
-      averageEngagement: 81
-    },
-    {
-      id: '4',
-      title: 'Data Structures: Trees and Graphs',
-      date: '2023-10-12',
-      time: '09:00-10:30',
-      status: 'completed',
-      studentCount: 30,
-      averageEngagement: 69
-    }
-  ];
+  // Fetch sessions from API
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingSessions(true);
+      const list = await sessionService.getAllSessions();
+      if (cancelled) return;
+      const mapped: Session[] = (list || []).map((s: { id: string; title: string; date: string; time: string; status: string; participants?: number }) => ({
+        id: s.id,
+        title: s.title,
+        date: s.date,
+        time: s.time,
+        status: (s.status || 'upcoming') as 'live' | 'upcoming' | 'completed',
+        studentCount: s.participants ?? 0,
+        averageEngagement: 75
+      }));
+      setSessions(mapped);
+      if (mapped.length && !cancelled) {
+        const live = mapped.find(s => s.status === 'live');
+        setSelectedSession(live?.id ?? mapped[0].id);
+      }
+      setLoadingSessions(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Live session (if any)
   const liveSession = sessions.find(s => s.status === 'live');
-  
-  // Initialize with live session if available
+
+  // Initialize selected session when sessions load or live session appears
   useEffect(() => {
-    if (liveSession && selectedTimeRange === 'live') {
+    if (selectedTimeRange === 'live' && liveSession) {
       setSelectedSession(liveSession.id);
-    } else if (selectedTimeRange === 'session' && !selectedSession) {
+    } else if (selectedTimeRange === 'session' && !selectedSession && sessions.length) {
       setSelectedSession(sessions[0]?.id || null);
     }
-  }, [liveSession]);
+  }, [liveSession, selectedTimeRange, sessions]);
 
-  // Real-time data updates (simulated)
+  // Real-time polling: live participant count when a live session is selected
   useEffect(() => {
-    if (selectedTimeRange === 'live' && isLive) {
-      const interval = setInterval(() => {
-        setLastUpdate(new Date());
-        // In real app, this would fetch new data from API
-      }, 3000); // Update every 3 seconds for live view
+    if (selectedTimeRange !== 'live' || !selectedSession) {
+      setLiveParticipantCount(null);
+      return;
+    }
+    const poll = async () => {
+      const stats = await sessionService.getLiveSessionStats(selectedSession);
+      setLiveParticipantCount(stats?.participantCount ?? null);
+      setLastUpdate(new Date());
+    };
+    poll();
+    const interval = setInterval(poll, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [selectedTimeRange, selectedSession]);
 
-      return () => clearInterval(interval);
-    } else if (selectedTimeRange === 'session') {
-      // Update every 3 seconds for near real-time updates
-      const interval = setInterval(() => {
-        setLastUpdate(new Date());
-      }, 3000);
-
+  // Simulated refresh for session/week view (keep lastUpdate ticking)
+  useEffect(() => {
+    if (selectedTimeRange === 'session' || selectedTimeRange === 'week') {
+      const interval = setInterval(() => setLastUpdate(new Date()), 5000);
       return () => clearInterval(interval);
     }
-  }, [selectedTimeRange, isLive]);
+  }, [selectedTimeRange]);
 
-  // Generate dynamic data based on time range
+  // Generate dynamic data based on time range (real-time count for live when available)
   const getEngagementData = (): EngagementData => {
+    const liveTotal = liveParticipantCount ?? sessions.find(s => s.id === selectedSession)?.studentCount ?? 0;
     const baseData = {
       live: {
         averageEngagement: 72 + Math.floor(Math.random() * 10),
-        totalStudents: 32,
-        activeNow: 28 + Math.floor(Math.random() * 5),
+        totalStudents: liveTotal,
+        activeNow: liveTotal,
         questionsAnswered: 45 + Math.floor(Math.random() * 10),
         averageResponseTime: 12.5 + (Math.random() * 3 - 1.5)
       },
@@ -146,7 +149,34 @@ export const InstructorAnalytics = () => {
     return baseData[selectedTimeRange];
   };
 
-  const engagementMetrics = useMemo(() => getEngagementData(), [selectedTimeRange, selectedSession, lastUpdate]);
+  const engagementMetrics = useMemo(() => getEngagementData(), [selectedTimeRange, selectedSession, lastUpdate, liveParticipantCount, sessions]);
+
+  const selectedSessionObj = selectedSession ? sessions.find(s => s.id === selectedSession) : null;
+  const isSelectedCompleted = selectedSessionObj?.status === 'completed';
+
+  const handleDownloadReport = async () => {
+    if (!selectedSession) return;
+    setDownloadingReportId(selectedSession);
+    try {
+      const blob = await sessionService.downloadReport(selectedSession);
+      if (blob) {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `report_${selectedSessionObj?.title?.replace(/\s+/g, '_') || selectedSession}.html`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success('Report downloaded');
+      } else {
+        toast.error('Report not available yet');
+      }
+    } catch {
+      toast.error('Failed to download report');
+    }
+    setDownloadingReportId(null);
+  };
 
   // Generate clusters data based on time range
   const getClustersData = (): ClusterData[] => {
@@ -331,9 +361,58 @@ export const InstructorAnalytics = () => {
             Monitor student engagement in real-time
           </p>
         </div>
+        {selectedSession && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<FileText className="h-4 w-4" />}
+              onClick={() => navigate(`/dashboard/sessions/${selectedSession}/report`)}
+            >
+              View report
+            </Button>
+            {isSelectedCompleted ? (
+              <Button
+                variant="primary"
+                size="sm"
+                leftIcon={downloadingReportId === selectedSession ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                onClick={handleDownloadReport}
+                disabled={downloadingReportId === selectedSession}
+              >
+                {downloadingReportId === selectedSession ? 'Downloading...' : 'Download report'}
+              </Button>
+            ) : (
+              <span className="text-xs text-gray-500">Report available after session ends</span>
+            )}
+          </div>
+        )}
       </div>
 
+      {/* Session selector: pick which session to view analytics and report for */}
+      {sessions.length > 0 && (
+        <div className="mb-4 flex items-center gap-2">
+          <label htmlFor="analytics-session" className="text-sm font-medium text-gray-700">Session:</label>
+          <select
+            id="analytics-session"
+            value={selectedSession || ''}
+            onChange={(e) => setSelectedSession(e.target.value || null)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 max-w-md"
+          >
+            {sessions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.title} ({s.status}) — {s.date}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {loadingSessions && (
+        <div className="py-8 text-center text-gray-500">Loading sessions...</div>
+      )}
+
       {/* Key Metrics: Total Students in Session + Questions per Student (real-time) */}
+      {!loadingSessions && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <Card className="p-4">
           <div className="flex items-center justify-between">
@@ -439,6 +518,7 @@ export const InstructorAnalytics = () => {
           </div>
         </Card>
       </div>
+      )}
     </div>
   );
 };

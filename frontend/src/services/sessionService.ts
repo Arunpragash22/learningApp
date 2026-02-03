@@ -159,6 +159,19 @@ export const sessionService = {
     }
   },
 
+  // Get live session stats (participant count) for real-time analytics
+  async getLiveSessionStats(sessionId: string): Promise<{ participantCount: number } | null> {
+    try {
+      const base = (import.meta.env.VITE_API_URL || "").replace(/\/api\/?$/, "");
+      const res = await fetch(`${base}/api/live/stats/${sessionId}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data?.stats ? { participantCount: data.stats.participantCount ?? 0 } : null;
+    } catch {
+      return null;
+    }
+  },
+
   // Get all stored reports from MongoDB
   async getAllReports(): Promise<{ reports: SessionReport[]; total: number }> {
     try {

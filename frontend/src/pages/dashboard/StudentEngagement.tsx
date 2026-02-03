@@ -1,24 +1,103 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSessionConnection } from '../../context/SessionConnectionContext';
 import { Card } from '../../components/ui/Card';
 import { EngagementIndicator } from '../../components/engagement/EngagementIndicator';
 import { PersonalizedFeedback } from '../../components/feedback/PersonalizedFeedback';
-import { Activity, Target } from 'lucide-react';
+import { Activity, Target, Download, FileText, Loader2 } from 'lucide-react';
+import { Button } from '../../components/ui/Button';
+import { sessionService } from '../../services/sessionService';
+import { toast } from 'sonner';
+
+const POLL_INTERVAL_MS = 8000;
 
 export const StudentEngagement = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { connectedSessionId } = useSessionConnection();
+  const sessionIdFromStorage = typeof window !== 'undefined' ? localStorage.getItem('connectedSessionId') : null;
+  const activeSessionId = connectedSessionId || sessionIdFromStorage;
 
-  // Mock student data
-  const studentData = {
-    engagementLevel: 'high' as const,
-    engagementScore: 85,
-    cluster: 'Active Participants',
-    sessionEngagement: 78,
-    overallEngagement: 82,
-    questionsAnswered: 12,
-    correctAnswers: 10,
-    averageResponseTime: 8.5
+  const [liveReport, setLiveReport] = useState<{
+    questionsAnswered: number;
+    correctAnswers: number;
+    quizScore: number | null;
+    averageResponseTime: number | null;
+    sessionTitle?: string;
+  } | null>(null);
+  const [downloadingReport, setDownloadingReport] = useState(false);
+
+  // Real-time: poll session report when student is in a session
+  useEffect(() => {
+    if (!activeSessionId || !user?.id) {
+      setLiveReport(null);
+      return;
+    }
+    const fetchReport = async () => {
+      const report = await sessionService.getSessionReport(activeSessionId);
+      if (!report?.students?.length) return;
+      const me = report.students[0];
+      setLiveReport({
+        questionsAnswered: me.totalQuestions ?? 0,
+        correctAnswers: me.correctAnswers ?? 0,
+        quizScore: me.quizScore ?? null,
+        averageResponseTime: me.averageResponseTime ?? null,
+        sessionTitle: report.sessionTitle
+      });
+    };
+    fetchReport();
+    const interval = setInterval(fetchReport, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [activeSessionId, user?.id]);
+
+  const handleDownloadReport = async () => {
+    if (!activeSessionId) return;
+    setDownloadingReport(true);
+    try {
+      const blob = await sessionService.downloadReport(activeSessionId);
+      if (blob) {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `report_${liveReport?.sessionTitle?.replace(/\s+/g, '_') || activeSessionId}.html`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success('Report downloaded');
+      } else {
+        toast.error('Report not available yet');
+      }
+    } catch {
+      toast.error('Failed to download report');
+    }
+    setDownloadingReport(false);
   };
+
+  // Merge live report with defaults for display
+  const studentData = useMemo(() => {
+    const base = {
+      engagementLevel: 'high' as const,
+      engagementScore: 85,
+      cluster: 'Active Participants',
+      sessionEngagement: 78,
+      overallEngagement: 82,
+      questionsAnswered: 12,
+      correctAnswers: 10,
+      averageResponseTime: 8.5
+    };
+    if (liveReport) {
+      return {
+        ...base,
+        questionsAnswered: liveReport.questionsAnswered,
+        correctAnswers: liveReport.correctAnswers,
+        averageResponseTime: liveReport.averageResponseTime ?? base.averageResponseTime,
+        engagementScore: liveReport.quizScore ?? base.engagementScore
+      };
+    }
+    return base;
+  }, [liveReport]);
 
   const feedback = [
     {
@@ -53,11 +132,44 @@ export const StudentEngagement = () => {
 
   return (
     <div className="py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">My Engagement Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Track your engagement, receive personalized feedback, and improve your learning
-        </p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">My Engagement Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Track your engagement, receive personalized feedback, and improve your learning
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<FileText className="h-4 w-4" />}
+            onClick={() => navigate('/dashboard/student/reports')}
+          >
+            My Reports
+          </Button>
+          {activeSessionId && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<FileText className="h-4 w-4" />}
+                onClick={() => navigate(`/dashboard/sessions/${activeSessionId}/report`)}
+              >
+                View report
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                leftIcon={downloadingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                onClick={handleDownloadReport}
+                disabled={downloadingReport}
+              >
+                {downloadingReport ? 'Downloading...' : 'Download report'}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Engagement Overview */}
@@ -90,7 +202,9 @@ export const StudentEngagement = () => {
             <div className="flex justify-between">
               <span className="text-gray-600">Accuracy</span>
               <span className="font-semibold text-gray-900">
-                {((studentData.correctAnswers / studentData.questionsAnswered) * 100).toFixed(0)}%
+                {studentData.questionsAnswered
+                  ? `${((studentData.correctAnswers / studentData.questionsAnswered) * 100).toFixed(0)}%`
+                  : 'N/A'}
               </span>
             </div>
             <div className="flex justify-between">
