@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card } from '../ui/Card';
-import { Users, TrendingUp, TrendingDown, Activity, Target } from 'lucide-react';
+import { Users, TrendingUp, TrendingDown, Activity } from 'lucide-react';
 
 interface Cluster {
   id: string;
@@ -111,28 +111,6 @@ export const ClusterVisualization: React.FC<ClusterVisualizationProps> = ({
           </Card>
         ))}
       </div>
-
-      {/* Visual Representation */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-          <Target className="h-5 w-5 mr-2" />
-          Cluster Distribution
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {clusters.map((cluster) => (
-            <div key={cluster.id} className="text-center">
-              <div
-                className="w-24 h-24 rounded-full mx-auto flex items-center justify-center text-white font-bold text-lg mb-2"
-                style={{ backgroundColor: cluster.color }}
-              >
-                {cluster.studentCount}
-              </div>
-              <p className="text-sm font-medium text-gray-900">{cluster.name}</p>
-              <p className="text-xs text-gray-500">{cluster.engagementLevel} engagement</p>
-            </div>
-          ))}
-        </div>
-      </Card>
     </div>
   );
 };
