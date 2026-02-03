@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Card, CardHeader, CardContent } from '../../components/ui/Card';
 import { ClusterVisualization } from '../../components/clustering/ClusterVisualization';
-import { Users, AlertCircle, Clock, Target, Radio } from 'lucide-react';
+import { Users, AlertCircle, Target, Radio } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 
 interface EngagementData {
@@ -291,28 +291,21 @@ export const InstructorAnalytics = () => {
 
   const atRiskStudents = useMemo(() => getAtRiskStudents(), [selectedTimeRange]);
 
-  // Generate recent activity
-  const getRecentActivity = () => {
-    const activities = [
-      { time: '2 min ago', student: 'Alice Johnson', action: 'Answered quiz question', cluster: 'Active Participants' },
-      { time: '3 min ago', student: 'Charlie Brown', action: 'Raised hand', cluster: 'Moderate Participants' },
-      { time: '4 min ago', student: 'David Lee', action: 'Submitted feedback', cluster: 'Active Participants' },
-      { time: '5 min ago', student: 'Emma Wilson', action: 'Asked a question', cluster: 'Active Participants' },
-      { time: '6 min ago', student: 'Frank Miller', action: 'Completed quiz', cluster: 'Moderate Participants' },
-    ];
+  // Moderate / Active students (for dropdown list)
+  const moderateActiveStudents = useMemo(
+    () => [
+      { id: 'm1', name: 'Alice Johnson', engagement: 72, cluster: 'Active Participants', lastActive: '2 min ago' },
+      { id: 'm2', name: 'Charlie Brown', engagement: 65, cluster: 'Moderate Participants', lastActive: '3 min ago' },
+      { id: 'm3', name: 'David Lee', engagement: 88, cluster: 'Active Participants', lastActive: '4 min ago' },
+      { id: 'm4', name: 'Emma Wilson', engagement: 91, cluster: 'Active Participants', lastActive: '5 min ago' },
+      { id: 'm5', name: 'Frank Miller', engagement: 68, cluster: 'Moderate Participants', lastActive: '6 min ago' },
+    ],
+    [],
+  );
 
-    if (selectedTimeRange === 'week') {
-      return [
-        ...activities,
-        { time: '1 day ago', student: 'Grace Taylor', action: 'Completed assignment', cluster: 'Active Participants' },
-        { time: '2 days ago', student: 'Henry Adams', action: 'Submitted project', cluster: 'Active Participants' },
-      ];
-    }
-
-    return activities;
-  };
-
-  const recentActivity = useMemo(() => getRecentActivity(), [selectedTimeRange]);
+  const [studentListView, setStudentListView] = useState<'at-risk' | 'moderate-active'>('at-risk');
+  const displayedStudents = studentListView === 'at-risk' ? atRiskStudents : moderateActiveStudents;
+  const isAtRiskView = studentListView === 'at-risk';
 
   // Format last update time
   const formatLastUpdate = () => {
@@ -381,57 +374,65 @@ export const InstructorAnalytics = () => {
         <ClusterVisualization clusters={clusters} showPredictions={true} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* At-Risk Students */}
+      {/* Student list: default At-Risk; dropdown to show Moderate Active */}
+      <div className="mb-6">
         <Card>
           <div className="p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <AlertCircle className="h-5 w-5 mr-2 text-red-600" />
-                At-Risk Students
+                {isAtRiskView ? (
+                  <>
+                    <AlertCircle className="h-5 w-5 mr-2 text-red-600" />
+                    At-Risk Students
+                  </>
+                ) : (
+                  <>
+                    <Target className="h-5 w-5 mr-2 text-green-600" />
+                    Moderate Active Students
+                  </>
+                )}
               </h3>
-              <Badge variant="danger">{atRiskStudents.length}</Badge>
+              <div className="flex items-center gap-3">
+                <label htmlFor="student-list-view" className="text-sm font-medium text-gray-700">Show:</label>
+                <select
+                  id="student-list-view"
+                  value={studentListView}
+                  onChange={(e) => setStudentListView(e.target.value as 'at-risk' | 'moderate-active')}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="at-risk">At-Risk Students</option>
+                  <option value="moderate-active">Moderate Active Students</option>
+                </select>
+                <Badge variant={isAtRiskView ? 'danger' : 'success'}>{displayedStudents.length}</Badge>
+              </div>
             </div>
             <div className="space-y-3">
-              {atRiskStudents.map((student) => (
-                <div key={student.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+              {displayedStudents.map((student) => (
+                <div
+                  key={student.id}
+                  className={`flex items-center justify-between p-3 rounded-lg ${
+                    isAtRiskView ? 'bg-red-50' : 'bg-green-50'
+                  }`}
+                >
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">{student.name}</p>
                     <div className="flex items-center space-x-2 mt-1">
                       <span className="text-xs text-gray-500">Engagement: {student.engagement}%</span>
                       <span className="text-xs text-gray-400">•</span>
                       <span className="text-xs text-gray-500">{student.lastActive}</span>
+                      {!isAtRiskView && (
+                        <>
+                          <span className="text-xs text-gray-400">•</span>
+                          <span className="text-xs text-gray-500">{student.cluster}</span>
+                        </>
+                      )}
                     </div>
                   </div>
-                  <button className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
-                    Intervene
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-
-        {/* Recent Activity */}
-        <Card>
-          <div className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <Clock className="h-5 w-5 mr-2 text-blue-600" />
-              Recent Activity
-            </h3>
-            <div className="space-y-3">
-              {recentActivity.map((activity, index) => (
-                <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                  <div className="flex-shrink-0 w-2 h-2 bg-blue-600 rounded-full mt-2 animate-pulse"></div>
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-900">
-                      <span className="font-medium">{activity.student}</span> {activity.action}
-                    </p>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <Badge variant="default" size="sm">{activity.cluster}</Badge>
-                      <span className="text-xs text-gray-500">{activity.time}</span>
-                    </div>
-                  </div>
+                  {isAtRiskView && (
+                    <button className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
+                      Intervene
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
