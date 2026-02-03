@@ -95,6 +95,7 @@ export const LiveSession = () => {
   const [showPerformance, setShowPerformance] = useState(false);
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
+  const [selectedAnswerIndex, setSelectedAnswerIndex] = useState<number | null>(null);
   const [timeTaken, setTimeTaken] = useState(0);
   const [clusters, setClusters] = useState<StudentCluster[]>([]);
   const [questionBank, setQuestionBank] = useState<Question[]>(DEFAULT_SESSION_QUESTIONS);
@@ -116,7 +117,7 @@ export const LiveSession = () => {
       id: quiz.questionId || quiz.question_id || `quiz-${Date.now()}`,
       question: quiz.question,
       options: quiz.options,
-      correctAnswer: -1, // Will be revealed after answer
+      correctAnswer: (quiz as { correctAnswer?: number; correct_answer?: number }).correctAnswer ?? (quiz as { correct_answer?: number }).correct_answer ?? -1,
       difficulty: 'medium',
       category: 'Live Quiz',
       tags: [],
@@ -127,6 +128,7 @@ export const LiveSession = () => {
     setActiveQuestion(question);
     setShowQuestions(false);
     setAnswerSubmitted(false);
+    setSelectedAnswerIndex(null);
     setShowPerformance(false);
     setQuizPerformance(null);
     questionStartTime.current = Date.now();
@@ -502,6 +504,7 @@ export const LiveSession = () => {
     const timeTakenSeconds = timeTakenMs / 1000;
     setTimeTaken(timeTakenSeconds);
     setAnswerSubmitted(true);
+    setSelectedAnswerIndex(answerIndex);
 
     console.log('Submitting answer to backend...', {
       questionId: activeQuestion.id,
@@ -558,6 +561,7 @@ export const LiveSession = () => {
     setQuizPerformance(null);
     setAnswerSubmitted(false);
     setIsCorrect(null);
+    setSelectedAnswerIndex(null);
   };
 
   const handleShowPerformance = () => {
@@ -697,14 +701,33 @@ export const LiveSession = () => {
                 timeLimit={activeQuestion.timeLimit}
                 isPersonalized={false}
               />
-              {answerSubmitted && !isInstructor && (
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              {answerSubmitted && !isInstructor && activeQuestion && (
+                <div className="mt-4 space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <p className="text-sm text-blue-800">
                     {isCorrect 
                       ? '✅ Great job! Your answer has been recorded.' 
                       : '📝 Your answer has been recorded. Keep learning!'}
                   </p>
-                  <p className="text-xs text-blue-600 mt-1">
+                  <div className="text-sm text-gray-700 space-y-2 border-t border-blue-200 pt-3 mt-3">
+                    <p className="font-medium text-gray-900">Answer details</p>
+                    {selectedAnswerIndex !== null && activeQuestion.options[selectedAnswerIndex] != null && (
+                      <p>
+                        <span className="text-gray-600">Your answer: </span>
+                        <span className={isCorrect ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
+                          {String.fromCharCode(65 + selectedAnswerIndex)}. {activeQuestion.options[selectedAnswerIndex]}
+                        </span>
+                      </p>
+                    )}
+                    {activeQuestion.correctAnswer >= 0 && activeQuestion.options[activeQuestion.correctAnswer] != null && (
+                      <p>
+                        <span className="text-gray-600">Correct answer: </span>
+                        <span className="text-green-700 font-medium">
+                          {String.fromCharCode(65 + activeQuestion.correctAnswer)}. {activeQuestion.options[activeQuestion.correctAnswer]}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-xs text-blue-600">
                     Performance statistics will be shown shortly...
                   </p>
                 </div>

@@ -4,7 +4,7 @@ import { Card } from '../../components/ui/Card';
 import { EngagementIndicator } from '../../components/engagement/EngagementIndicator';
 import { PersonalizedFeedback } from '../../components/feedback/PersonalizedFeedback';
 import { TargetedQuiz } from '../../components/quiz/TargetedQuiz';
-import { TrendingUp, TrendingDown, Activity, Award, Target, Clock } from 'lucide-react';
+import { TrendingDown, Activity, Award, Target, Clock } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 
 export const StudentEngagement = () => {
@@ -103,7 +103,7 @@ export const StudentEngagement = () => {
       </div>
 
       {/* Engagement Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Current Engagement</h3>
@@ -115,27 +115,6 @@ export const StudentEngagement = () => {
             cluster={studentData.cluster}
             showCluster={true}
           />
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Session Performance</h3>
-            <TrendingUp className="h-6 w-6 text-blue-600" />
-          </div>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Session Engagement</span>
-              <span className="font-semibold text-gray-900">{studentData.sessionEngagement}%</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Overall Engagement</span>
-              <span className="font-semibold text-gray-900">{studentData.overallEngagement}%</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Questions Answered</span>
-              <span className="font-semibold text-gray-900">{studentData.questionsAnswered}</span>
-            </div>
-          </div>
         </Card>
 
         <Card className="p-6">
