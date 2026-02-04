@@ -413,6 +413,7 @@ export const InstructorAnalytics = () => {
 
       {/* Key Metrics: Total Students in Session + Questions per Student (real-time) */}
       {!loadingSessions && (
+      <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <Card className="p-4">
           <div className="flex items-center justify-between">
@@ -518,6 +519,7 @@ export const InstructorAnalytics = () => {
           </div>
         </Card>
       </div>
+      </>
       )}
     </div>
   );
