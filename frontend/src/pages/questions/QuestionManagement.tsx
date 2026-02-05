@@ -274,7 +274,7 @@ export const QuestionManagement = () => {
             {/* Session Selection for Standalone */}
             {meetingType === 'standalone' && (
               <div className="flex items-center gap-2">
-                <label htmlFor="session-select" className="text-sm font-medium text-gray-700">Session:</label>
+                <label htmlFor="session-select" className="text-sm font-medium text-gray-700">Lesson:</label>
                 <select
                   id="session-select"
                   value={selectedSessionId}
@@ -294,7 +294,7 @@ export const QuestionManagement = () => {
             {/* Session Selection for Course Meeting - Only show after course is selected */}
             {meetingType === 'course' && selectedCourseId && (
               <div className="flex items-center gap-2">
-                <label htmlFor="session-select" className="text-sm font-medium text-gray-700">Session:</label>
+                <label htmlFor="session-select" className="text-sm font-medium text-gray-700">Lesson:</label>
                 <select
                   id="session-select"
                   value={selectedSessionId}
