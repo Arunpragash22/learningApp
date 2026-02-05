@@ -373,7 +373,7 @@ export const CourseDetail = () => {
               </Link>
             </div>
             <h1 className="text-3xl font-bold text-gray-900">{course.title}</h1>
-            <p className="mt-1 text-lg text-gray-600">Course Code: {course.id ?? '—'}</p>
+            {course.courseCode && <p className="mt-1 text-lg text-gray-600">Course Code: {course.courseCode}</p>}
             <p className="mt-2 text-sm text-gray-500">Instructor: {course.instructorName}</p>
           </div>
         </div>
