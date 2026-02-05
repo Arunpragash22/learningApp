@@ -12,6 +12,8 @@ export interface Question {
   createdAt?: string;
   instructorId?: string;
   courseId?: string;
+  questionType?: 'generic' | 'cluster';
+  targetCluster?: 'passive' | 'moderate' | 'active';
 }
 
 export interface CreateQuestionData {
@@ -23,6 +25,8 @@ export interface CreateQuestionData {
   tags?: string[];
   timeLimit?: number;
   courseId?: string;
+  questionType?: 'generic' | 'cluster';
+  targetCluster?: 'passive' | 'moderate' | 'active';
 }
 
 // ✔ Correct API root — no slash, no /api suffix

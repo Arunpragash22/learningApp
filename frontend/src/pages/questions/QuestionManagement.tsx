@@ -93,6 +93,8 @@ export const QuestionManagement = () => {
         tags: question.tags,
         timeLimit: question.timeLimit,
         courseId: editingQuestion?.courseId ?? (selectedCourseId || undefined),
+        questionType: question.questionType,
+        targetCluster: question.targetCluster,
       };
 
       if (editingQuestion) {
