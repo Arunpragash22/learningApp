@@ -270,10 +270,10 @@ export const StudentEngagement = () => {
         <PersonalizedFeedback feedback={feedback} studentName={user?.firstName} />
       </div>
 
-      {/* Session Reports Section — at the bottom, completed sessions only */}
-      {completedSessions.length > 0 && (
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Session Reports</h2>
+      {/* Session Reports Section — at the bottom */}
+      <div className="mt-6 pt-6 border-t border-gray-200">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Session Reports</h2>
+        {completedSessions.length > 0 ? (
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50 p-4 rounded-lg">
             <div className="flex items-center gap-2">
               <label htmlFor="student-session-report" className="text-sm font-medium text-gray-700">Session:</label>
@@ -312,8 +312,12 @@ export const StudentEngagement = () => {
               </div>
             )}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="bg-gray-50 p-4 rounded-lg text-center text-gray-500">
+            No completed sessions yet. Reports will appear here after you participate in sessions.
+          </div>
+        )}
+      </div>
     </div>
   );
 };

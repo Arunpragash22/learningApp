@@ -27,20 +27,15 @@ reports_router = APIRouter(prefix="/api/reports", tags=["Reports"])
 @reports_router.get("")
 async def get_all_reports(user: dict = Depends(get_current_user)):
     """
-    Get all reports - ONLY for Instructors.
-    Instructors see reports for all their sessions with full student details.
+    Get all reports.
+    - Instructors: see reports for all their sessions with full student details.
+    - Students: see only sessions they participated in (with their own data only).
     """
     try:
         user_role = user.get("role", "student")
         user_id = user.get("id")
         
-        # ONLY INSTRUCTORS CAN ACCESS REPORTS LIST
-        if user_role == "student":
-            raise HTTPException(
-                status_code=403, 
-                detail="Only instructors can view reports"
-            )
-        
+        # get_all_reports handles both instructors and students
         reports = await SessionReportModel.get_all_reports(user_id, user_role)
         return {"reports": reports, "total": len(reports)}
         
