@@ -361,12 +361,12 @@ def _generate_report_html(report: dict, user_role: str) -> str:
             
             student_rows += f"""
             <tr>
-                <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">{student.get("studentName", "Unknown")}</td>
-                <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">{student.get("studentEmail", "N/A")}</td>
-                <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">{student.get("totalQuestions", 0)}</td>
-                <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">{student.get("correctAnswers", 0)}</td>
-                <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; {score_color}; font-weight: 600;">{score_display}</td>
-                <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">{connection_badge}</td>
+                <td style="padding: 8px 6px; border-bottom: 1px solid #e5e7eb; width: 22%; font-size: 13px;">{student.get("studentName", "Unknown")}</td>
+                <td style="padding: 8px 6px; border-bottom: 1px solid #e5e7eb; width: 28%; font-size: 12px; word-break: break-all;">{student.get("studentEmail") or "N/A"}</td>
+                <td style="padding: 8px 6px; border-bottom: 1px solid #e5e7eb; width: 12%; text-align: center; font-size: 13px;">{student.get("totalQuestions", 0)}</td>
+                <td style="padding: 8px 6px; border-bottom: 1px solid #e5e7eb; width: 12%; text-align: center; font-size: 13px;">{student.get("correctAnswers", 0)}</td>
+                <td style="padding: 8px 6px; border-bottom: 1px solid #e5e7eb; width: 12%; text-align: center; {score_color}; font-weight: 600; font-size: 13px;">{score_display}</td>
+                <td style="padding: 8px 6px; border-bottom: 1px solid #e5e7eb; width: 14%; text-align: center;">{connection_badge}</td>
             </tr>
             """
     
@@ -460,7 +460,7 @@ def _generate_report_html(report: dict, user_role: str) -> str:
                 </td>
                 <td style="width: 5px;"></td>
                 <td style="width: 25%; padding: 10px; text-align: center; background: #eef2ff; border: 1px solid #e0e7ff; border-radius: 8px;">
-                    <p style="margin: 0 0 5px 0; font-size: 28px; font-weight: bold; color: #6366f1;">{report.get("averageQuizScore", "N/A") if report.get("averageQuizScore") is None else f"{report.get('averageQuizScore'):.1f}%"}</p>
+                    <p style="margin: 0 0 5px 0; font-size: 28px; font-weight: bold; color: #6366f1;">{"N/A" if report.get("averageQuizScore") is None else f"{report.get('averageQuizScore'):.1f}%"}</p>
                     <p style="margin: 0; font-size: 12px; color: #3730a3;">Avg. Quiz Score</p>
                 </td>
                 <td style="width: 5px;"></td>
@@ -494,15 +494,15 @@ def _generate_report_html(report: dict, user_role: str) -> str:
                 <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: #111827;">Student Performance</h3>
             </div>
             <div style="padding: 0;">
-                <table style="width: 100%; border-collapse: collapse;">
+                <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
                     <thead>
                         <tr style="background: #e5e7eb;">
-                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase;">Student</th>
-                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase;">Email</th>
-                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase;">Questions</th>
-                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase;">Correct</th>
-                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase;">Score</th>
-                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase;">Connection</th>
+                            <th style="padding: 8px 6px; text-align: left; font-size: 10px; font-weight: bold; color: #374151; text-transform: uppercase; width: 22%;">Student</th>
+                            <th style="padding: 8px 6px; text-align: left; font-size: 10px; font-weight: bold; color: #374151; text-transform: uppercase; width: 28%;">Email</th>
+                            <th style="padding: 8px 6px; text-align: center; font-size: 10px; font-weight: bold; color: #374151; text-transform: uppercase; width: 12%;">Questions</th>
+                            <th style="padding: 8px 6px; text-align: center; font-size: 10px; font-weight: bold; color: #374151; text-transform: uppercase; width: 12%;">Correct</th>
+                            <th style="padding: 8px 6px; text-align: center; font-size: 10px; font-weight: bold; color: #374151; text-transform: uppercase; width: 12%;">Score</th>
+                            <th style="padding: 8px 6px; text-align: center; font-size: 10px; font-weight: bold; color: #374151; text-transform: uppercase; width: 14%;">Connection</th>
                         </tr>
                     </thead>
                     <tbody>
