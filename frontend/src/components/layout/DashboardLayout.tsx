@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
+import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSessionConnection } from '../../context/SessionConnectionContext';
 import { QuizPopup } from '../quiz/QuizPopup';
@@ -103,13 +103,7 @@ export const DashboardLayout = () => {
   // Check if profile is active
   const isProfileActive = location.pathname === '/dashboard/profile';
 
-  // Redirect to login if not authenticated
-  if (!isLoading && !isAuthenticated) {
-    navigate('/login');
-    return null;
-  }
-
-  // Show loading state
+  // Show loading state while checking authentication
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50">
@@ -119,6 +113,11 @@ export const DashboardLayout = () => {
         </div>
       </div>
     );
+  }
+
+  // Redirect to login if not authenticated
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
   }
 
   return (
