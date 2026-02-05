@@ -69,25 +69,24 @@ export const InstructorAnalytics = () => {
       }));
       setSessions(mapped);
       if (mapped.length && !cancelled) {
-        const live = mapped.find(s => s.status === 'live');
-        setSelectedSession(live?.id ?? mapped[0].id);
+        // For reports section, default to first completed session
+        const completed = mapped.find(s => s.status === 'completed');
+        setSelectedSession(completed?.id ?? null);
       }
       setLoadingSessions(false);
     })();
     return () => { cancelled = true; };
   }, []);
 
-  // Live session (if any)
-  const liveSession = sessions.find(s => s.status === 'live');
-
-  // Initialize selected session when sessions load or live session appears
+  // Initialize selected session to first completed session for reports
   useEffect(() => {
-    if (selectedTimeRange === 'live' && liveSession) {
-      setSelectedSession(liveSession.id);
-    } else if (selectedTimeRange === 'session' && !selectedSession && sessions.length) {
-      setSelectedSession(sessions[0]?.id || null);
+    if (!selectedSession && sessions.length) {
+      const completed = sessions.find(s => s.status === 'completed');
+      if (completed) {
+        setSelectedSession(completed.id);
+      }
     }
-  }, [liveSession, selectedTimeRange, sessions]);
+  }, [sessions, selectedSession]);
 
   // Real-time polling: live participant count when a live session is selected
   useEffect(() => {
@@ -152,7 +151,6 @@ export const InstructorAnalytics = () => {
   const engagementMetrics = useMemo(() => getEngagementData(), [selectedTimeRange, selectedSession, lastUpdate, liveParticipantCount, sessions]);
 
   const selectedSessionObj = selectedSession ? sessions.find(s => s.id === selectedSession) : null;
-  const isSelectedCompleted = selectedSessionObj?.status === 'completed';
 
   const handleDownloadReport = async () => {
     if (!selectedSession) return;
@@ -362,52 +360,6 @@ export const InstructorAnalytics = () => {
         </p>
       </div>
 
-      {/* Session, View report, Download report — top control bar */}
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        {sessions.length > 0 && (
-          <div className="flex items-center gap-2">
-            <label htmlFor="analytics-session" className="text-sm font-medium text-gray-700">Session:</label>
-            <select
-              id="analytics-session"
-              value={selectedSession || ''}
-              onChange={(e) => setSelectedSession(e.target.value || null)}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 max-w-md"
-            >
-              {sessions.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.title} ({s.status}) — {s.date}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        {selectedSession && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<FileText className="h-4 w-4" />}
-              onClick={() => navigate(`/dashboard/sessions/${selectedSession}/report`)}
-            >
-              View report
-            </Button>
-            {isSelectedCompleted ? (
-              <Button
-                variant="primary"
-                size="sm"
-                leftIcon={downloadingReportId === selectedSession ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                onClick={handleDownloadReport}
-                disabled={downloadingReportId === selectedSession}
-              >
-                {downloadingReportId === selectedSession ? 'Downloading...' : 'Download report'}
-              </Button>
-            ) : (
-              <span className="text-xs text-gray-500">Report available after session ends</span>
-            )}
-          </div>
-        )}
-      </div>
-
       {loadingSessions && (
         <div className="py-8 text-center text-gray-500">Loading sessions...</div>
       )}
@@ -520,6 +472,51 @@ export const InstructorAnalytics = () => {
           </div>
         </Card>
       </div>
+
+      {/* Session Reports Section — at the bottom, completed sessions only */}
+      {sessions.filter(s => s.status === 'completed').length > 0 && (
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Session Reports</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50 p-4 rounded-lg">
+            <div className="flex items-center gap-2">
+              <label htmlFor="analytics-session" className="text-sm font-medium text-gray-700">Session:</label>
+              <select
+                id="analytics-session"
+                value={selectedSession || ''}
+                onChange={(e) => setSelectedSession(e.target.value || null)}
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 max-w-md"
+              >
+                {sessions.filter(s => s.status === 'completed').map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title} — {s.date}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selectedSession && (
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<FileText className="h-4 w-4" />}
+                  onClick={() => navigate(`/dashboard/sessions/${selectedSession}/report`)}
+                >
+                  View report
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  leftIcon={downloadingReportId === selectedSession ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  onClick={handleDownloadReport}
+                  disabled={downloadingReportId === selectedSession}
+                >
+                  {downloadingReportId === selectedSession ? 'Downloading...' : 'Download report'}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       </>
       )}
     </div>
