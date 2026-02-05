@@ -18,7 +18,7 @@ export const Footer = () => {
   return (
     <footer className="mt-auto">
       {/* Top Contact Banner */}
-      <div className="bg-gradient-to-r from-red-500 to-red-600">
+      <div className="bg-gradient-to-r from-[#3B82F6] via-[#2563eb] to-[#1d4ed8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-white text-center">
             {/* Phone */}
@@ -41,7 +41,7 @@ export const Footer = () => {
       </div>
 
       {/* Main Footer Content */}
-      <div className="bg-[#1a1a2e]">
+      <div className="bg-[#0f172a]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {/* Brand & Social */}
@@ -52,10 +52,10 @@ export const Footer = () => {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-white">ClassPulse</h3>
-                  <p className="text-xs text-gray-400">by TechSnatcherrs</p>
+                  <p className="text-xs text-blue-300">by TechSnatcherrs</p>
                 </div>
               </div>
-              <p className="text-gray-400 text-sm mb-4">
+              <p className="text-blue-200/70 text-sm mb-4">
                 Empowering education through real-time engagement and analytics.
               </p>
               <p className="text-white font-medium mb-3">Follow Us On</p>
@@ -80,37 +80,37 @@ export const Footer = () => {
 
             {/* Quick Links */}
             <div>
-              <h4 className="text-white font-semibold mb-4 border-b border-gray-600 pb-2">QUICK LINKS</h4>
+              <h4 className="text-white font-semibold mb-4 border-b border-blue-500/50 pb-2">QUICK LINKS</h4>
               <ul className="space-y-2">
-                <li><Link to="/dashboard/courses" className="text-gray-400 hover:text-white transition-colors text-sm">All Courses</Link></li>
-                <li><Link to="/dashboard/sessions" className="text-gray-400 hover:text-white transition-colors text-sm">Meetings</Link></li>
-                <li><Link to="/dashboard/profile" className="text-gray-400 hover:text-white transition-colors text-sm">My Profile</Link></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Help & Support</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Contact Us</a></li>
+                <li><Link to="/dashboard/courses" className="text-blue-200/70 hover:text-white transition-colors text-sm">All Courses</Link></li>
+                <li><Link to="/dashboard/sessions" className="text-blue-200/70 hover:text-white transition-colors text-sm">Meetings</Link></li>
+                <li><Link to="/dashboard/profile" className="text-blue-200/70 hover:text-white transition-colors text-sm">My Profile</Link></li>
+                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Help & Support</a></li>
+                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Contact Us</a></li>
               </ul>
             </div>
 
             {/* About */}
             <div>
-              <h4 className="text-white font-semibold mb-4 border-b border-gray-600 pb-2">ABOUT</h4>
+              <h4 className="text-white font-semibold mb-4 border-b border-blue-500/50 pb-2">ABOUT</h4>
               <ul className="space-y-2">
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">About ClassPulse</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">About TechSnatcherrs</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Our Team</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Careers</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Partners</a></li>
+                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">About ClassPulse</a></li>
+                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">About TechSnatcherrs</a></li>
+                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Our Team</a></li>
+                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Careers</a></li>
+                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Partners</a></li>
               </ul>
             </div>
 
             {/* Features */}
             <div>
-              <h4 className="text-white font-semibold mb-4 border-b border-gray-600 pb-2">FEATURES</h4>
+              <h4 className="text-white font-semibold mb-4 border-b border-blue-500/50 pb-2">FEATURES</h4>
               <ul className="space-y-2">
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Live Sessions</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Real-time Quizzes</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Student Analytics</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Engagement Tracking</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Session Reports</a></li>
+                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Live Sessions</a></li>
+                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Real-time Quizzes</a></li>
+                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Student Analytics</a></li>
+                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Engagement Tracking</a></li>
+                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Session Reports</a></li>
               </ul>
             </div>
           </div>
@@ -118,16 +118,16 @@ export const Footer = () => {
       </div>
 
       {/* Bottom Copyright Bar */}
-      <div className="bg-[#16162a]">
+      <div className="bg-[#020617]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-3">
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-blue-200/70">
               Copyright © {currentYear} - ClassPulse - All Rights Reserved. Concept, Design & Development By{' '}
               <span className="text-white font-medium">TechSnatcherrs</span>.
             </p>
             <div className="flex gap-4">
-              <a href="#" className="text-sm text-gray-400 hover:text-white transition-colors">Privacy Policy</a>
-              <a href="#" className="text-sm text-gray-400 hover:text-white transition-colors">Cookie Policy</a>
+              <a href="#" className="text-sm text-blue-200/70 hover:text-white transition-colors">Privacy Policy</a>
+              <a href="#" className="text-sm text-blue-200/70 hover:text-white transition-colors">Cookie Policy</a>
             </div>
           </div>
         </div>
