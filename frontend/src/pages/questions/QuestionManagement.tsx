@@ -168,18 +168,19 @@ export const QuestionManagement = () => {
     setPrefillCategory(null);
   };
 
-  // Statistics
+  // Statistics - count cluster questions by targetCluster
   const stats = {
     total: questions.length,
     byCategory: questions.reduce((acc, q) => {
       acc[q.category] = (acc[q.category] || 0) + 1;
       return acc;
     }, {} as Record<string, number>),
-    byDifficulty: {
-      easy: questions.filter(q => q.difficulty === 'easy').length,
-      medium: questions.filter(q => q.difficulty === 'medium').length,
-      hard: questions.filter(q => q.difficulty === 'hard').length
-    }
+    byCluster: {
+      passive: questions.filter(q => q.questionType === 'cluster' && q.targetCluster === 'passive').length,
+      moderate: questions.filter(q => q.questionType === 'cluster' && q.targetCluster === 'moderate').length,
+      active: questions.filter(q => q.questionType === 'cluster' && q.targetCluster === 'active').length
+    },
+    generic: questions.filter(q => q.questionType === 'generic' || !q.questionType).length
   };
 
   return (
@@ -211,7 +212,7 @@ export const QuestionManagement = () => {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -226,8 +227,19 @@ export const QuestionManagement = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
+              <p className="text-sm text-gray-600">Generic</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.generic}</p>
+            </div>
+            <div className="p-3 bg-purple-100 rounded-lg">
+              <Users className="h-6 w-6 text-purple-600" />
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
               <p className="text-sm text-gray-600">Passive</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.byDifficulty.easy}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.byCluster.passive}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-lg">
               <BookOpenIcon className="h-6 w-6 text-blue-600" />
@@ -238,7 +250,7 @@ export const QuestionManagement = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Moderate</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.byDifficulty.medium}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.byCluster.moderate}</p>
             </div>
             <div className="p-3 bg-yellow-100 rounded-lg">
               <BookOpenIcon className="h-6 w-6 text-yellow-600" />
@@ -249,7 +261,7 @@ export const QuestionManagement = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Active</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.byDifficulty.hard}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.byCluster.active}</p>
             </div>
             <div className="p-3 bg-orange-100 rounded-lg">
               <BookOpenIcon className="h-6 w-6 text-orange-600" />
