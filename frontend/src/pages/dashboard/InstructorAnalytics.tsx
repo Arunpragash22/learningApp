@@ -157,11 +157,11 @@ export const InstructorAnalytics = () => {
     setDownloadingReportId(selectedSession);
     try {
       const filename = `report_${selectedSessionObj?.title?.replace(/\s+/g, '_') || selectedSession}.pdf`;
-      const success = await sessionService.downloadReport(selectedSession, filename);
-      if (success) {
+      const result = await sessionService.downloadReport(selectedSession, filename);
+      if (result.success) {
         toast.success('Report downloaded as PDF');
       } else {
-        toast.error('Report not available yet');
+        toast.error(result.error || 'Report not available yet');
       }
     } catch {
       toast.error('Failed to download report');

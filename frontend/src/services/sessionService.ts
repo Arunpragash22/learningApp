@@ -119,7 +119,7 @@ export const sessionService = {
     }
   },
 
-  async downloadReport(sessionId: string, filename?: string): Promise<boolean> {
+  async downloadReport(sessionId: string, filename?: string): Promise<{ success: boolean; error?: string }> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/report/download`, {
         headers: {
@@ -128,8 +128,15 @@ export const sessionService = {
       });
 
       if (!res.ok) {
-        console.error("Failed to download report:", await res.text());
-        return false;
+        const errorText = await res.text();
+        console.error("Failed to download report:", errorText);
+        // Try to parse error message from JSON response
+        try {
+          const errorJson = JSON.parse(errorText);
+          return { success: false, error: errorJson.detail || 'Failed to download report' };
+        } catch {
+          return { success: false, error: errorText || 'Failed to download report' };
+        }
       }
 
       const htmlContent = await res.text();
@@ -161,10 +168,10 @@ export const sessionService = {
       // Clean up
       document.body.removeChild(container);
       
-      return true;
+      return { success: true };
     } catch (err) {
       console.error("Report download error:", err);
-      return false;
+      return { success: false, error: 'Failed to generate PDF' };
     }
   },
 

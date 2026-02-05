@@ -90,11 +90,11 @@ export const StudentEngagement = () => {
     setDownloadingReport(true);
     try {
       const filename = `report_${liveReport?.sessionTitle?.replace(/\s+/g, '_') || activeSessionId}.pdf`;
-      const success = await sessionService.downloadReport(activeSessionId, filename);
-      if (success) {
+      const result = await sessionService.downloadReport(activeSessionId, filename);
+      if (result.success) {
         toast.success('Report downloaded as PDF');
       } else {
-        toast.error('Report not available yet');
+        toast.error(result.error || 'Report not available yet');
       }
     } catch {
       toast.error('Failed to download report');
@@ -109,11 +109,11 @@ export const StudentEngagement = () => {
     try {
       const session = completedSessions.find(s => s.id === selectedReportSession);
       const filename = `report_${session?.title?.replace(/\s+/g, '_') || selectedReportSession}.pdf`;
-      const success = await sessionService.downloadReport(selectedReportSession, filename);
-      if (success) {
+      const result = await sessionService.downloadReport(selectedReportSession, filename);
+      if (result.success) {
         toast.success('Report downloaded as PDF');
       } else {
-        toast.error('Report not available yet');
+        toast.error(result.error || 'Report not available yet');
       }
     } catch {
       toast.error('Failed to download report');

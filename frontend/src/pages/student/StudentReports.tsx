@@ -160,11 +160,11 @@ export const StudentReports = () => {
     setDownloadingReportId(report.sessionId);
     try {
       const filename = `report_${report.sessionTitle.replace(/\s+/g, '_')}.pdf`;
-      const success = await sessionService.downloadReport(report.sessionId, filename);
-      if (success) {
+      const result = await sessionService.downloadReport(report.sessionId, filename);
+      if (result.success) {
         toast.success('Report downloaded as PDF');
       } else {
-        toast.error('Failed to download report');
+        toast.error(result.error || 'Failed to download report');
       }
     } catch {
       toast.error('Failed to download report');
