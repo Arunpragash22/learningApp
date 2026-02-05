@@ -111,10 +111,6 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
       newErrors.question = 'Question is required';
     }
 
-    if (!formData.category.trim()) {
-      newErrors.category = 'Category is required';
-    }
-
     const validOptions = formData.options.filter(opt => opt.trim());
     if (validOptions.length < 2) {
       newErrors.options = 'At least 2 options are required';
@@ -180,44 +176,6 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
           {errors.question && (
             <p className="mt-1 text-sm text-red-600">{errors.question}</p>
           )}
-        </div>
-
-        {/* Category and Difficulty */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category *
-            </label>
-            <input
-              type="text"
-              value={formData.category}
-              onChange={(e) => {
-                setFormData({ ...formData, category: e.target.value });
-                if (errors.category) setErrors({ ...errors, category: '' });
-              }}
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                errors.category ? 'border-red-300' : 'border-gray-300'
-              }`}
-              placeholder="e.g., Neural Networks, Database Design"
-            />
-            {errors.category && (
-              <p className="mt-1 text-sm text-red-600">{errors.category}</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Difficulty *
-            </label>
-            <select
-              value={formData.difficulty}
-              onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as any })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="easy">Passive</option>
-              <option value="medium">Moderate</option>
-              <option value="hard">Active</option>
-            </select>
-          </div>
         </div>
 
         {/* Question Type - Generic or Cluster-wise */}
