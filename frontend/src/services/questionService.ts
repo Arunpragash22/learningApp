@@ -12,6 +12,7 @@ export interface Question {
   createdAt?: string;
   instructorId?: string;
   courseId?: string;
+  sessionId?: string;
   questionType?: 'generic' | 'cluster';
   targetCluster?: 'passive' | 'moderate' | 'active';
 }
@@ -25,6 +26,7 @@ export interface CreateQuestionData {
   tags?: string[];
   timeLimit?: number;
   courseId?: string;
+  sessionId?: string;
   questionType?: 'generic' | 'cluster';
   targetCluster?: 'passive' | 'moderate' | 'active';
 }
@@ -103,11 +105,11 @@ export const questionService = {
     }
   },
 
-  // Get all questions (instructor: only their own; optional courseId filter)
-  async getAllQuestions(courseId?: string): Promise<Question[]> {
+  // Get all questions (instructor: only their own; optional sessionId filter)
+  async getAllQuestions(sessionId?: string): Promise<Question[]> {
     try {
-      const url = courseId
-        ? `${API_BASE_URL}/api/questions/?course_id=${encodeURIComponent(courseId)}`
+      const url = sessionId
+        ? `${API_BASE_URL}/api/questions/?session_id=${encodeURIComponent(sessionId)}`
         : `${API_BASE_URL}/api/questions/`;
       const response = await fetch(url, {
         method: 'GET',

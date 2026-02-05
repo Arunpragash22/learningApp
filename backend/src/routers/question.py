@@ -18,6 +18,7 @@ class QuestionOption(BaseModel):
     tags: Optional[List[str]] = []
     timeLimit: Optional[int] = 30
     courseId: Optional[str] = None  # Optional: which course this question belongs to
+    sessionId: Optional[str] = None  # Optional: which session this question belongs to
     questionType: Optional[str] = "generic"  # 'generic' or 'cluster'
     targetCluster: Optional[str] = None  # 'passive', 'moderate', 'active' (only when questionType is 'cluster')
 
@@ -34,6 +35,7 @@ class QuestionResponse(BaseModel):
     createdAt: Optional[str] = None
     instructorId: Optional[str] = None
     courseId: Optional[str] = None
+    sessionId: Optional[str] = None
     questionType: Optional[str] = "generic"  # 'generic' or 'cluster'
     targetCluster: Optional[str] = None  # 'passive', 'moderate', 'active'
 
@@ -43,7 +45,7 @@ async def create_question(
     question_data: QuestionOption,
     user: dict = Depends(require_instructor)
 ):
-    """Create a new question (instructor only). Stored per instructor; optional courseId for course-specific question set."""
+    """Create a new question (instructor only). Stored per instructor; optional courseId or sessionId for filtering."""
     try:
         instructor_id = user.get("id", "")
         print(f"📝 Creating question by instructor: {user.get('email', 'unknown')} ({instructor_id})")
@@ -55,6 +57,8 @@ async def create_question(
         question_dict["instructorId"] = instructor_id
         if question_data.courseId:
             question_dict["courseId"] = question_data.courseId
+        if question_data.sessionId:
+            question_dict["sessionId"] = question_data.sessionId
         
         created_question = await Question.create(question_dict)
         print(f"✅ Question created with ID: {created_question.get('id', '')}")
@@ -71,6 +75,7 @@ async def create_question(
             createdAt=created_question.get("createdAt"),
             instructorId=instructor_id,
             courseId=question_dict.get("courseId"),
+            sessionId=question_dict.get("sessionId"),
             questionType=created_question.get("questionType", "generic"),
             targetCluster=created_question.get("targetCluster"),
         )
@@ -92,15 +97,16 @@ async def create_question(
 @router.get("/", response_model=List[QuestionResponse])
 async def get_all_questions(
     course_id: Optional[str] = None,
+    session_id: Optional[str] = None,
     user: dict = Depends(get_current_user),
 ):
-    """Get questions: instructors see only their own; optional filter by courseId."""
+    """Get questions: instructors see only their own; optional filter by courseId or sessionId."""
     try:
         role = user.get("role", "student")
         user_id = user.get("id", "")
         
         if role in ("instructor", "admin"):
-            questions = await Question.find_by_instructor(user_id, course_id=course_id)
+            questions = await Question.find_by_instructor(user_id, course_id=course_id, session_id=session_id)
         else:
             questions = []
         
@@ -118,6 +124,7 @@ async def get_all_questions(
                 createdAt=q.get("createdAt"),
                 instructorId=q.get("instructorId"),
                 courseId=q.get("courseId"),
+                sessionId=q.get("sessionId"),
                 questionType=q.get("questionType", "generic"),
                 targetCluster=q.get("targetCluster"),
             ))
