@@ -89,17 +89,10 @@ export const StudentEngagement = () => {
     if (!activeSessionId) return;
     setDownloadingReport(true);
     try {
-      const blob = await sessionService.downloadReport(activeSessionId);
-      if (blob) {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `report_${liveReport?.sessionTitle?.replace(/\s+/g, '_') || activeSessionId}.html`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast.success('Report downloaded');
+      const filename = `report_${liveReport?.sessionTitle?.replace(/\s+/g, '_') || activeSessionId}.pdf`;
+      const success = await sessionService.downloadReport(activeSessionId, filename);
+      if (success) {
+        toast.success('Report downloaded as PDF');
       } else {
         toast.error('Report not available yet');
       }
@@ -114,18 +107,11 @@ export const StudentEngagement = () => {
     if (!selectedReportSession) return;
     setDownloadingReportId(selectedReportSession);
     try {
-      const blob = await sessionService.downloadReport(selectedReportSession);
-      if (blob) {
-        const session = completedSessions.find(s => s.id === selectedReportSession);
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `report_${session?.title?.replace(/\s+/g, '_') || selectedReportSession}.html`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast.success('Report downloaded');
+      const session = completedSessions.find(s => s.id === selectedReportSession);
+      const filename = `report_${session?.title?.replace(/\s+/g, '_') || selectedReportSession}.pdf`;
+      const success = await sessionService.downloadReport(selectedReportSession, filename);
+      if (success) {
+        toast.success('Report downloaded as PDF');
       } else {
         toast.error('Report not available yet');
       }

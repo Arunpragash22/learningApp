@@ -55,17 +55,10 @@ export const SessionReports = () => {
   const handleDownload = async (sessionId: string, sessionTitle: string) => {
     setDownloadingId(sessionId);
     try {
-      const blob = await sessionService.downloadReport(sessionId);
-      if (blob) {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `report_${sessionTitle.replace(/\s+/g, '_')}.html`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast.success('Report downloaded successfully!');
+      const filename = `report_${sessionTitle.replace(/\s+/g, '_')}.pdf`;
+      const success = await sessionService.downloadReport(sessionId, filename);
+      if (success) {
+        toast.success('Report downloaded as PDF');
       } else {
         toast.error('Failed to download report');
       }

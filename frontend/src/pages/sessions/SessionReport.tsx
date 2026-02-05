@@ -7,7 +7,6 @@ import {
   ArrowLeftIcon,
   UsersIcon,
   HelpCircleIcon,
-  TrendingUpIcon,
   CheckCircleIcon,
   XCircleIcon,
   ClockIcon,
@@ -52,17 +51,10 @@ export const SessionReport = () => {
     
     setDownloading(true);
     try {
-      const blob = await sessionService.downloadReport(sessionId);
-      if (blob) {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `session_report_${sessionId}.html`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast.success('Report downloaded successfully!');
+      const filename = `session_report_${sessionId}.pdf`;
+      const success = await sessionService.downloadReport(sessionId, filename);
+      if (success) {
+        toast.success('Report downloaded as PDF');
       } else {
         toast.error('Failed to download report');
       }
@@ -292,7 +284,7 @@ export const SessionReport = () => {
       </Card>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card className="p-4 text-center">
           <div className="flex justify-center mb-2">
             <UsersIcon className="h-8 w-8 text-blue-500" />
@@ -311,18 +303,6 @@ export const SessionReport = () => {
             {report.totalQuestionsAsked}
           </p>
           <p className="text-sm text-gray-500">Questions Asked</p>
-        </Card>
-        
-        <Card className="p-4 text-center">
-          <div className="flex justify-center mb-2">
-            <TrendingUpIcon className="h-8 w-8 text-indigo-500" />
-          </div>
-          <p className={`text-3xl font-bold ${getScoreColor(report.averageQuizScore)}`}>
-            {report.averageQuizScore !== null && report.averageQuizScore !== undefined 
-              ? `${report.averageQuizScore.toFixed(1)}%` 
-              : 'N/A'}
-          </p>
-          <p className="text-sm text-gray-500">Avg. Quiz Score</p>
         </Card>
         
         <Card className="p-4 text-center">

@@ -119,7 +119,7 @@ export const sessionService = {
     }
   },
 
-  async downloadReport(sessionId: string): Promise<Blob | null> {
+  async downloadReport(sessionId: string, filename?: string): Promise<boolean> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/report/download`, {
         headers: {
@@ -129,13 +129,42 @@ export const sessionService = {
 
       if (!res.ok) {
         console.error("Failed to download report:", await res.text());
-        return null;
+        return false;
       }
 
-      return await res.blob();
+      const htmlContent = await res.text();
+      
+      // Create a temporary container for the HTML
+      const container = document.createElement('div');
+      container.innerHTML = htmlContent;
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      container.style.width = '210mm'; // A4 width
+      document.body.appendChild(container);
+      
+      // Import html2pdf dynamically
+      const html2pdf = (await import('html2pdf.js')).default;
+      
+      // Generate PDF
+      const pdfFilename = filename || `session_report_${sessionId}.pdf`;
+      await html2pdf()
+        .set({
+          margin: 10,
+          filename: pdfFilename,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        })
+        .from(container)
+        .save();
+      
+      // Clean up
+      document.body.removeChild(container);
+      
+      return true;
     } catch (err) {
       console.error("Report download error:", err);
-      return null;
+      return false;
     }
   },
 

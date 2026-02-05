@@ -156,17 +156,10 @@ export const InstructorAnalytics = () => {
     if (!selectedSession) return;
     setDownloadingReportId(selectedSession);
     try {
-      const blob = await sessionService.downloadReport(selectedSession);
-      if (blob) {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `report_${selectedSessionObj?.title?.replace(/\s+/g, '_') || selectedSession}.html`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast.success('Report downloaded');
+      const filename = `report_${selectedSessionObj?.title?.replace(/\s+/g, '_') || selectedSession}.pdf`;
+      const success = await sessionService.downloadReport(selectedSession, filename);
+      if (success) {
+        toast.success('Report downloaded as PDF');
       } else {
         toast.error('Report not available yet');
       }

@@ -155,21 +155,14 @@ export const StudentReports = () => {
     }
   };
 
-  // Download session report as HTML (same format as instructor report, personal data only)
+  // Download session report as PDF
   const handleDownloadReport = async (report: MyStoredReport) => {
     setDownloadingReportId(report.sessionId);
     try {
-      const blob = await sessionService.downloadReport(report.sessionId);
-      if (blob) {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `report_${report.sessionTitle.replace(/\s+/g, '_')}.html`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast.success('Report downloaded!');
+      const filename = `report_${report.sessionTitle.replace(/\s+/g, '_')}.pdf`;
+      const success = await sessionService.downloadReport(report.sessionId, filename);
+      if (success) {
+        toast.success('Report downloaded as PDF');
       } else {
         toast.error('Failed to download report');
       }
