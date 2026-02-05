@@ -381,90 +381,96 @@ def _generate_report_html(report: dict, user_role: str) -> str:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Session Report - {report.get("sessionTitle", "Session")}</title>
     <style>
+        * {{ box-sizing: border-box; }}
+        body {{ margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f8fafc; }}
         @media print {{
             body {{ margin: 0; padding: 20px; }}
             .no-print {{ display: none !important; }}
         }}
     </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; -webkit-font-smoothing: antialiased;">
-    <div style="max-width: 900px; margin: 0 auto; padding: 40px 20px;">
+<body>
+    <div style="max-width: 800px; margin: 0 auto; padding: 30px 20px; background: #ffffff;">
         
         <!-- Header -->
-        <div style="text-align: center; margin-bottom: 32px;">
-            <div style="display: inline-block; background: linear-gradient(135deg, #059669 0%, #0d9488 100%); padding: 12px 24px; border-radius: 50px; margin-bottom: 16px;">
-                <span style="color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.5px;">Class Pulse</span>
-            </div>
-            <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 700; color: #111827;">Session Report</h1>
-            <p style="margin: 0; color: #6b7280; font-size: 14px;">Generated on {datetime.now().strftime("%B %d, %Y at %I:%M %p")}</p>
+        <div style="text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #059669;">
+            <h1 style="margin: 0 0 5px 0; font-size: 24px; font-weight: bold; color: #059669;">Class Pulse</h1>
+            <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: bold; color: #111827;">Session Report</h2>
+            <p style="margin: 0; color: #6b7280; font-size: 12px;">Generated on {datetime.now().strftime("%B %d, %Y at %I:%M %p")}</p>
         </div>
         
-        <!-- Session Info Card -->
-        <div style="background: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); overflow: hidden; margin-bottom: 24px;">
-            <div style="height: 4px; background: linear-gradient(90deg, #059669 0%, #0d9488 50%, #06b6d4 100%);"></div>
-            <div style="padding: 24px;">
-                <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #111827;">{report.get("sessionTitle", "Session")}</h2>
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
-                    <div>
-                        <p style="margin: 0 0 4px 0; font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px;">Course</p>
-                        <p style="margin: 0; font-size: 15px; color: #374151; font-weight: 500;">{report.get("courseName", "")} ({report.get("courseCode", "")})</p>
-                    </div>
-                    <div>
-                        <p style="margin: 0 0 4px 0; font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px;">Instructor</p>
-                        <p style="margin: 0; font-size: 15px; color: #374151; font-weight: 500;">{report.get("instructorName", "")}</p>
-                    </div>
-                    <div>
-                        <p style="margin: 0 0 4px 0; font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px;">Date</p>
-                        <p style="margin: 0; font-size: 15px; color: #374151; font-weight: 500;">{report.get("sessionDate", "")}</p>
-                    </div>
-                    <div>
-                        <p style="margin: 0 0 4px 0; font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px;">Time</p>
-                        <p style="margin: 0; font-size: 15px; color: #374151; font-weight: 500;">{report.get("sessionTime", "")} ({report.get("sessionDuration", "")})</p>
-                    </div>
-                </div>
-            </div>
+        <!-- Session Info Table -->
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h3 style="margin: 0 0 15px 0; font-size: 16px; font-weight: bold; color: #111827;">{report.get("sessionTitle", "Session")}</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 8px 0; width: 50%; vertical-align: top;">
+                        <p style="margin: 0 0 2px 0; font-size: 11px; color: #9ca3af; text-transform: uppercase;">Course</p>
+                        <p style="margin: 0; font-size: 14px; color: #374151; font-weight: 500;">{report.get("courseName", "")} ({report.get("courseCode", "")})</p>
+                    </td>
+                    <td style="padding: 8px 0; width: 50%; vertical-align: top;">
+                        <p style="margin: 0 0 2px 0; font-size: 11px; color: #9ca3af; text-transform: uppercase;">Instructor</p>
+                        <p style="margin: 0; font-size: 14px; color: #374151; font-weight: 500;">{report.get("instructorName", "")}</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; width: 50%; vertical-align: top;">
+                        <p style="margin: 0 0 2px 0; font-size: 11px; color: #9ca3af; text-transform: uppercase;">Date</p>
+                        <p style="margin: 0; font-size: 14px; color: #374151; font-weight: 500;">{report.get("sessionDate", "")}</p>
+                    </td>
+                    <td style="padding: 8px 0; width: 50%; vertical-align: top;">
+                        <p style="margin: 0 0 2px 0; font-size: 11px; color: #9ca3af; text-transform: uppercase;">Time</p>
+                        <p style="margin: 0; font-size: 14px; color: #374151; font-weight: 500;">{report.get("sessionTime", "")} ({report.get("sessionDuration", "")})</p>
+                    </td>
+                </tr>
+            </table>
         </div>
         
-        <!-- Statistics Cards -->
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
-            <div style="background: #ffffff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); text-align: center;">
-                <p style="margin: 0 0 8px 0; font-size: 32px; font-weight: 700; color: #059669;">{report.get("totalParticipants", 0)}</p>
-                <p style="margin: 0; font-size: 13px; color: #6b7280;">Participants</p>
-            </div>
-            <div style="background: #ffffff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); text-align: center;">
-                <p style="margin: 0 0 8px 0; font-size: 32px; font-weight: 700; color: #0d9488;">{report.get("totalQuestionsAsked", 0)}</p>
-                <p style="margin: 0; font-size: 13px; color: #6b7280;">Questions Asked</p>
-            </div>
-            <div style="background: #ffffff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); text-align: center;">
-                <p style="margin: 0 0 8px 0; font-size: 32px; font-weight: 700; color: #6366f1;">{report.get("averageQuizScore", "N/A") if report.get("averageQuizScore") is None else f"{report.get('averageQuizScore'):.1f}%"}</p>
-                <p style="margin: 0; font-size: 13px; color: #6b7280;">Avg. Quiz Score</p>
-            </div>
-            <div style="background: #ffffff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); text-align: center;">
-                <p style="margin: 0 0 8px 0; font-size: 32px; font-weight: 700; color: #f59e0b;">{report.get("engagementSummary", {}).get("highly_engaged", 0)}</p>
-                <p style="margin: 0; font-size: 13px; color: #6b7280;">Highly Engaged</p>
-            </div>
-        </div>
+        <!-- Statistics Table -->
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+                <td style="width: 25%; padding: 10px; text-align: center; background: #ecfdf5; border: 1px solid #d1fae5; border-radius: 8px;">
+                    <p style="margin: 0 0 5px 0; font-size: 28px; font-weight: bold; color: #059669;">{report.get("totalParticipants", 0)}</p>
+                    <p style="margin: 0; font-size: 12px; color: #065f46;">Participants</p>
+                </td>
+                <td style="width: 5px;"></td>
+                <td style="width: 25%; padding: 10px; text-align: center; background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 8px;">
+                    <p style="margin: 0 0 5px 0; font-size: 28px; font-weight: bold; color: #0d9488;">{report.get("totalQuestionsAsked", 0)}</p>
+                    <p style="margin: 0; font-size: 12px; color: #134e4a;">Questions Asked</p>
+                </td>
+                <td style="width: 5px;"></td>
+                <td style="width: 25%; padding: 10px; text-align: center; background: #eef2ff; border: 1px solid #e0e7ff; border-radius: 8px;">
+                    <p style="margin: 0 0 5px 0; font-size: 28px; font-weight: bold; color: #6366f1;">{report.get("averageQuizScore", "N/A") if report.get("averageQuizScore") is None else f"{report.get('averageQuizScore'):.1f}%"}</p>
+                    <p style="margin: 0; font-size: 12px; color: #3730a3;">Avg. Quiz Score</p>
+                </td>
+                <td style="width: 5px;"></td>
+                <td style="width: 25%; padding: 10px; text-align: center; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px;">
+                    <p style="margin: 0 0 5px 0; font-size: 28px; font-weight: bold; color: #f59e0b;">{report.get("engagementSummary", {}).get("highly_engaged", 0)}</p>
+                    <p style="margin: 0; font-size: 12px; color: #92400e;">Highly Engaged</p>
+                </td>
+            </tr>
+        </table>
         
         {"" if not is_instructor else f'''
         <!-- Student Performance Table (Instructor View) -->
-        <div style="background: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); overflow: hidden; margin-bottom: 24px;">
-            <div style="padding: 20px 24px; border-bottom: 1px solid #e5e7eb;">
-                <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #111827;">Student Performance</h3>
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px;">
+            <div style="padding: 15px 20px; border-bottom: 1px solid #e5e7eb;">
+                <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: #111827;">Student Performance</h3>
             </div>
-            <div style="overflow-x: auto;">
+            <div style="padding: 0;">
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
-                        <tr style="background: #f9fafb;">
-                            <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Student</th>
-                            <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Email</th>
-                            <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Questions</th>
-                            <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Correct</th>
-                            <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Score</th>
-                            <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Connection</th>
+                        <tr style="background: #e5e7eb;">
+                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase;">Student</th>
+                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase;">Email</th>
+                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase;">Questions</th>
+                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase;">Correct</th>
+                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase;">Score</th>
+                            <th style="padding: 10px 12px; text-align: left; font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase;">Connection</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {student_rows if student_rows else '<tr><td colspan="6" style="padding: 24px; text-align: center; color: #9ca3af;">No student data available</td></tr>'}
+                        {student_rows if student_rows else '<tr><td colspan="6" style="padding: 20px; text-align: center; color: #9ca3af;">No student data available</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -473,36 +479,40 @@ def _generate_report_html(report: dict, user_role: str) -> str:
         
         {"" if is_instructor else f'''
         <!-- Personal Quiz Results (Student View) -->
-        <div style="background: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); overflow: hidden; margin-bottom: 24px;">
-            <div style="padding: 20px 24px; border-bottom: 1px solid #e5e7eb;">
-                <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #111827;">Your Quiz Results</h3>
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px;">
+            <div style="padding: 15px 20px; border-bottom: 1px solid #e5e7eb;">
+                <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: #111827;">Your Quiz Results</h3>
             </div>
-            <div style="padding: 24px;">
+            <div style="padding: 20px;">
                 {personal_quiz_details if personal_quiz_details else '<p style="text-align: center; color: #9ca3af;">No quiz data available</p>'}
             </div>
         </div>
         '''}
         
         <!-- Engagement Summary -->
-        <div style="background: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); overflow: hidden; margin-bottom: 24px;">
-            <div style="padding: 20px 24px; border-bottom: 1px solid #e5e7eb;">
-                <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #111827;">Engagement Summary</h3>
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px;">
+            <div style="padding: 15px 20px; border-bottom: 1px solid #e5e7eb;">
+                <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: #111827;">Engagement Summary</h3>
             </div>
-            <div style="padding: 24px;">
-                <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 150px; padding: 16px; background: #ecfdf5; border-radius: 8px; text-align: center;">
-                        <p style="margin: 0 0 4px 0; font-size: 24px; font-weight: 700; color: #059669;">{report.get("engagementSummary", {}).get("highly_engaged", 0)}</p>
-                        <p style="margin: 0; font-size: 13px; color: #065f46;">Highly Engaged</p>
-                    </div>
-                    <div style="flex: 1; min-width: 150px; padding: 16px; background: #fef3c7; border-radius: 8px; text-align: center;">
-                        <p style="margin: 0 0 4px 0; font-size: 24px; font-weight: 700; color: #d97706;">{report.get("engagementSummary", {}).get("moderately_engaged", 0)}</p>
-                        <p style="margin: 0; font-size: 13px; color: #92400e;">Moderately Engaged</p>
-                    </div>
-                    <div style="flex: 1; min-width: 150px; padding: 16px; background: #fee2e2; border-radius: 8px; text-align: center;">
-                        <p style="margin: 0 0 4px 0; font-size: 24px; font-weight: 700; color: #dc2626;">{report.get("engagementSummary", {}).get("at_risk", 0)}</p>
-                        <p style="margin: 0; font-size: 13px; color: #991b1b;">At Risk</p>
-                    </div>
-                </div>
+            <div style="padding: 20px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="width: 33%; padding: 15px; text-align: center; background: #ecfdf5; border: 1px solid #d1fae5; border-radius: 8px;">
+                            <p style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; color: #059669;">{report.get("engagementSummary", {}).get("highly_engaged", 0)}</p>
+                            <p style="margin: 0; font-size: 12px; color: #065f46;">Highly Engaged</p>
+                        </td>
+                        <td style="width: 5px;"></td>
+                        <td style="width: 33%; padding: 15px; text-align: center; background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px;">
+                            <p style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; color: #d97706;">{report.get("engagementSummary", {}).get("moderately_engaged", 0)}</p>
+                            <p style="margin: 0; font-size: 12px; color: #92400e;">Moderately Engaged</p>
+                        </td>
+                        <td style="width: 5px;"></td>
+                        <td style="width: 33%; padding: 15px; text-align: center; background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px;">
+                            <p style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; color: #dc2626;">{report.get("engagementSummary", {}).get("at_risk", 0)}</p>
+                            <p style="margin: 0; font-size: 12px; color: #991b1b;">At Risk</p>
+                        </td>
+                    </tr>
+                </table>
             </div>
         </div>
         

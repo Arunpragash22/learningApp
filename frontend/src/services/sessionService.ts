@@ -146,10 +146,19 @@ export const sessionService = {
         // Create a temporary container for the HTML
         const container = document.createElement('div');
         container.innerHTML = htmlContent;
-        container.style.position = 'absolute';
-        container.style.left = '-9999px';
+        container.style.position = 'fixed';
+        container.style.left = '0';
+        container.style.top = '0';
         container.style.width = '210mm'; // A4 width
+        container.style.minHeight = '297mm'; // A4 height
+        container.style.background = '#ffffff';
+        container.style.zIndex = '-9999';
+        container.style.opacity = '0';
+        container.style.pointerEvents = 'none';
         document.body.appendChild(container);
+        
+        // Wait for content to render
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Import html2pdf dynamically
         const html2pdfModule = await import('html2pdf.js');
@@ -159,11 +168,20 @@ export const sessionService = {
         await new Promise<void>((resolve, reject) => {
           html2pdf()
             .set({
-              margin: 10,
+              margin: [10, 10, 10, 10],
               filename: pdfFilename,
               image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { scale: 2, useCORS: true, logging: false },
-              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+              html2canvas: { 
+                scale: 2, 
+                useCORS: true, 
+                logging: false,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                windowWidth: 794, // A4 width in pixels at 96 DPI
+                windowHeight: 1123 // A4 height in pixels at 96 DPI
+              },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+              pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             })
             .from(container)
             .save()
