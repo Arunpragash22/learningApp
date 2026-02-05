@@ -153,7 +153,7 @@ export const CourseDetail = () => {
   };
 
   const tabs = [
-    { id: 'sessions', label: 'Sessions', icon: CalendarIcon },
+    { id: 'sessions', label: 'Lessons', icon: CalendarIcon },
     { id: 'materials', label: 'Materials', icon: FileTextIcon },
   ];
 
@@ -584,7 +584,7 @@ export const CourseDetail = () => {
             {/* Upcoming Sessions */}
             {courseSessions.upcoming.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Sessions</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Lessons</h3>
                 <div className="space-y-3">
                   {courseSessions.upcoming.map(session => (
                     <Card key={session.id} className="p-4">
@@ -629,7 +629,7 @@ export const CourseDetail = () => {
             {/* Past Sessions */}
             {courseSessions.past.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Past Sessions</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Past Lessons</h3>
                 <div className="space-y-3">
                   {courseSessions.past.map(session => (
                     <Card key={session.id} className="p-4">
