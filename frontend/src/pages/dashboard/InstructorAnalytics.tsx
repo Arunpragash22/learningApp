@@ -159,7 +159,12 @@ export const InstructorAnalytics = () => {
       const filename = `report_${selectedSessionObj?.title?.replace(/\s+/g, '_') || selectedSession}.pdf`;
       const result = await sessionService.downloadReport(selectedSession, filename);
       if (result.success) {
-        toast.success('Report downloaded as PDF');
+        if (result.error) {
+          // Fallback case - downloaded but as HTML
+          toast.success(result.error);
+        } else {
+          toast.success('Report downloaded as PDF');
+        }
       } else {
         toast.error(result.error || 'Report not available yet');
       }

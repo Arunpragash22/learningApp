@@ -58,7 +58,7 @@ export const SessionReports = () => {
       const filename = `report_${sessionTitle.replace(/\s+/g, '_')}.pdf`;
       const result = await sessionService.downloadReport(sessionId, filename);
       if (result.success) {
-        toast.success('Report downloaded as PDF');
+        toast.success(result.error || 'Report downloaded as PDF');
       } else {
         toast.error(result.error || 'Failed to download report');
       }

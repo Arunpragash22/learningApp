@@ -92,7 +92,7 @@ export const StudentEngagement = () => {
       const filename = `report_${liveReport?.sessionTitle?.replace(/\s+/g, '_') || activeSessionId}.pdf`;
       const result = await sessionService.downloadReport(activeSessionId, filename);
       if (result.success) {
-        toast.success('Report downloaded as PDF');
+        toast.success(result.error || 'Report downloaded as PDF');
       } else {
         toast.error(result.error || 'Report not available yet');
       }
@@ -111,7 +111,7 @@ export const StudentEngagement = () => {
       const filename = `report_${session?.title?.replace(/\s+/g, '_') || selectedReportSession}.pdf`;
       const result = await sessionService.downloadReport(selectedReportSession, filename);
       if (result.success) {
-        toast.success('Report downloaded as PDF');
+        toast.success(result.error || 'Report downloaded as PDF');
       } else {
         toast.error(result.error || 'Report not available yet');
       }

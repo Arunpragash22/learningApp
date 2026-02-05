@@ -140,38 +140,62 @@ export const sessionService = {
       }
 
       const htmlContent = await res.text();
-      
-      // Create a temporary container for the HTML
-      const container = document.createElement('div');
-      container.innerHTML = htmlContent;
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.style.width = '210mm'; // A4 width
-      document.body.appendChild(container);
-      
-      // Import html2pdf dynamically
-      const html2pdf = (await import('html2pdf.js')).default;
-      
-      // Generate PDF
       const pdfFilename = filename || `session_report_${sessionId}.pdf`;
-      await html2pdf()
-        .set({
-          margin: 10,
-          filename: pdfFilename,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        })
-        .from(container)
-        .save();
       
-      // Clean up
-      document.body.removeChild(container);
-      
-      return { success: true };
+      try {
+        // Create a temporary container for the HTML
+        const container = document.createElement('div');
+        container.innerHTML = htmlContent;
+        container.style.position = 'absolute';
+        container.style.left = '-9999px';
+        container.style.width = '210mm'; // A4 width
+        document.body.appendChild(container);
+        
+        // Import html2pdf dynamically
+        const html2pdfModule = await import('html2pdf.js');
+        const html2pdf = html2pdfModule.default;
+        
+        // Generate PDF with promise wrapper for better error handling
+        await new Promise<void>((resolve, reject) => {
+          html2pdf()
+            .set({
+              margin: 10,
+              filename: pdfFilename,
+              image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { scale: 2, useCORS: true, logging: false },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            })
+            .from(container)
+            .save()
+            .then(() => {
+              resolve();
+            })
+            .catch((err: Error) => {
+              reject(err);
+            });
+        });
+        
+        // Clean up
+        document.body.removeChild(container);
+        
+        return { success: true };
+      } catch (pdfError) {
+        console.error("PDF generation error:", pdfError);
+        // Fallback to HTML download if PDF fails
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = pdfFilename.replace('.pdf', '.html');
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        return { success: true, error: 'Downloaded as HTML (PDF generation failed)' };
+      }
     } catch (err) {
       console.error("Report download error:", err);
-      return { success: false, error: 'Failed to generate PDF' };
+      return { success: false, error: 'Failed to download report' };
     }
   },
 
