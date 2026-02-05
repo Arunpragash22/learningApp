@@ -377,14 +377,6 @@ export const CourseList = () => {
                       </Link>
                     </div>
                   )}
-                  {!isInstructor && (
-                    <Link
-                      to={`/dashboard/sessions`}
-                      className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 transition-colors text-center"
-                    >
-                      Sessions
-                    </Link>
-                  )}
                 </div>
               </div>
             </Card>
