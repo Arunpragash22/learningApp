@@ -24,7 +24,7 @@ export const QuestionManagement = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   
-  // Course selection (for course meetings)
+  // Course selection (for course lessons)
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   
@@ -244,11 +244,11 @@ export const QuestionManagement = () => {
               >
                 <option value="all">All my questions</option>
                 <option value="standalone">Standalone Meeting</option>
-                <option value="course">Course Meeting</option>
+                <option value="course">Course Lesson</option>
               </select>
             </div>
 
-            {/* Course Selection - Only show for Course Meeting type */}
+            {/* Course Selection - Only show for Course Lesson type */}
             {meetingType === 'course' && (
               <div className="flex items-center gap-2">
                 <label htmlFor="course-select" className="text-sm font-medium text-gray-700">Course:</label>
@@ -301,7 +301,7 @@ export const QuestionManagement = () => {
                   onChange={(e) => setSelectedSessionId(e.target.value)}
                   className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 min-w-[200px]"
                 >
-                  <option value="">Select a session</option>
+                  <option value="">Select a lesson</option>
                   {filteredSessions.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.title} - {s.date} ({s.status})
@@ -315,7 +315,7 @@ export const QuestionManagement = () => {
               {meetingType === 'all' && 'Showing all your questions'}
               {meetingType === 'standalone' && !selectedSessionId && 'Select a standalone session'}
               {meetingType === 'course' && !selectedCourseId && 'Select a course first'}
-              {meetingType === 'course' && selectedCourseId && !selectedSessionId && 'Select a session'}
+              {meetingType === 'course' && selectedCourseId && !selectedSessionId && 'Select a lesson'}
               {selectedSessionId && 'Showing questions for selected session'}
             </span>
           </div>

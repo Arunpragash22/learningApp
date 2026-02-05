@@ -140,11 +140,11 @@ export const SessionForm: React.FC<SessionFormProps> = ({
       <Card>
         <CardHeader>
           <h2 className="text-xl font-semibold text-gray-900">
-            {mode === 'course' ? 'Add Meeting to Course' : 'Meeting Information'}
+            {mode === 'course' ? 'Add Lesson to Course' : 'Meeting Information'}
           </h2>
           {mode === 'course' && courseData && (
             <p className="text-sm text-gray-500 mt-1">
-              Creating session for: <span className="font-medium text-indigo-600">{courseData.title}</span>
+              Creating lesson for: <span className="font-medium text-indigo-600">{courseData.title}</span>
             </p>
           )}
         </CardHeader>
@@ -160,7 +160,7 @@ export const SessionForm: React.FC<SessionFormProps> = ({
                 </div>
               </div>
               <p className="text-xs text-green-600 mt-2">
-                ✓ Students enrolled in this course can access this session without a separate enrollment key.
+                ✓ Students enrolled in this course can access this lesson without a separate enrollment key.
               </p>
             </div>
           )}

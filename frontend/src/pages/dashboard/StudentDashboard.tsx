@@ -404,7 +404,7 @@ export const StudentDashboard = () => {
             {sessions.filter(s => !s.isStandalone).length > 0 && (
               <div className="bg-white shadow rounded-lg">
                 <div className="px-4 py-3 border-b">
-                  <h4 className="text-sm font-semibold text-gray-900">Course meetings</h4>
+                  <h4 className="text-sm font-semibold text-gray-900">Course Lessons</h4>
                   <p className="text-xs text-gray-500 mt-0.5">From your enrolled courses</p>
                 </div>
                 {sessions.filter(s => !s.isStandalone).map((session) => {

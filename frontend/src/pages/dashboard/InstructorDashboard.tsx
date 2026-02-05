@@ -340,14 +340,14 @@ export const InstructorDashboard = () => {
               </div>
             )}
 
-            {/* COURSE MEETINGS SECTION */}
+            {/* COURSE LESSONS SECTION */}
             {sessions.filter(s => !s.isStandalone).length > 0 && (
               <div>
                 <div className="mb-3 flex items-center gap-2">
                   <span className="text-lg"></span>
                   <div>
-                    <h3 className="text-md font-semibold text-gray-900">Course Meetings</h3>
-                    <p className="text-xs text-gray-500">Meetings from your courses</p>
+                    <h3 className="text-md font-semibold text-gray-900">Course Lessons</h3>
+                    <p className="text-xs text-gray-500">Lessons from your courses</p>
                   </div>
                 </div>
                 <div className="bg-white shadow overflow-hidden sm:rounded-md">

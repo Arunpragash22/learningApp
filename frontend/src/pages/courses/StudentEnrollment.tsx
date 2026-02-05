@@ -279,7 +279,7 @@ export const StudentEnrollment = () => {
             </li>
             <li className="flex items-start">
               <span className="flex-shrink-0 w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-medium mr-3">3</span>
-              <span>Once enrolled, you can access course sessions and materials</span>
+              <span>Once enrolled, you can access course lessons and materials</span>
             </li>
           </ol>
         </CardContent>

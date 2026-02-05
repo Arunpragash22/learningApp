@@ -1075,15 +1075,15 @@ export const SessionList = () => {
             )}
           </div>
 
-          {/* Course-Based Meetings Section */}
+          {/* Course Lessons Section */}
           <div>
             <div className="mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <BookOpenIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                Course Meetings
+                Course Lessons
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Meetings from enrolled courses
+                Lessons from enrolled courses
               </p>
             </div>
             {courseMeetings.length > 0 ? (
@@ -1230,7 +1230,7 @@ export const SessionList = () => {
             ) : (
               <Card className="p-6 text-center text-gray-500">
                 <BookOpenIcon className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                <p>No course meetings</p>
+                <p>No course lessons</p>
               </Card>
             )}
           </div>

@@ -269,11 +269,11 @@ export const CourseDetail = () => {
         description: ''
       });
       setShowCreateSession(false);
-      toast.success("Session created successfully! Students enrolled in this course can access it directly.");
+      toast.success("Lesson created successfully! Students enrolled in this course can access it directly.");
 
     } catch (err: any) {
       console.error("❌ Error creating session:", err);
-      toast.error(err.message || "Failed to create session");
+      toast.error(err.message || "Failed to create lesson");
     } finally {
       setIsCreatingSession(false);
     }
@@ -435,9 +435,9 @@ export const CourseDetail = () => {
             {isInstructor && (
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Course Sessions</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Course Lessons</h3>
                   <p className="text-sm text-gray-500">
-                    Sessions created here are accessible to all enrolled students without a separate enrollment key.
+                    Lessons created here are accessible to all enrolled students without a separate enrollment key.
                   </p>
                 </div>
                 <Button
@@ -445,7 +445,7 @@ export const CourseDetail = () => {
                   leftIcon={<PlusIcon className="h-4 w-4" />}
                   onClick={() => setShowCreateSession(true)}
                 >
-                  Add Session
+                  Add Lesson
                 </Button>
               </div>
             )}
@@ -455,7 +455,7 @@ export const CourseDetail = () => {
               <Card className="border-2 border-indigo-200">
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-semibold text-gray-900">Create New Session</h4>
+                    <h4 className="text-lg font-semibold text-gray-900">Create New Lesson</h4>
                     <button
                       onClick={() => setShowCreateSession(false)}
                       className="p-1 rounded-full hover:bg-gray-100"
@@ -466,14 +466,14 @@ export const CourseDetail = () => {
 
                   <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
                     <p className="text-sm text-green-800">
-                      <strong>✓ No enrollment key needed:</strong> Students enrolled in "{course.title}" can access this session directly.
+                      <strong>✓ No enrollment key needed:</strong> Students enrolled in "{course.title}" can access this lesson directly.
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Session Title *
+                        Lesson Title *
                       </label>
                       <Input
                         value={newSession.title}
@@ -574,7 +574,7 @@ export const CourseDetail = () => {
                       onClick={handleCreateSession}
                       disabled={isCreatingSession}
                     >
-                      {isCreatingSession ? 'Creating...' : 'Create Session'}
+                      {isCreatingSession ? 'Creating...' : 'Create Lesson'}
                     </Button>
                   </div>
                 </div>
@@ -679,11 +679,11 @@ export const CourseDetail = () => {
             {courseSessions.upcoming.length === 0 && courseSessions.past.length === 0 && (
               <Card className="p-8 text-center">
                 <CalendarIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No Sessions Yet</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Lessons Yet</h3>
                 <p className="text-gray-500 mb-4">
                   {isInstructor
-                    ? 'Create your first session for this course.'
-                    : 'No sessions have been scheduled for this course yet.'}
+                    ? 'Create your first lesson for this course.'
+                    : 'No lessons have been scheduled for this course yet.'}
                 </p>
                 {isInstructor && (
                   <Button
@@ -691,7 +691,7 @@ export const CourseDetail = () => {
                     leftIcon={<PlusIcon className="h-4 w-4" />}
                     onClick={() => setShowCreateSession(true)}
                   >
-                    Create First Session
+                    Create First Lesson
                   </Button>
                 )}
               </Card>
