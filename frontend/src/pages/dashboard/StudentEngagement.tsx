@@ -236,14 +236,6 @@ export const StudentEngagement = () => {
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Accuracy</span>
-              <span className="font-semibold text-gray-900">
-                {studentData.questionsAnswered
-                  ? `${((studentData.correctAnswers / studentData.questionsAnswered) * 100).toFixed(0)}%`
-                  : 'N/A'}
-              </span>
-            </div>
-            <div className="flex justify-between">
               <span className="text-gray-600">Avg Response Time</span>
               <span className="font-semibold text-gray-900">{studentData.averageResponseTime}s</span>
             </div>
