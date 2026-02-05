@@ -176,17 +176,18 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
                   <div className="flex items-center flex-wrap gap-2 mb-2">
                     {/* Question Target Badge - show cluster info OR generic */}
                     {question.questionType === 'cluster' ? (
-                      <>
-                        <Badge variant={getDifficultyColor(question.difficulty) as any} size="sm">
-                          {getDifficultyLabel(question.difficulty)}
-                        </Badge>
-                        <Badge variant="warning" size="sm">
-                          <Target className="h-3 w-3 mr-1" />
-                          {question.targetCluster === 'passive' && 'Passive'}
-                          {question.targetCluster === 'moderate' && 'Moderate'}
-                          {question.targetCluster === 'active' && 'Active'}
-                        </Badge>
-                      </>
+                      <Badge 
+                        variant={
+                          question.targetCluster === 'passive' ? 'danger' :
+                          question.targetCluster === 'moderate' ? 'warning' : 'success'
+                        } 
+                        size="sm"
+                      >
+                        <Target className="h-3 w-3 mr-1" />
+                        {question.targetCluster === 'passive' && 'Passive'}
+                        {question.targetCluster === 'moderate' && 'Moderate'}
+                        {question.targetCluster === 'active' && 'Active'}
+                      </Badge>
                     ) : (
                       <Badge variant="info" size="sm">
                         <Users className="h-3 w-3 mr-1" />
