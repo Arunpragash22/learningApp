@@ -27,7 +27,7 @@ class Course(BaseModel):
     instructorEmail: str
     category: Optional[str] = None
     duration: Optional[str] = None
-    level: Optional[str] = "Beginner"  # Beginner, Intermediate, Advanced
+    courseCode: Optional[str] = None  # e.g., CS101, WEB201
     thumbnail: Optional[str] = None
     syllabus: Optional[List[dict]] = []
     enrolledStudents: Optional[List[str]] = []  # List of student IDs
@@ -51,7 +51,7 @@ class Course(BaseModel):
                 "instructorEmail": "john@example.com",
                 "category": "Programming",
                 "duration": "8 weeks",
-                "level": "Beginner",
+                "courseCode": "CS101",
                 "status": "published"
             }
         }

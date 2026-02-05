@@ -23,7 +23,7 @@ export interface Course {
   instructorEmail: string;
   category?: string;
   duration?: string;
-  level?: 'Beginner' | 'Intermediate' | 'Advanced';
+  courseCode?: string;
   thumbnail?: string;
   syllabus?: Array<{ title: string; description?: string; url?: string }>;
   enrolledStudents?: string[];
@@ -50,7 +50,7 @@ export interface CreateCourseData {
   description: string;
   category?: string;
   duration?: string;
-  level?: 'Beginner' | 'Intermediate' | 'Advanced';
+  courseCode?: string;
   thumbnail?: string;
   syllabus?: Array<{ title: string; description?: string; url?: string }>;
   maxStudents?: number;

@@ -178,14 +178,6 @@ export const CourseManagement = () => {
     }
   };
 
-  const getLevelColor = (level: string) => {
-    switch (level) {
-      case 'Beginner': return 'bg-blue-100 text-blue-800';
-      case 'Intermediate': return 'bg-yellow-100 text-yellow-800';
-      case 'Advanced': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   if (loading) {
     return (
@@ -257,9 +249,11 @@ export const CourseManagement = () => {
                             <Badge variant={getStatusColor(course.status) as any} size="sm">
                               {course.status.toUpperCase()}
                             </Badge>
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${getLevelColor(course.level || 'Beginner')}`}>
-                              {course.level}
-                            </span>
+                            {course.courseCode && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                                {course.courseCode}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="text-right ml-2">
@@ -325,8 +319,8 @@ export const CourseManagement = () => {
                       </Badge>
                     </div>
                     <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-xs text-gray-500 uppercase">Level</p>
-                      <p className="font-medium text-gray-900 mt-1">{selectedCourse.level}</p>
+                      <p className="text-xs text-gray-500 uppercase">Course Code</p>
+                      <p className="font-medium text-gray-900 mt-1">{selectedCourse.courseCode || 'Not set'}</p>
                     </div>
                     <div className="bg-gray-50 p-3 rounded-lg">
                       <p className="text-xs text-gray-500 uppercase">Duration</p>

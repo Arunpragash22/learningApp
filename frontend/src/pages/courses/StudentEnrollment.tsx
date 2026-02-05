@@ -83,14 +83,6 @@ export const StudentEnrollment = () => {
     }
   };
 
-  const getLevelColor = (level: string) => {
-    switch (level) {
-      case 'Beginner': return 'bg-blue-100 text-blue-800';
-      case 'Intermediate': return 'bg-yellow-100 text-yellow-800';
-      case 'Advanced': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   return (
     <div className="py-6 max-w-4xl mx-auto">
@@ -223,9 +215,11 @@ export const StudentEnrollment = () => {
                       <h3 className="font-semibold text-gray-900">{course.title}</h3>
                       <p className="text-sm text-gray-500 mt-1">{course.instructorName}</p>
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${getLevelColor(course.level || 'Beginner')}`}>
-                      {course.level}
-                    </span>
+                    {course.courseCode && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                        {course.courseCode}
+                      </span>
+                    )}
                   </div>
 
                   <p className="text-sm text-gray-600 mb-4 line-clamp-2">

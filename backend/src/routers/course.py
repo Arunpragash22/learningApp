@@ -24,7 +24,7 @@ class CreateCourseRequest(BaseModel):
     description: str
     category: Optional[str] = None
     duration: Optional[str] = None
-    level: Optional[str] = "Beginner"
+    courseCode: Optional[str] = None
     thumbnail: Optional[str] = None
     syllabus: Optional[List[dict]] = []
     maxStudents: Optional[int] = None
@@ -38,7 +38,7 @@ class UpdateCourseRequest(BaseModel):
     description: Optional[str] = None
     category: Optional[str] = None
     duration: Optional[str] = None
-    level: Optional[str] = None
+    courseCode: Optional[str] = None
     thumbnail: Optional[str] = None
     syllabus: Optional[List[dict]] = None
     maxStudents: Optional[int] = None
@@ -63,7 +63,7 @@ async def create_course(
             "instructorEmail": current_user["email"],
             "category": request_data.category,
             "duration": request_data.duration,
-            "level": request_data.level,
+            "courseCode": request_data.courseCode,
             "thumbnail": request_data.thumbnail,
             "syllabus": request_data.syllabus or [],
             "maxStudents": request_data.maxStudents,
@@ -366,8 +366,8 @@ async def update_course(
             update_data["category"] = request_data.category
         if request_data.duration is not None:
             update_data["duration"] = request_data.duration
-        if request_data.level is not None:
-            update_data["level"] = request_data.level
+        if request_data.courseCode is not None:
+            update_data["courseCode"] = request_data.courseCode
         if request_data.thumbnail is not None:
             update_data["thumbnail"] = request_data.thumbnail
         if request_data.syllabus is not None:

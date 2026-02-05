@@ -14,6 +14,7 @@ import {
   UsersIcon,
   CalendarIcon,
   TagIcon,
+  HashIcon,
 } from 'lucide-react';
 
 export const CourseCreate = () => {
@@ -25,7 +26,7 @@ export const CourseCreate = () => {
     description: '',
     category: '',
     duration: '',
-    level: 'Beginner' as 'Beginner' | 'Intermediate' | 'Advanced',
+    courseCode: '',
     maxStudents: 50,
     status: 'draft' as 'draft' | 'published',
   });
@@ -62,7 +63,7 @@ export const CourseCreate = () => {
         description: formData.description,
         category: formData.category || undefined,
         duration: formData.duration || undefined,
-        level: formData.level,
+        courseCode: formData.courseCode || undefined,
         maxStudents: formData.maxStudents || undefined,
         status: formData.status,
       });
@@ -144,7 +145,7 @@ export const CourseCreate = () => {
                     description: '',
                     category: '',
                     duration: '',
-                    level: 'Beginner',
+                    courseCode: '',
                     maxStudents: 50,
                     status: 'draft',
                   });
@@ -249,18 +250,15 @@ export const CourseCreate = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Level
+                      <HashIcon className="h-4 w-4 inline mr-1" />
+                      Course Code
                     </label>
-                    <select
-                      name="level"
-                      value={formData.level}
+                    <Input
+                      name="courseCode"
+                      value={formData.courseCode}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="Beginner">Beginner</option>
-                      <option value="Intermediate">Intermediate</option>
-                      <option value="Advanced">Advanced</option>
-                    </select>
+                      placeholder="e.g., CS101, WEB201"
+                    />
                   </div>
 
                   <div>

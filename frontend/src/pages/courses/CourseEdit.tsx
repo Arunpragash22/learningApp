@@ -12,6 +12,7 @@ import {
   TagIcon,
   CalendarIcon,
   UsersIcon,
+  HashIcon,
 } from 'lucide-react';
 
 export const CourseEdit = () => {
@@ -24,7 +25,7 @@ export const CourseEdit = () => {
     description: '',
     category: '',
     duration: '',
-    level: 'Beginner' as 'Beginner' | 'Intermediate' | 'Advanced',
+    courseCode: '',
     maxStudents: 50,
     status: 'draft' as 'draft' | 'published',
   });
@@ -61,7 +62,7 @@ export const CourseEdit = () => {
           description: course.description || '',
           category: course.category || '',
           duration: course.duration || '',
-          level: course.level || 'Beginner',
+          courseCode: course.courseCode || '',
           maxStudents: course.maxStudents || 50,
           status: course.status || 'draft',
         });
@@ -112,7 +113,7 @@ export const CourseEdit = () => {
           description: formData.description,
           category: formData.category || undefined,
           duration: formData.duration || undefined,
-          level: formData.level,
+          courseCode: formData.courseCode || undefined,
           maxStudents: formData.maxStudents || undefined,
           status: formData.status,
         }),
@@ -241,21 +242,18 @@ export const CourseEdit = () => {
                 />
               </div>
 
-              {/* Level */}
+              {/* Course Code */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Level
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                  <HashIcon className="h-4 w-4" />
+                  Course Code
                 </label>
-                <select
-                  name="level"
-                  value={formData.level}
+                <Input
+                  name="courseCode"
+                  value={formData.courseCode}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="Beginner">Beginner</option>
-                  <option value="Intermediate">Intermediate</option>
-                  <option value="Advanced">Advanced</option>
-                </select>
+                  placeholder="e.g., CS101, WEB201"
+                />
               </div>
 
               {/* Max Students */}
