@@ -203,19 +203,17 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
             Question Target
           </label>
           <div className="flex gap-4">
-            <label className={`flex-1 flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
-              formData.questionType === 'generic' 
-                ? 'border-indigo-500 bg-indigo-50' 
-                : 'border-gray-200 hover:border-gray-300'
-            }`}>
-              <input
-                type="radio"
-                name="questionType"
-                value="generic"
-                checked={formData.questionType === 'generic'}
-                onChange={() => setFormData({ ...formData, questionType: 'generic', targetCluster: undefined })}
-                className="sr-only"
-              />
+            <div 
+              onClick={() => {
+                console.log('🔘 Generic clicked');
+                setFormData({ ...formData, questionType: 'generic', targetCluster: undefined });
+              }}
+              className={`flex-1 flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                formData.questionType === 'generic' 
+                  ? 'border-indigo-500 bg-indigo-50' 
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
               <Users className={`h-5 w-5 ${formData.questionType === 'generic' ? 'text-indigo-600' : 'text-gray-400'}`} />
               <div>
                 <p className={`font-medium ${formData.questionType === 'generic' ? 'text-indigo-900' : 'text-gray-700'}`}>
@@ -223,20 +221,18 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
                 </p>
                 <p className="text-sm text-gray-500">Send to all students</p>
               </div>
-            </label>
-            <label className={`flex-1 flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
-              formData.questionType === 'cluster' 
-                ? 'border-indigo-500 bg-indigo-50' 
-                : 'border-gray-200 hover:border-gray-300'
-            }`}>
-              <input
-                type="radio"
-                name="questionType"
-                value="cluster"
-                checked={formData.questionType === 'cluster'}
-                onChange={() => setFormData({ ...formData, questionType: 'cluster', targetCluster: 'passive' })}
-                className="sr-only"
-              />
+            </div>
+            <div 
+              onClick={() => {
+                console.log('🔘 Cluster-wise clicked');
+                setFormData({ ...formData, questionType: 'cluster', targetCluster: 'passive' });
+              }}
+              className={`flex-1 flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                formData.questionType === 'cluster' 
+                  ? 'border-indigo-500 bg-indigo-50' 
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
               <Target className={`h-5 w-5 ${formData.questionType === 'cluster' ? 'text-indigo-600' : 'text-gray-400'}`} />
               <div>
                 <p className={`font-medium ${formData.questionType === 'cluster' ? 'text-indigo-900' : 'text-gray-700'}`}>
@@ -244,7 +240,7 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
                 </p>
                 <p className="text-sm text-gray-500">Target specific cluster</p>
               </div>
-            </label>
+            </div>
           </div>
         </div>
 
