@@ -116,8 +116,10 @@ export const DashboardLayout = () => {
   }
 
   // Redirect to login if not authenticated
+  // Save the intended URL so we can redirect back after login
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    const intendedPath = location.pathname + location.search;
+    return <Navigate to="/login" state={{ from: intendedPath }} replace />;
   }
 
   return (

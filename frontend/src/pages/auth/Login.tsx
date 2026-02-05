@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
@@ -7,6 +7,10 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 export const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Get the intended destination URL from state (if redirected from protected route)
+  const from = (location.state as { from?: string })?.from;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -47,11 +51,17 @@ export const Login = () => {
     
     if (success) {
       setTimeout(() => {
-        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-        if (currentUser && currentUser.role) {
-          navigate(`/dashboard/${currentUser.role}`);
+        // If there was an intended URL (from protected route redirect), go there
+        if (from && from.startsWith('/dashboard')) {
+          navigate(from, { replace: true });
         } else {
-          navigate('/dashboard/student');
+          // Otherwise, go to the user's default dashboard
+          const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+          if (currentUser && currentUser.role) {
+            navigate(`/dashboard/${currentUser.role}`, { replace: true });
+          } else {
+            navigate('/dashboard/student', { replace: true });
+          }
         }
       }, 100);
     } else {

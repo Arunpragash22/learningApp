@@ -159,13 +159,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     toast.success("Logged out successfully");
   };
 
+  // User is only authenticated if both user AND token exist
+  const isAuthenticated = !!(user && token);
+
   return (
     <AuthContext.Provider
       value={{
         user,
         token,
         tokenType,
-        isAuthenticated: !!user,
+        isAuthenticated,
         isLoading,
         login,
         register,
