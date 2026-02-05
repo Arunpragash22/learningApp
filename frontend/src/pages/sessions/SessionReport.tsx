@@ -284,16 +284,19 @@ export const SessionReport = () => {
       </Card>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card className="p-4 text-center">
-          <div className="flex justify-center mb-2">
-            <UsersIcon className="h-8 w-8 text-blue-500" />
-          </div>
-          <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            {report.totalParticipants}
-          </p>
-          <p className="text-sm text-gray-500">Participants</p>
-        </Card>
+      <div className={`grid grid-cols-1 gap-4 mb-6 ${isInstructor ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+        {/* Participants - Only for instructors */}
+        {isInstructor && (
+          <Card className="p-4 text-center">
+            <div className="flex justify-center mb-2">
+              <UsersIcon className="h-8 w-8 text-blue-500" />
+            </div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+              {report.totalParticipants}
+            </p>
+            <p className="text-sm text-gray-500">Participants</p>
+          </Card>
+        )}
         
         <Card className="p-4 text-center">
           <div className="flex justify-center mb-2">

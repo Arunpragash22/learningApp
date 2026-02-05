@@ -426,7 +426,8 @@ def _generate_report_html(report: dict, user_role: str) -> str:
             </table>
         </div>
         
-        <!-- Statistics Table -->
+        <!-- Statistics Table - Different for instructors vs students -->
+        {"" if not is_instructor else f'''
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
             <tr>
                 <td style="width: 25%; padding: 10px; text-align: center; background: #ecfdf5; border: 1px solid #d1fae5; border-radius: 8px;">
@@ -450,6 +451,22 @@ def _generate_report_html(report: dict, user_role: str) -> str:
                 </td>
             </tr>
         </table>
+        '''}
+        {"" if is_instructor else f'''
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+                <td style="width: 48%; padding: 10px; text-align: center; background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 8px;">
+                    <p style="margin: 0 0 5px 0; font-size: 28px; font-weight: bold; color: #0d9488;">{report.get("totalQuestionsAsked", 0)}</p>
+                    <p style="margin: 0; font-size: 12px; color: #134e4a;">Questions Asked</p>
+                </td>
+                <td style="width: 4%;"></td>
+                <td style="width: 48%; padding: 10px; text-align: center; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px;">
+                    <p style="margin: 0 0 5px 0; font-size: 28px; font-weight: bold; color: #f59e0b;">{report.get("engagementSummary", {}).get("highly_engaged", 0)}</p>
+                    <p style="margin: 0; font-size: 12px; color: #92400e;">Highly Engaged</p>
+                </td>
+            </tr>
+        </table>
+        '''}
         
         {"" if not is_instructor else f'''
         <!-- Student Performance Table (Instructor View) -->
