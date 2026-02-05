@@ -356,7 +356,7 @@ def _generate_report_html(report: dict, user_role: str) -> str:
             score_display = f"{quiz_score:.1f}%" if quiz_score is not None else "N/A"
             score_color = "color: #059669" if quiz_score and quiz_score >= 70 else "color: #dc2626" if quiz_score and quiz_score < 50 else "color: #d97706"
             
-            connection = student.get("averageConnectionQuality", "unknown")
+            connection = student.get("averageConnectionQuality") or "unknown"
             connection_badge = f'<span style="padding: 2px 8px; border-radius: 9999px; font-size: 12px; {"background: #dcfce7; color: #166534;" if connection in ["excellent", "good"] else "background: #fef3c7; color: #92400e;" if connection == "fair" else "background: #fee2e2; color: #991b1b;"}">{connection.title()}</span>'
             
             student_rows += f"""
