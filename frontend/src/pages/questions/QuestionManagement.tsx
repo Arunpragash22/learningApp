@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
 import { questionService, CreateQuestionData } from '../../services/questionService';
 import { sessionService, Session } from '../../services/sessionService';
+import { courseService, Course } from '../../services/courseService';
 
 export const QuestionManagement = () => {
   const { user } = useAuth();
@@ -23,12 +24,27 @@ export const QuestionManagement = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   
+  // Course selection (for course meetings)
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
+  
   // Modal state for question type selection
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [selectedQuestionType, setSelectedQuestionType] = useState<'generic' | 'cluster'>('generic');
   const [selectedCluster, setSelectedCluster] = useState<'passive' | 'moderate' | 'active'>('passive');
 
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
+
+  // Load courses for instructor
+  useEffect(() => {
+    if (!isInstructor) return;
+    
+    courseService.getMyCourses().then((res) => {
+      if (res.success && res.courses) {
+        setCourses(res.courses);
+      }
+    }).catch(() => {});
+  }, [isInstructor]);
 
   // Load sessions based on meeting type
   useEffect(() => {
@@ -43,10 +59,15 @@ export const QuestionManagement = () => {
     }).catch(() => {});
   }, [isInstructor]);
 
-  // Get filtered sessions based on meeting type
+  // Get filtered sessions based on meeting type and selected course
   const filteredSessions = sessions.filter(session => {
     if (meetingType === 'standalone') return session.isStandalone === true;
-    if (meetingType === 'course') return !session.isStandalone;
+    if (meetingType === 'course') {
+      // Must not be standalone and must match selected course
+      if (session.isStandalone) return false;
+      if (selectedCourseId && session.courseId !== selectedCourseId) return false;
+      return true;
+    }
     return true;
   });
 
@@ -217,6 +238,7 @@ export const QuestionManagement = () => {
                 onChange={(e) => {
                   setMeetingType(e.target.value as 'all' | 'standalone' | 'course');
                   setSelectedSessionId(''); // Reset session when type changes
+                  setSelectedCourseId(''); // Reset course when type changes
                 }}
                 className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
               >
@@ -226,12 +248,53 @@ export const QuestionManagement = () => {
               </select>
             </div>
 
-            {/* Session Selection - Only show when meeting type is selected */}
-            {meetingType !== 'all' && (
+            {/* Course Selection - Only show for Course Meeting type */}
+            {meetingType === 'course' && (
               <div className="flex items-center gap-2">
-                <label htmlFor="session-select" className="text-sm font-medium text-gray-700">
-                  {meetingType === 'standalone' ? 'Standalone Session:' : 'Course Session:'}
-                </label>
+                <label htmlFor="course-select" className="text-sm font-medium text-gray-700">Course:</label>
+                <select
+                  id="course-select"
+                  value={selectedCourseId}
+                  onChange={(e) => {
+                    setSelectedCourseId(e.target.value);
+                    setSelectedSessionId(''); // Reset session when course changes
+                  }}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 min-w-[200px]"
+                >
+                  <option value="">Select a course</option>
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title} {c.courseCode ? `(${c.courseCode})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Session Selection for Standalone */}
+            {meetingType === 'standalone' && (
+              <div className="flex items-center gap-2">
+                <label htmlFor="session-select" className="text-sm font-medium text-gray-700">Session:</label>
+                <select
+                  id="session-select"
+                  value={selectedSessionId}
+                  onChange={(e) => setSelectedSessionId(e.target.value)}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 min-w-[200px]"
+                >
+                  <option value="">Select a session</option>
+                  {filteredSessions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.title} - {s.date} ({s.status})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Session Selection for Course Meeting - Only show after course is selected */}
+            {meetingType === 'course' && selectedCourseId && (
+              <div className="flex items-center gap-2">
+                <label htmlFor="session-select" className="text-sm font-medium text-gray-700">Session:</label>
                 <select
                   id="session-select"
                   value={selectedSessionId}
@@ -251,8 +314,9 @@ export const QuestionManagement = () => {
             <span className="text-sm text-gray-500">
               {meetingType === 'all' && 'Showing all your questions'}
               {meetingType === 'standalone' && !selectedSessionId && 'Select a standalone session'}
-              {meetingType === 'course' && !selectedSessionId && 'Select a course session'}
-              {selectedSessionId && `Showing questions for selected session`}
+              {meetingType === 'course' && !selectedCourseId && 'Select a course first'}
+              {meetingType === 'course' && selectedCourseId && !selectedSessionId && 'Select a session'}
+              {selectedSessionId && 'Showing questions for selected session'}
             </span>
           </div>
         )}
