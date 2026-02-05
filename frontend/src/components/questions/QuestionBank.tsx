@@ -37,19 +37,29 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
   isTriggerLoading = false
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
+  const [selectedQuestionType, setSelectedQuestionType] = useState<string>('all');
+  const [selectedTargetCluster, setSelectedTargetCluster] = useState<string>('all');
 
-  // Extract unique categories
-  const categories = Array.from(new Set(questions.map(q => q.category)));
-
-  // Filter questions
+  // Filter questions based on question type and target cluster
   const filteredQuestions = questions.filter(q => {
     const matchesSearch = q.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
       q.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesCategory = selectedCategory === 'all' || q.category === selectedCategory;
-    const matchesDifficulty = selectedDifficulty === 'all' || q.difficulty === selectedDifficulty;
-    return matchesSearch && matchesCategory && matchesDifficulty;
+    
+    // Filter by question type
+    let matchesType = true;
+    if (selectedQuestionType === 'generic') {
+      matchesType = q.questionType === 'generic' || !q.questionType;
+    } else if (selectedQuestionType === 'cluster') {
+      matchesType = q.questionType === 'cluster';
+    }
+    
+    // Filter by target cluster (only when cluster type is selected)
+    let matchesCluster = true;
+    if (selectedQuestionType === 'cluster' && selectedTargetCluster !== 'all') {
+      matchesCluster = q.targetCluster === selectedTargetCluster;
+    }
+    
+    return matchesSearch && matchesType && matchesCluster;
   });
 
   const getDifficultyColor = (difficulty: string) => {
@@ -107,25 +117,35 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
             />
           </div>
           <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
+            value={selectedQuestionType}
+            onChange={(e) => {
+              setSelectedQuestionType(e.target.value);
+              if (e.target.value !== 'cluster') {
+                setSelectedTargetCluster('all');
+              }
+            }}
             className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           >
-            <option value="all">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
+            <option value="all">All Questions</option>
+            <option value="generic">Generic</option>
+            <option value="cluster">Cluster-wise</option>
           </select>
-          <select
-            value={selectedDifficulty}
-            onChange={(e) => setSelectedDifficulty(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          >
-            <option value="all">All Difficulties</option>
-            <option value="easy">Passive</option>
-            <option value="medium">Moderate</option>
-            <option value="hard">Active</option>
-          </select>
+          {selectedQuestionType === 'cluster' ? (
+            <select
+              value={selectedTargetCluster}
+              onChange={(e) => setSelectedTargetCluster(e.target.value)}
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            >
+              <option value="all">All Clusters</option>
+              <option value="passive">Passive (At-Risk)</option>
+              <option value="moderate">Moderate</option>
+              <option value="active">Active (Highly Engaged)</option>
+            </select>
+          ) : (
+            <div className="block w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-400 sm:text-sm">
+              Select "Cluster-wise" to filter by cluster
+            </div>
+          )}
         </div>
       </Card>
 
