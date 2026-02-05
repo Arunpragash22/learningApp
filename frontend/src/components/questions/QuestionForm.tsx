@@ -131,9 +131,24 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
       return;
     }
 
+    // Set category based on question type and target cluster
+    let category = formData.category;
+    if (formData.questionType === 'cluster' && formData.targetCluster) {
+      // Use cluster name as category for cluster-wise questions
+      const clusterLabels: Record<string, string> = {
+        'passive': 'Passive',
+        'moderate': 'Moderate',
+        'active': 'Active'
+      };
+      category = clusterLabels[formData.targetCluster] || formData.targetCluster;
+    } else if (formData.questionType === 'generic') {
+      category = 'Generic';
+    }
+
     const questionData: Question = {
       id: question?.id || Date.now().toString(),
       ...formData,
+      category,
       options: formData.options.filter(opt => opt.trim()),
       createdAt: question?.createdAt || new Date().toISOString()
     };
