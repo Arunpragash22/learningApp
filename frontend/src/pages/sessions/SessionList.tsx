@@ -551,9 +551,10 @@ export const SessionList = () => {
 
       {/* Start Session Modal with Automation Config (Instructors) */}
       {showStartModal && startingSession && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4">
-            <div className="p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-5">
+              {/* Header */}
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900 dark:text-white">Start Meeting</h2>
@@ -570,152 +571,159 @@ export const SessionList = () => {
                 </button>
               </div>
 
-              {/* Real-Time Analytics Toggle */}
-              <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <BarChart3Icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                    <span className="font-medium text-gray-900 dark:text-white">Real-Time Analytics</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setRealTimeAnalyticsEnabled(!realTimeAnalyticsEnabled)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      realTimeAnalyticsEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        realTimeAnalyticsEnabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {realTimeAnalyticsEnabled 
-                    ? 'Monitor student engagement and send quiz questions in real-time'
-                    : 'Session will start without real-time analytics'
-                  }
-                </p>
-              </div>
-
-              {/* Auto-Trigger Questions Toggle (only if Real-Time Analytics is enabled) */}
-              {realTimeAnalyticsEnabled && (
-                <div className="mb-6 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <ZapIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                      <span className="font-medium text-gray-900 dark:text-white">Auto-Trigger Questions</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setAutomationEnabled(!automationEnabled)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        automationEnabled ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          automationEnabled ? 'translate-x-6' : 'translate-x-1'
+              {/* Two-column layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Left Column - Toggles */}
+                <div className="space-y-3">
+                  {/* Real-Time Analytics Toggle */}
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <BarChart3Icon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <span className="font-medium text-sm text-gray-900 dark:text-white">Real-Time Analytics</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setRealTimeAnalyticsEnabled(!realTimeAnalyticsEnabled)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                          realTimeAnalyticsEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
                         }`}
-                      />
-                    </button>
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {automationEnabled 
-                      ? 'Questions will be automatically sent to students during the session'
-                      : 'You will need to manually trigger questions'
-                    }
-                  </p>
-                </div>
-              )}
-
-              {/* Automation Settings (only if Real-Time Analytics and Auto-Trigger are enabled) */}
-              {realTimeAnalyticsEnabled && automationEnabled && (
-                <div className="space-y-4 mb-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      First Question After (minutes)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="60"
-                      value={firstDelayMinutes}
-                      onChange={(e) => setFirstDelayMinutes(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      First question triggers {firstDelayMinutes} minute(s) after session starts
+                      >
+                        <span
+                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                            realTimeAnalyticsEnabled ? 'translate-x-5' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      {realTimeAnalyticsEnabled 
+                        ? 'Monitor engagement & send quiz questions'
+                        : 'Session without real-time analytics'
+                      }
                     </p>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Question Interval (minutes)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="60"
-                      value={intervalMinutes}
-                      onChange={(e) => setIntervalMinutes(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      After the first, questions sent every {intervalMinutes} minute(s)
-                    </p>
-                  </div>
+                  {/* Auto-Trigger Questions Toggle */}
+                  {realTimeAnalyticsEnabled && (
+                    <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <ZapIcon className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                          <span className="font-medium text-sm text-gray-900 dark:text-white">Auto-Trigger Questions</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setAutomationEnabled(!automationEnabled)}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                            automationEnabled ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                              automationEnabled ? 'translate-x-5' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        {automationEnabled 
+                          ? 'Questions sent automatically'
+                          : 'Manual triggering only'
+                        }
+                      </p>
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Max Questions (optional)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={maxQuestions || ''}
-                      onChange={(e) => setMaxQuestions(e.target.value ? Number(e.target.value) : null)}
-                      placeholder="Unlimited"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Leave empty for unlimited questions
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Summary */}
-              <div className="mb-6 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm">
-                <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                  <SettingsIcon className="h-4 w-4" />
-                  <span className="font-medium">Summary:</span>
-                </div>
-                <ul className="mt-2 space-y-1 text-gray-600 dark:text-gray-400 ml-6">
-                  <li>• Session will be marked as LIVE</li>
-                  <li>• Zoom meeting will open automatically</li>
-                  {realTimeAnalyticsEnabled ? (
-                    <>
-                      <li>• Real-time analytics enabled</li>
-                      {automationEnabled ? (
+                  {/* Summary */}
+                  <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg text-xs">
+                    <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300 mb-2">
+                      <SettingsIcon className="h-3 w-3" />
+                      <span className="font-medium">Summary:</span>
+                    </div>
+                    <ul className="space-y-0.5 text-gray-600 dark:text-gray-400 ml-4">
+                      <li>• Session marked as LIVE</li>
+                      <li>• Zoom opens automatically</li>
+                      {realTimeAnalyticsEnabled ? (
                         <>
-                          <li>• First question after {firstDelayMinutes} min</li>
-                          <li>• Then every {intervalMinutes} min</li>
-                          <li>• {maxQuestions ? `Maximum ${maxQuestions} questions` : 'Unlimited questions'}</li>
+                          <li>• Real-time analytics ON</li>
+                          {automationEnabled ? (
+                            <>
+                              <li>• First Q: {firstDelayMinutes} min</li>
+                              <li>• Interval: {intervalMinutes} min</li>
+                              <li>• {maxQuestions ? `Max ${maxQuestions} Q` : 'Unlimited'}</li>
+                            </>
+                          ) : (
+                            <li>• Manual triggering</li>
+                          )}
                         </>
                       ) : (
-                        <li>• Manual question triggering only</li>
+                        <li>• Analytics OFF</li>
                       )}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Right Column - Settings (only if automation enabled) */}
+                <div className="space-y-3">
+                  {realTimeAnalyticsEnabled && automationEnabled ? (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          First Question After (min)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="60"
+                          value={firstDelayMinutes}
+                          onChange={(e) => setFirstDelayMinutes(Number(e.target.value))}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Question Interval (min)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="60"
+                          value={intervalMinutes}
+                          onChange={(e) => setIntervalMinutes(Number(e.target.value))}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Max Questions (optional)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={maxQuestions || ''}
+                          onChange={(e) => setMaxQuestions(e.target.value ? Number(e.target.value) : null)}
+                          placeholder="Unlimited"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                        />
+                      </div>
                     </>
                   ) : (
-                    <li>• Real-time analytics disabled (normal session)</li>
+                    <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500 text-sm">
+                      {realTimeAnalyticsEnabled 
+                        ? 'Enable Auto-Trigger for settings'
+                        : 'Enable Real-Time Analytics first'
+                      }
+                    </div>
                   )}
-                </ul>
+                </div>
               </div>
 
-              <div className="flex gap-3">
+              {/* Buttons */}
+              <div className="flex gap-3 mt-4">
                 <Button
                   variant="outline"
                   onClick={() => {
