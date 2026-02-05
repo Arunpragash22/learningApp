@@ -29,7 +29,7 @@ export const sessionService = {
     try {
       const res = await fetch(`${API_BASE_URL}/api/sessions`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
       });
 
@@ -48,7 +48,7 @@ export const sessionService = {
   async getSession(id: string): Promise<Session | null> {
     const res = await fetch(`${API_BASE_URL}/api/sessions/${id}`, {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+        Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
       },
     });
 
@@ -61,7 +61,7 @@ export const sessionService = {
     try {
       const res = await fetch(`${API_BASE_URL}/api/sessions/course/${courseId}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
       });
       if (!res.ok) return [];
@@ -85,7 +85,7 @@ export const sessionService = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+        Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
       },
       body: JSON.stringify(payload),
     });
@@ -103,7 +103,7 @@ export const sessionService = {
     try {
       const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/report`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
       });
 
@@ -123,7 +123,7 @@ export const sessionService = {
     try {
       const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/report/download`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
       });
 
@@ -201,7 +201,7 @@ export const sessionService = {
       const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/report/send-email`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
       });
 
@@ -234,7 +234,7 @@ export const sessionService = {
     try {
       const res = await fetch(`${API_BASE_URL}/api/reports`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
       });
 
@@ -255,7 +255,7 @@ export const sessionService = {
     try {
       const res = await fetch(`${API_BASE_URL}/api/reports/${reportId}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
       });
 
@@ -276,7 +276,7 @@ export const sessionService = {
     try {
       const res = await fetch(`${API_BASE_URL}/api/reports/session/${sessionId}/stored`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
       });
 
@@ -302,7 +302,7 @@ export const sessionService = {
       const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/end`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
       });
 
@@ -351,7 +351,7 @@ export const sessionService = {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
         body: automationConfig ? JSON.stringify(automationConfig) : undefined,
       });
@@ -372,7 +372,7 @@ export const sessionService = {
     try {
       const res = await fetch(`${API_BASE_URL}/api/live/automation/${sessionId}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
       });
 
@@ -403,7 +403,7 @@ export const sessionService = {
       const res = await fetch(`${API_BASE_URL}/api/live/automation/${sessionId}/start?${params}`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
       });
 
@@ -424,7 +424,7 @@ export const sessionService = {
       const res = await fetch(`${API_BASE_URL}/api/live/automation/${sessionId}/stop`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
       });
 
@@ -453,7 +453,7 @@ export const sessionService = {
       const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/join`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
       });
 
@@ -475,7 +475,7 @@ export const sessionService = {
       const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/leave`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}`,
         },
       });
 

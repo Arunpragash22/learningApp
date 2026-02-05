@@ -122,7 +122,7 @@ export const StudentReports = () => {
   }, []);
 
   const getAuthHeaders = () => ({
-    'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
+    'Authorization': `Bearer ${sessionStorage.getItem('access_token') || ''}`,
     'Content-Type': 'application/json'
   });
 

@@ -44,7 +44,7 @@ export const CourseEdit = () => {
       try {
         const res = await fetch(`${API_BASE}/api/courses/${courseId}`, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+            Authorization: `Bearer ${sessionStorage.getItem('access_token')}`,
           },
         });
 
@@ -106,7 +106,7 @@ export const CourseEdit = () => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+          Authorization: `Bearer ${sessionStorage.getItem('access_token')}`,
         },
         body: JSON.stringify({
           title: formData.title,

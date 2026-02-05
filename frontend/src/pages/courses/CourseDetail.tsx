@@ -136,7 +136,7 @@ export const CourseDetail = () => {
 
   const downloadMaterialUrl = (url: string, filename?: string) => {
     const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
-    const token = localStorage.getItem('access_token');
+    const token = sessionStorage.getItem('access_token');
     fetch(fullUrl, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then((res) => {
         if (!res.ok) throw new Error('Download failed');
@@ -213,7 +213,7 @@ export const CourseDetail = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`
+          Authorization: `Bearer ${sessionStorage.getItem("access_token")}`
         },
         body: JSON.stringify(payload)
       });

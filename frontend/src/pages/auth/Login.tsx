@@ -56,7 +56,7 @@ export const Login = () => {
           navigate(from, { replace: true });
         } else {
           // Otherwise, go to the user's default dashboard
-          const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+          const currentUser = JSON.parse(sessionStorage.getItem('user') || '{}');
           if (currentUser && currentUser.role) {
             navigate(`/dashboard/${currentUser.role}`, { replace: true });
           } else {

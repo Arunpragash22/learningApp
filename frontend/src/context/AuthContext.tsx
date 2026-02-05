@@ -53,11 +53,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [tokenType, setTokenType] = useState<string | null>("Bearer");
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load stored login
+  // Load stored login from sessionStorage (tab-specific)
+  // sessionStorage is NOT shared across browser tabs, so opening a new tab
+  // or pasting a URL in a new tab will require login
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    const storedToken = localStorage.getItem("access_token");
-    const storedTokenType = localStorage.getItem("token_type");
+    const storedUser = sessionStorage.getItem("user");
+    const storedToken = sessionStorage.getItem("access_token");
+    const storedTokenType = sessionStorage.getItem("token_type");
 
     if (storedUser) setUser(JSON.parse(storedUser));
     if (storedToken) setToken(storedToken);
@@ -76,17 +78,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const response = await authService.login(email, password);
 
       if (response.success && response.user) {
-        // Save user
+        // Save user to sessionStorage (tab-specific)
         setUser(response.user);
-        localStorage.setItem("user", JSON.stringify(response.user));
+        sessionStorage.setItem("user", JSON.stringify(response.user));
 
-        // Save JWT token
+        // Save JWT token to sessionStorage
         if (response.access_token) {
           setToken(response.access_token);
-          localStorage.setItem("access_token", response.access_token);
+          sessionStorage.setItem("access_token", response.access_token);
 
           setTokenType(response.token_type || "Bearer");
-          localStorage.setItem("token_type", response.token_type || "Bearer");
+          sessionStorage.setItem("token_type", response.token_type || "Bearer");
         }
 
         toast.success("Login successful");
@@ -152,9 +154,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setToken(null);
     setTokenType("Bearer");
 
-    localStorage.removeItem("user");
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("token_type");
+    // Clear sessionStorage on logout
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("access_token");
+    sessionStorage.removeItem("token_type");
 
     toast.success("Logged out successfully");
   };

@@ -141,7 +141,7 @@ export const SessionList = () => {
       try {
         const apiUrl = import.meta.env.VITE_API_URL;
         const res = await fetch(`${apiUrl}/api/live/latest-quiz/${sessionId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("access_token") || ""}` },
+          headers: { Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}` },
         });
         const data = await res.json();
         if (data.success && data.quiz) {
@@ -175,7 +175,7 @@ export const SessionList = () => {
       try {
         const apiUrl = import.meta.env.VITE_API_URL;
         const res = await fetch(`${apiUrl}/api/live/latest-quiz/${sessionId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("access_token") || ""}` },
+          headers: { Authorization: `Bearer ${sessionStorage.getItem("access_token") || ""}` },
         });
         const data = await res.json();
         if (data.success && data.quiz) {
@@ -281,7 +281,7 @@ export const SessionList = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('access_token')}`
         },
         body: JSON.stringify({ enrollmentKey: enrollmentKey.trim() })
       });

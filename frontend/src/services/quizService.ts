@@ -70,7 +70,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const getAuthToken = (): string => {
   try {
     // Token is stored separately in localStorage as 'access_token'
-    const token = localStorage.getItem('access_token');
+    const token = sessionStorage.getItem('access_token');
     if (!token) {
       console.error('❌ No authentication token found in localStorage');
       throw new Error('Not authenticated. Please log in again.');
@@ -84,7 +84,7 @@ const getAuthToken = (): string => {
 
 const getUserRole = (): string => {
   try {
-    const user = localStorage.getItem('user');
+    const user = sessionStorage.getItem('user');
     if (user) {
       const userData = JSON.parse(user);
       return userData.role || 'student';

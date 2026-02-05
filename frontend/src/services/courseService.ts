@@ -66,7 +66,7 @@ export interface UpdateCourseData extends Partial<CreateCourseData> {}
 // ============================================================
 
 const getAuthHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('access_token');
+  const token = sessionStorage.getItem('access_token');
   return {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` }),
@@ -137,7 +137,7 @@ export const courseService = {
     title: string,
     description?: string,
   ): Promise<{ success: boolean; url: string; filename: string; title: string; description: string }> {
-    const token = localStorage.getItem('access_token');
+    const token = sessionStorage.getItem('access_token');
     const formData = new FormData();
     formData.append('file', file);
     formData.append('title', title);

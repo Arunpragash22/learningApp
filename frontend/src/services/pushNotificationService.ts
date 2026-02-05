@@ -120,7 +120,7 @@ export async function sendSubscriptionToBackend(
   subscription: PushSubscription
 ): Promise<boolean> {
   try {
-    const token = localStorage.getItem('access_token');
+    const token = sessionStorage.getItem('access_token');
     
     if (!token) {
       console.error('❌ No access token found');
@@ -245,7 +245,7 @@ export async function unsubscribeFromPush(): Promise<boolean> {
       console.log('✅ Unsubscribed from push notifications');
       
       // Optionally notify backend
-      const token = localStorage.getItem('access_token');
+      const token = sessionStorage.getItem('access_token');
       if (token) {
         await fetch(`${API_BASE_URL}/api/notifications/unsubscribe?endpoint=${encodeURIComponent(subscription.endpoint)}`, {
           method: 'DELETE',

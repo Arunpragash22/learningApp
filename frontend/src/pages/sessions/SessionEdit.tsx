@@ -33,7 +33,7 @@ export const SessionEdit = () => {
         
         const res = await fetch(apiUrl, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
           },
         });
 
@@ -151,7 +151,7 @@ export const SessionEdit = () => {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${sessionStorage.getItem("access_token")}`,
         },
         body: JSON.stringify(updatePayload),
       });
