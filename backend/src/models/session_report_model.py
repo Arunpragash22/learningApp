@@ -118,11 +118,13 @@ class SessionReportModel:
     COLLECTION_NAME = "session_reports"
     
     @staticmethod
-    async def generate_report(session_id: str, user_id: str, user_role: str) -> Optional[Dict]:
+    async def generate_report(session_id: str, user_id: str, user_role: str, user_email: str = None) -> Optional[Dict]:
         """
         Generate a session report.
         - Instructors get full report with all student data
         - Students get personalized report with their own data only
+        
+        For students, matches by studentId OR email (for Zoom webhook participants).
         """
         database = get_database()
         if database is None:
@@ -265,7 +267,14 @@ class SessionReportModel:
         # Build report based on user role
         if user_role == "student":
             # Filter to only include requesting student's data
-            student_reports = [s for s in student_reports if s.studentId == user_id]
+            # Match by studentId OR email (for Zoom webhook participants who may have different IDs)
+            def matches_student(s):
+                if s.studentId == user_id:
+                    return True
+                if user_email and s.studentEmail and s.studentEmail.lower() == user_email.lower():
+                    return True
+                return False
+            student_reports = [s for s in student_reports if matches_student(s)]
         
         report = SessionReport(
             sessionId=session_id,
@@ -737,18 +746,20 @@ class SessionReportModel:
         return report
     
     @staticmethod
-    async def get_report_for_user(session_id: str, user_id: str, user_role: str) -> Optional[Dict]:
+    async def get_report_for_user(session_id: str, user_id: str, user_role: str, user_email: str = None) -> Optional[Dict]:
         """
         Get report from MongoDB, filtering data based on user role.
         - Instructors/admins: Get full master report with all students
         - Students: Get filtered report with only their own data
+        
+        For students, matches by studentId OR email (for Zoom webhook participants).
         """
         # First, try to get the stored master report
         master_report = await SessionReportModel.get_stored_master_report(session_id)
         
         if not master_report:
             # No stored report - generate fresh one (fallback for older sessions)
-            return await SessionReportModel.generate_report(session_id, user_id, user_role)
+            return await SessionReportModel.generate_report(session_id, user_id, user_role, user_email)
         
         # Clone the report for filtering
         import copy
@@ -756,7 +767,15 @@ class SessionReportModel:
         
         if user_role == "student":
             # Filter to only show this student's data
-            report["students"] = [s for s in report.get("students", []) if s.get("studentId") == user_id]
+            # Match by studentId OR email (for Zoom webhook participants who may have different IDs)
+            def matches_student(s):
+                if s.get("studentId") == user_id:
+                    return True
+                if user_email and s.get("studentEmail") and s.get("studentEmail").lower() == user_email.lower():
+                    return True
+                return False
+            
+            report["students"] = [s for s in report.get("students", []) if matches_student(s)]
             report["reportType"] = "student_personal"
             # Remove raw data from student view
             report.pop("rawAssignments", None)

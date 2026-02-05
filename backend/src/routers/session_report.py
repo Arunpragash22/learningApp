@@ -59,15 +59,24 @@ async def get_report_by_id(
         
         user_role = user.get("role", "student")
         user_id = user.get("id")
+        user_email = user.get("email", "")
         
         # Check access permissions
         if user_role == "student":
             # Students can only view their own reports
-            student_ids = [s.get("studentId") for s in report.get("students", [])]
-            if user_id not in student_ids:
+            # Match by studentId OR email (for Zoom webhook participants)
+            def matches_student(s):
+                if s.get("studentId") == user_id:
+                    return True
+                if user_email and s.get("studentEmail") and s.get("studentEmail").lower() == user_email.lower():
+                    return True
+                return False
+            
+            has_access = any(matches_student(s) for s in report.get("students", []))
+            if not has_access:
                 raise HTTPException(status_code=403, detail="Access denied")
             # Filter to only show their data
-            report["students"] = [s for s in report.get("students", []) if s.get("studentId") == user_id]
+            report["students"] = [s for s in report.get("students", []) if matches_student(s)]
             # Remove raw data from student view
             report.pop("rawAssignments", None)
             report.pop("rawQuizAnswers", None)
@@ -97,9 +106,11 @@ async def get_stored_report_for_session(
     try:
         user_role = user.get("role", "student")
         user_id = user.get("id")
+        user_email = user.get("email", "")
         
         # Get stored report from MongoDB
-        report = await SessionReportModel.get_report_for_user(session_id, user_id, user_role)
+        # Pass email for fallback matching (for Zoom webhook participants)
+        report = await SessionReportModel.get_report_for_user(session_id, user_id, user_role, user_email)
         
         if not report:
             raise HTTPException(
@@ -139,6 +150,7 @@ async def get_session_report(
         
         user_role = user.get("role", "student")
         user_id = user.get("id")
+        user_email = user.get("email", "")
         
         # Instructors can only view reports for their own sessions
         if user_role == "instructor":
@@ -149,11 +161,12 @@ async def get_session_report(
                 )
         
         # Get report (instructor: full; student: filtered to their data)
-        report = await SessionReportModel.get_report_for_user(session_id, user_id, user_role)
+        # Pass email for fallback matching (for Zoom webhook participants)
+        report = await SessionReportModel.get_report_for_user(session_id, user_id, user_role, user_email)
         
         if not report:
             # No stored report - generate fresh report (live or preview)
-            report = await SessionReportModel.generate_report(session_id, user_id, user_role)
+            report = await SessionReportModel.generate_report(session_id, user_id, user_role, user_email)
         
         # Students may only view report if they participated (have data in report)
         if user_role == "student" and report and len(report.get("students", [])) == 0:
@@ -208,6 +221,7 @@ async def download_session_report(
     try:
         user_role = user.get("role", "student")
         user_id = user.get("id")
+        user_email = user.get("email", "")
         
         session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
         if not session:
@@ -221,9 +235,10 @@ async def download_session_report(
                 )
         
         # Get report (instructor: full; student: filtered to their data)
-        report = await SessionReportModel.get_report_for_user(session_id, user_id, user_role)
+        # Pass email for fallback matching (for Zoom webhook participants)
+        report = await SessionReportModel.get_report_for_user(session_id, user_id, user_role, user_email)
         if not report:
-            report = await SessionReportModel.generate_report(session_id, user_id, user_role)
+            report = await SessionReportModel.generate_report(session_id, user_id, user_role, user_email)
         if not report:
             raise HTTPException(status_code=404, detail="Could not generate report")
         
