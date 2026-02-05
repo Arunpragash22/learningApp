@@ -2,7 +2,7 @@
  * Shared quiz popup for instructor-triggered questions.
  * Used globally (DashboardLayout) so students receive questions on any page.
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
 
 export interface QuizPopupProps {
@@ -18,6 +18,39 @@ export interface QuizPopupProps {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
+// Play notification sound using Web Audio API
+const playNotificationSound = () => {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Create oscillator for a pleasant notification tone
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // Two-tone notification sound
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5
+    oscillator.frequency.setValueAtTime(1108.73, audioContext.currentTime + 0.1); // C#6
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime + 0.2); // A5
+    
+    oscillator.type = 'sine';
+    
+    // Envelope for smooth sound
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.02);
+    gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.1);
+    gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.12);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.4);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.4);
+  } catch (err) {
+    console.log("Could not play notification sound:", err);
+  }
+};
+
 export const QuizPopup: React.FC<QuizPopupProps> = ({
   quiz,
   onClose,
@@ -28,6 +61,15 @@ export const QuizPopup: React.FC<QuizPopupProps> = ({
   const [timeLeft, setTimeLeft] = useState<number>(quiz?.timeLimit || 30);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const soundPlayedRef = useRef(false);
+
+  // Play notification sound when quiz arrives
+  useEffect(() => {
+    if (quiz && !soundPlayedRef.current) {
+      soundPlayedRef.current = true;
+      playNotificationSound();
+    }
+  }, [quiz]);
 
   useEffect(() => {
     if (timeLeft <= 0) {
