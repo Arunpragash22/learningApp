@@ -10,6 +10,13 @@ import { Button } from '../../components/ui/Button';
 import { sessionService } from '../../services/sessionService';
 import { toast } from 'sonner';
 
+interface Session {
+  id: string;
+  title: string;
+  date: string;
+  status: string;
+}
+
 const POLL_INTERVAL_MS = 8000;
 
 export const StudentEngagement = () => {
@@ -27,6 +34,11 @@ export const StudentEngagement = () => {
     sessionTitle?: string;
   } | null>(null);
   const [downloadingReport, setDownloadingReport] = useState(false);
+  
+  // Session reports section state
+  const [completedSessions, setCompletedSessions] = useState<Session[]>([]);
+  const [selectedReportSession, setSelectedReportSession] = useState<string | null>(null);
+  const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
 
   // Real-time: poll session report when student is in a session
   useEffect(() => {
@@ -51,6 +63,26 @@ export const StudentEngagement = () => {
     return () => clearInterval(interval);
   }, [activeSessionId, user?.id]);
 
+  // Fetch completed sessions for the reports section
+  useEffect(() => {
+    const fetchSessions = async () => {
+      const list = await sessionService.getAllSessions();
+      const completed = (list || [])
+        .filter((s: { status: string }) => s.status === 'completed')
+        .map((s: { id: string; title: string; date: string; status: string }) => ({
+          id: s.id,
+          title: s.title,
+          date: s.date,
+          status: s.status
+        }));
+      setCompletedSessions(completed);
+      if (completed.length > 0 && !selectedReportSession) {
+        setSelectedReportSession(completed[0].id);
+      }
+    };
+    fetchSessions();
+  }, []);
+
   const handleDownloadReport = async () => {
     if (!activeSessionId) return;
     setDownloadingReport(true);
@@ -73,6 +105,32 @@ export const StudentEngagement = () => {
       toast.error('Failed to download report');
     }
     setDownloadingReport(false);
+  };
+
+  // Download report for selected session in bottom section
+  const handleDownloadSessionReport = async () => {
+    if (!selectedReportSession) return;
+    setDownloadingReportId(selectedReportSession);
+    try {
+      const blob = await sessionService.downloadReport(selectedReportSession);
+      if (blob) {
+        const session = completedSessions.find(s => s.id === selectedReportSession);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `report_${session?.title?.replace(/\s+/g, '_') || selectedReportSession}.html`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success('Report downloaded');
+      } else {
+        toast.error('Report not available yet');
+      }
+    } catch {
+      toast.error('Failed to download report');
+    }
+    setDownloadingReportId(null);
   };
 
   // Merge live report with defaults for display
@@ -219,6 +277,51 @@ export const StudentEngagement = () => {
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Personalized Feedback</h2>
         <PersonalizedFeedback feedback={feedback} studentName={user?.firstName} />
       </div>
+
+      {/* Session Reports Section — at the bottom, completed sessions only */}
+      {completedSessions.length > 0 && (
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">My Session Reports</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50 p-4 rounded-lg">
+            <div className="flex items-center gap-2">
+              <label htmlFor="student-session-report" className="text-sm font-medium text-gray-700">Session:</label>
+              <select
+                id="student-session-report"
+                value={selectedReportSession || ''}
+                onChange={(e) => setSelectedReportSession(e.target.value || null)}
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 max-w-md"
+              >
+                {completedSessions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title} — {s.date}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selectedReportSession && (
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<FileText className="h-4 w-4" />}
+                  onClick={() => navigate(`/dashboard/sessions/${selectedReportSession}/report`)}
+                >
+                  View report
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  leftIcon={downloadingReportId === selectedReportSession ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  onClick={handleDownloadSessionReport}
+                  disabled={downloadingReportId === selectedReportSession}
+                >
+                  {downloadingReportId === selectedReportSession ? 'Downloading...' : 'Download report'}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
