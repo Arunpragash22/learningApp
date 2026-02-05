@@ -361,7 +361,7 @@ export const CourseList = () => {
                         className="flex-1 text-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors flex items-center justify-center"
                       >
                         <VideoIcon className="h-4 w-4 mr-1" />
-                        Create Session
+                        Create Lesson
                       </Link>
                       <Link
                         to={`/dashboard/courses/${course.id}/edit`}
