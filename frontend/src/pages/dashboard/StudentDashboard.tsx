@@ -363,7 +363,7 @@ export const StudentDashboard = () => {
       {/* Upcoming Meetings (next 24 hours) — list or empty state */}
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-medium text-gray-900">Upcoming Meetings (next 24 hours)</h3>
+          <h3 className="text-lg font-medium text-gray-900">Upcoming Meetings</h3>
           <Link to="/dashboard/sessions" className="text-sm font-medium hover:opacity-80" style={{ color: "#3B82F6" }}>
             Join from Meetings →
           </Link>
@@ -375,7 +375,7 @@ export const StudentDashboard = () => {
         {/* Meeting list or empty state */}
         {sessions.length === 0 ? (
           <div className="bg-white shadow rounded-lg px-4 py-8 text-center text-gray-500">
-            <p className="text-sm">No meetings in the next 24 hours</p>
+            <p className="text-sm">No upcoming meetings</p>
             <Link to="/dashboard/sessions" className="text-sm text-blue-600 hover:underline mt-2 inline-block">Go to Meetings</Link>
           </div>
         ) : (

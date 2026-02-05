@@ -285,7 +285,7 @@ export const InstructorDashboard = () => {
       {/* ================= REAL UPCOMING SESSION LIST - VIEW-ONLY, NEXT 24H ================= */}
       <div className="mt-8">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-medium text-gray-900">Upcoming Meetings (next 24 hours)</h2>
+          <h2 className="text-lg font-medium text-gray-900">Upcoming Meetings</h2>
         </div>
         <p className="text-xs text-gray-500 mb-2">
           View-only. Go to <Link to="/dashboard/sessions" className="text-indigo-600 hover:underline">Meetings</Link> to start or manage.
@@ -293,7 +293,7 @@ export const InstructorDashboard = () => {
 
         {sessions.length === 0 ? (
           <div className="bg-white shadow overflow-hidden sm:rounded-md px-4 py-8 text-center text-gray-500">
-            <p>No meetings in the next 24 hours</p>
+            <p>No upcoming meetings</p>
             <Link to="/dashboard/sessions">
               <span className="text-sm text-indigo-600 hover:underline mt-2 inline-block">Go to Meetings</span>
             </Link>

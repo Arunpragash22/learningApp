@@ -24,16 +24,14 @@ export function getSessionStartDate(session: Session): Date | null {
 }
 
 /**
- * True if the session should be shown on the dashboard: upcoming or live,
- * and for upcoming sessions, start time is within the next 24 hours.
+ * True if the session should be shown on the dashboard: upcoming or live.
+ * Shows all upcoming sessions (not limited to 24 hours).
  */
 export function isWithinNext24Hours(session: Session): boolean {
   const status = normalizeStatus(session.status);
+  // Show all live sessions
   if (status === "live") return true;
-  if (status !== "upcoming") return false;
-  const start = getSessionStartDate(session);
-  if (!start) return false;
-  const now = new Date();
-  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  return start >= now && start <= in24h;
+  // Show all upcoming sessions
+  if (status === "upcoming") return true;
+  return false;
 }
