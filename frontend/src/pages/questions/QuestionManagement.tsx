@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { QuestionBank, Question } from '../../components/questions/QuestionBank';
 import { QuestionForm } from '../../components/questions/QuestionForm';
 import { Card } from '../../components/ui/Card';
-import { BookOpenIcon, TargetIcon, LayersIcon } from 'lucide-react';
+import { Button } from '../../components/ui/Button';
+import { BookOpenIcon, TargetIcon, Users, Target, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
 import { questionService, CreateQuestionData } from '../../services/questionService';
@@ -18,6 +19,11 @@ export const QuestionManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const [instructorCourses, setInstructorCourses] = useState<Course[]>([]);
+  
+  // Modal state for question type selection
+  const [showTypeModal, setShowTypeModal] = useState(false);
+  const [selectedQuestionType, setSelectedQuestionType] = useState<'generic' | 'cluster'>('generic');
+  const [selectedCluster, setSelectedCluster] = useState<'passive' | 'moderate' | 'active'>('passive');
 
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
 
@@ -55,7 +61,19 @@ export const QuestionManagement = () => {
     setEditingQuestion(null);
     setPrefillQuestion(null);
     setPrefillCategory(null);
+    // Show the type selection modal first
+    setSelectedQuestionType('generic');
+    setSelectedCluster('passive');
+    setShowTypeModal(true);
+  };
+
+  const handleTypeModalConfirm = () => {
+    setShowTypeModal(false);
     setShowForm(true);
+  };
+
+  const handleTypeModalCancel = () => {
+    setShowTypeModal(false);
   };
 
   const handleEditQuestion = (question: Question) => {
@@ -84,6 +102,7 @@ export const QuestionManagement = () => {
     try {
       console.log('📝 Saving question:', question);
       
+      // Store questionType based on what instructor selected (cluster or generic)
       const questionData: CreateQuestionData = {
         question: question.question,
         options: question.options,
@@ -93,8 +112,8 @@ export const QuestionManagement = () => {
         tags: question.tags,
         timeLimit: question.timeLimit,
         courseId: editingQuestion?.courseId ?? (selectedCourseId || undefined),
-        questionType: question.questionType,
-        targetCluster: question.targetCluster,
+        questionType: editingQuestion ? question.questionType : selectedQuestionType, // Store actual type selected
+        targetCluster: selectedQuestionType === 'cluster' ? selectedCluster : question.targetCluster,
       };
 
       console.log('📤 Sending to API:', questionData);
@@ -192,7 +211,7 @@ export const QuestionManagement = () => {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -201,19 +220,6 @@ export const QuestionManagement = () => {
             </div>
             <div className="p-3 bg-indigo-100 rounded-lg">
               <TargetIcon className="h-6 w-6 text-indigo-600" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Categories</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {Object.keys(stats.byCategory).length}
-              </p>
-            </div>
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <LayersIcon className="h-6 w-6 text-purple-600" />
             </div>
           </div>
         </Card>
@@ -252,12 +258,98 @@ export const QuestionManagement = () => {
         </Card>
       </div>
 
+      {/* Question Type Selection Modal */}
+      {showTypeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Select Question Type</h3>
+              <button
+                onClick={handleTypeModalCancel}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Generic Option */}
+              <div 
+                onClick={() => setSelectedQuestionType('generic')}
+                className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                  selectedQuestionType === 'generic' 
+                    ? 'border-indigo-500 bg-indigo-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <Users className={`h-6 w-6 ${selectedQuestionType === 'generic' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                <div>
+                  <p className={`font-medium ${selectedQuestionType === 'generic' ? 'text-indigo-900' : 'text-gray-700'}`}>
+                    Generic
+                  </p>
+                  <p className="text-sm text-gray-500">Send to all students</p>
+                </div>
+              </div>
+
+              {/* Cluster Option */}
+              <div 
+                onClick={() => setSelectedQuestionType('cluster')}
+                className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                  selectedQuestionType === 'cluster' 
+                    ? 'border-indigo-500 bg-indigo-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <Target className={`h-6 w-6 ${selectedQuestionType === 'cluster' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                <div>
+                  <p className={`font-medium ${selectedQuestionType === 'cluster' ? 'text-indigo-900' : 'text-gray-700'}`}>
+                    Cluster
+                  </p>
+                  <p className="text-sm text-gray-500">Target specific engagement cluster</p>
+                </div>
+              </div>
+
+              {/* Cluster Selection - Only shown when cluster is selected */}
+              {selectedQuestionType === 'cluster' && (
+                <div className="mt-4 pl-4 border-l-2 border-indigo-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Target Cluster
+                  </label>
+                  <select
+                    value={selectedCluster}
+                    onChange={(e) => setSelectedCluster(e.target.value as 'passive' | 'moderate' | 'active')}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="passive">Passive (At-Risk / Low Engagement)</option>
+                    <option value="moderate">Moderate (Medium Engagement)</option>
+                    <option value="active">Active (Highly Engaged)</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Question will be sent to students in the selected cluster
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t bg-gray-50 rounded-b-lg">
+              <Button variant="outline" onClick={handleTypeModalCancel}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleTypeModalConfirm}>
+                Continue
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Question Form or Question Bank */}
       {showForm ? (
         <QuestionForm
           question={editingQuestion}
           prefillQuestion={prefillQuestion}
           prefillCategory={prefillCategory}
+          initialQuestionType={selectedQuestionType}
+          initialTargetCluster={selectedQuestionType === 'cluster' ? selectedCluster : undefined}
+          hideTypeSelector={!editingQuestion}
           onSave={handleSaveQuestion}
           onCancel={handleCancel}
         />

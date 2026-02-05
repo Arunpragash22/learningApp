@@ -8,6 +8,9 @@ interface QuestionFormProps {
   question?: Question | null;
   prefillQuestion?: Question | null;
   prefillCategory?: string | null;
+  initialQuestionType?: 'generic' | 'cluster';
+  initialTargetCluster?: 'passive' | 'moderate' | 'active';
+  hideTypeSelector?: boolean;
   onSave: (question: Question) => void;
   onCancel: () => void;
 }
@@ -16,6 +19,9 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
   question,
   prefillQuestion = null,
   prefillCategory = null,
+  initialQuestionType,
+  initialTargetCluster,
+  hideTypeSelector = false,
   onSave,
   onCancel
 }) => {
@@ -27,8 +33,8 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
     category: question?.category || '',
     tags: question?.tags || [],
     timeLimit: question?.timeLimit || 30,
-    questionType: question?.questionType || 'generic',
-    targetCluster: question?.targetCluster || undefined
+    questionType: initialQuestionType || question?.questionType || 'generic',
+    targetCluster: initialTargetCluster || question?.targetCluster || undefined
   });
 
   const [newTag, setNewTag] = useState('');
@@ -197,55 +203,71 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
           )}
         </div>
 
-        {/* Question Type - Generic or Cluster-wise */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Question Target
-          </label>
-          <div className="flex gap-4">
-            <div 
-              onClick={() => {
-                console.log('🔘 Generic clicked');
-                setFormData({ ...formData, questionType: 'generic', targetCluster: undefined });
-              }}
-              className={`flex-1 flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                formData.questionType === 'generic' 
-                  ? 'border-indigo-500 bg-indigo-50' 
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <Users className={`h-5 w-5 ${formData.questionType === 'generic' ? 'text-indigo-600' : 'text-gray-400'}`} />
-              <div>
-                <p className={`font-medium ${formData.questionType === 'generic' ? 'text-indigo-900' : 'text-gray-700'}`}>
-                  Generic
-                </p>
-                <p className="text-sm text-gray-500">Send to all students</p>
+        {/* Question Type - Generic or Cluster-wise (hidden when pre-selected from modal) */}
+        {!hideTypeSelector && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Question Target
+            </label>
+            <div className="flex gap-4">
+              <div 
+                onClick={() => {
+                  console.log('🔘 Generic clicked');
+                  setFormData({ ...formData, questionType: 'generic', targetCluster: undefined });
+                }}
+                className={`flex-1 flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                  formData.questionType === 'generic' 
+                    ? 'border-indigo-500 bg-indigo-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <Users className={`h-5 w-5 ${formData.questionType === 'generic' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                <div>
+                  <p className={`font-medium ${formData.questionType === 'generic' ? 'text-indigo-900' : 'text-gray-700'}`}>
+                    Generic
+                  </p>
+                  <p className="text-sm text-gray-500">Send to all students</p>
+                </div>
               </div>
-            </div>
-            <div 
-              onClick={() => {
-                console.log('🔘 Cluster-wise clicked');
-                setFormData({ ...formData, questionType: 'cluster', targetCluster: 'passive' });
-              }}
-              className={`flex-1 flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                formData.questionType === 'cluster' 
-                  ? 'border-indigo-500 bg-indigo-50' 
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <Target className={`h-5 w-5 ${formData.questionType === 'cluster' ? 'text-indigo-600' : 'text-gray-400'}`} />
-              <div>
-                <p className={`font-medium ${formData.questionType === 'cluster' ? 'text-indigo-900' : 'text-gray-700'}`}>
-                  Cluster-wise
-                </p>
-                <p className="text-sm text-gray-500">Target specific cluster</p>
+              <div 
+                onClick={() => {
+                  console.log('🔘 Cluster-wise clicked');
+                  setFormData({ ...formData, questionType: 'cluster', targetCluster: 'passive' });
+                }}
+                className={`flex-1 flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                  formData.questionType === 'cluster' 
+                    ? 'border-indigo-500 bg-indigo-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <Target className={`h-5 w-5 ${formData.questionType === 'cluster' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                <div>
+                  <p className={`font-medium ${formData.questionType === 'cluster' ? 'text-indigo-900' : 'text-gray-700'}`}>
+                    Cluster-wise
+                  </p>
+                  <p className="text-sm text-gray-500">Target specific cluster</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Target Cluster Dropdown - Only shown when cluster-wise is selected */}
-        {formData.questionType === 'cluster' && (
+        {/* Show selected type info when type selector is hidden */}
+        {hideTypeSelector && (
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-sm font-medium text-gray-700">
+              Question Type: <span className="text-indigo-600 capitalize">{formData.questionType}</span>
+              {formData.questionType === 'cluster' && formData.targetCluster && (
+                <span className="ml-2">
+                  → Target: <span className="text-indigo-600 capitalize">{formData.targetCluster}</span>
+                </span>
+              )}
+            </p>
+          </div>
+        )}
+
+        {/* Target Cluster Dropdown - Only shown when cluster-wise is selected and type selector is visible */}
+        {!hideTypeSelector && formData.questionType === 'cluster' && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Target Cluster *
