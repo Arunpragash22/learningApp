@@ -13,7 +13,6 @@ import {
   WifiIcon,
   AlertTriangleIcon,
   Loader2Icon,
-  DatabaseIcon,
   CalendarIcon
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/Card';
@@ -184,12 +183,6 @@ export const SessionReport = () => {
                 size="sm"
               >
                 {report.sessionStatus === 'completed' ? 'Completed' : report.sessionStatus === 'live' ? 'Live' : 'Upcoming'}
-              </Badge>
-            )}
-            {report.id && (
-              <Badge variant="success" size="sm" className="flex items-center gap-1">
-                <DatabaseIcon className="h-3 w-3" />
-                Stored in MongoDB
               </Badge>
             )}
             {report.generatedAt && (
