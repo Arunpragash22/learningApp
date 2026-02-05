@@ -24,7 +24,8 @@ import {
   LockIcon,
   ZapIcon,
   ZapOffIcon,
-  SettingsIcon
+  SettingsIcon,
+  BarChart3Icon
 } from 'lucide-react';
 
 import { Card } from '../../components/ui/Card';
@@ -55,6 +56,7 @@ export const SessionList = () => {
   // Automation configuration modal state (for instructors)
   const [showStartModal, setShowStartModal] = useState(false);
   const [startingSession, setStartingSession] = useState<Session | null>(null);
+  const [realTimeAnalyticsEnabled, setRealTimeAnalyticsEnabled] = useState(false);
   const [automationEnabled, setAutomationEnabled] = useState(true);
   const [firstDelayMinutes, setFirstDelayMinutes] = useState(2);   // 2 minutes default
   const [intervalMinutes, setIntervalMinutes] = useState(10);       // 10 minutes default
@@ -357,6 +359,7 @@ export const SessionList = () => {
   // ---------------------------------------------------
   const handleOpenStartModal = (session: Session) => {
     setStartingSession(session);
+    setRealTimeAnalyticsEnabled(false);
     setAutomationEnabled(true);
     setFirstDelayMinutes(2);
     setIntervalMinutes(10);
@@ -371,20 +374,28 @@ export const SessionList = () => {
     setShowStartModal(false);
     
     const result = await sessionService.startSession(startingSession.id, {
-      enableAutomation: automationEnabled,
+      enableRealTimeAnalytics: realTimeAnalyticsEnabled,
+      enableAutomation: realTimeAnalyticsEnabled && automationEnabled,
       firstDelaySeconds: firstDelayMinutes * 60,
       intervalSeconds: intervalMinutes * 60,
       maxQuestions: maxQuestions || undefined
     });
     
     if (result.success) {
-      if (automationEnabled) {
+      if (realTimeAnalyticsEnabled && automationEnabled) {
         toast.success(
           <div>
-            <p className="font-medium">Session started with auto-questions!</p>
+            <p className="font-medium">Session started with real-time analytics!</p>
             <p className="text-sm text-gray-500">
               First question in {firstDelayMinutes} min, then every {intervalMinutes} min
             </p>
+          </div>
+        );
+      } else if (realTimeAnalyticsEnabled) {
+        toast.success(
+          <div>
+            <p className="font-medium">Session started with real-time analytics!</p>
+            <p className="text-sm text-gray-500">Manual question triggering enabled</p>
           </div>
         );
       } else {
@@ -559,37 +570,68 @@ export const SessionList = () => {
                 </button>
               </div>
 
-              {/* Automation Toggle */}
-              <div className="mb-6 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+              {/* Real-Time Analytics Toggle */}
+              <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <ZapIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                    <span className="font-medium text-gray-900 dark:text-white">Auto-Trigger Questions</span>
+                    <BarChart3Icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    <span className="font-medium text-gray-900 dark:text-white">Real-Time Analytics</span>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setAutomationEnabled(!automationEnabled)}
+                    onClick={() => setRealTimeAnalyticsEnabled(!realTimeAnalyticsEnabled)}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      automationEnabled ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'
+                      realTimeAnalyticsEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
                     }`}
                   >
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        automationEnabled ? 'translate-x-6' : 'translate-x-1'
+                        realTimeAnalyticsEnabled ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
                   </button>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {automationEnabled 
-                    ? 'Questions will be automatically sent to students during the session'
-                    : 'You will need to manually trigger questions'
+                  {realTimeAnalyticsEnabled 
+                    ? 'Monitor student engagement and send quiz questions in real-time'
+                    : 'Session will start without real-time analytics'
                   }
                 </p>
               </div>
 
-              {/* Automation Settings (only if enabled) */}
-              {automationEnabled && (
+              {/* Auto-Trigger Questions Toggle (only if Real-Time Analytics is enabled) */}
+              {realTimeAnalyticsEnabled && (
+                <div className="mb-6 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <ZapIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                      <span className="font-medium text-gray-900 dark:text-white">Auto-Trigger Questions</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAutomationEnabled(!automationEnabled)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        automationEnabled ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          automationEnabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {automationEnabled 
+                      ? 'Questions will be automatically sent to students during the session'
+                      : 'You will need to manually trigger questions'
+                    }
+                  </p>
+                </div>
+              )}
+
+              {/* Automation Settings (only if Real-Time Analytics and Auto-Trigger are enabled) */}
+              {realTimeAnalyticsEnabled && automationEnabled && (
                 <div className="space-y-4 mb-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -654,14 +696,21 @@ export const SessionList = () => {
                 <ul className="mt-2 space-y-1 text-gray-600 dark:text-gray-400 ml-6">
                   <li>• Session will be marked as LIVE</li>
                   <li>• Zoom meeting will open automatically</li>
-                  {automationEnabled ? (
+                  {realTimeAnalyticsEnabled ? (
                     <>
-                      <li>• First question after {firstDelayMinutes} min</li>
-                      <li>• Then every {intervalMinutes} min</li>
-                      <li>• {maxQuestions ? `Maximum ${maxQuestions} questions` : 'Unlimited questions'}</li>
+                      <li>• Real-time analytics enabled</li>
+                      {automationEnabled ? (
+                        <>
+                          <li>• First question after {firstDelayMinutes} min</li>
+                          <li>• Then every {intervalMinutes} min</li>
+                          <li>• {maxQuestions ? `Maximum ${maxQuestions} questions` : 'Unlimited questions'}</li>
+                        </>
+                      ) : (
+                        <li>• Manual question triggering only</li>
+                      )}
                     </>
                   ) : (
-                    <li>• Manual question triggering only</li>
+                    <li>• Real-time analytics disabled (normal session)</li>
                   )}
                 </ul>
               </div>

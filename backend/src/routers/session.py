@@ -621,7 +621,8 @@ async def end_session(
 
 class StartSessionRequest(BaseModel):
     """Request body for starting a session with optional automation config"""
-    enableAutomation: Optional[bool] = True  # Auto-trigger questions (default: enabled)
+    enableRealTimeAnalytics: Optional[bool] = False  # Enable real-time analytics (default: disabled)
+    enableAutomation: Optional[bool] = True  # Auto-trigger questions (default: enabled, only if analytics enabled)
     firstDelaySeconds: Optional[int] = 120   # Delay before first question (2 minutes)
     intervalSeconds: Optional[int] = 600     # Interval between questions (10 minutes)
     maxQuestions: Optional[int] = None       # Max questions to auto-trigger (None = unlimited)
@@ -637,7 +638,8 @@ async def start_session(
     Start a session (mark as live)
     
     Optional automation configuration:
-    - enableAutomation: Enable auto-triggering questions (default: True)
+    - enableRealTimeAnalytics: Enable real-time analytics (default: False)
+    - enableAutomation: Enable auto-triggering questions (default: True, only if analytics enabled)
     - firstDelaySeconds: Seconds before first question (default: 120 = 2 minutes)
     - intervalSeconds: Seconds between questions (default: 600 = 10 minutes)
     - maxQuestions: Maximum questions to auto-trigger (default: None = unlimited)
@@ -654,6 +656,9 @@ async def start_session(
         if request is None:
             request = StartSessionRequest()
         
+        # Only enable automation if real-time analytics is also enabled
+        effective_automation = request.enableRealTimeAnalytics and request.enableAutomation
+        
         await db.database.sessions.update_one(
             {"_id": ObjectId(session_id)},
             {
@@ -661,7 +666,8 @@ async def start_session(
                     "status": "live",
                     "actualStartTime": datetime.utcnow(),
                     "startedAt": datetime.utcnow(),
-                    "automationEnabled": request.enableAutomation,
+                    "realTimeAnalyticsEnabled": request.enableRealTimeAnalytics,
+                    "automationEnabled": effective_automation,
                     "automationConfig": {
                         "firstDelaySeconds": request.firstDelaySeconds,
                         "intervalSeconds": request.intervalSeconds,
@@ -681,7 +687,8 @@ async def start_session(
             "status": "live",
             "message": "Session has started",
             "timestamp": datetime.utcnow().isoformat(),
-            "automationEnabled": request.enableAutomation
+            "realTimeAnalyticsEnabled": request.enableRealTimeAnalytics,
+            "automationEnabled": effective_automation
         }
         
         # Broadcast using zoomMeetingId if available
@@ -690,11 +697,11 @@ async def start_session(
         # Also broadcast using MongoDB session_id
         await ws_manager.broadcast_to_session(session_id, session_started_event)
         
-        print(f"📢 Session started event broadcasted: session={session_id}, zoom={zoom_meeting_id}")
+        print(f"📢 Session started event broadcasted: session={session_id}, zoom={zoom_meeting_id}, analytics={request.enableRealTimeAnalytics}")
         
-        # 🤖 Start quiz automation if enabled
+        # 🤖 Start quiz automation if enabled (only when real-time analytics is on)
         automation_result = None
-        if request.enableAutomation:
+        if effective_automation:
             automation_result = await quiz_scheduler.start_automation(
                 session_id=session_id,
                 zoom_meeting_id=str(zoom_meeting_id) if zoom_meeting_id else None,
@@ -708,7 +715,8 @@ async def start_session(
             "success": True, 
             "message": "Session started", 
             "status": "live",
-            "automationEnabled": request.enableAutomation,
+            "realTimeAnalyticsEnabled": request.enableRealTimeAnalytics,
+            "automationEnabled": effective_automation,
             "automation": automation_result
         }
         

@@ -282,10 +282,11 @@ export const sessionService = {
   async startSession(
     sessionId: string, 
     automationConfig?: {
-      enableAutomation?: boolean;      // Default: true - auto-trigger questions
-      firstDelaySeconds?: number;      // Default: 120 (2 minutes) - delay before first question
-      intervalSeconds?: number;        // Default: 600 (10 minutes) - interval between questions
-      maxQuestions?: number;           // Default: null (unlimited)
+      enableRealTimeAnalytics?: boolean; // Default: false - enable real-time analytics
+      enableAutomation?: boolean;        // Default: true - auto-trigger questions (only if analytics enabled)
+      firstDelaySeconds?: number;        // Default: 120 (2 minutes) - delay before first question
+      intervalSeconds?: number;          // Default: 600 (10 minutes) - interval between questions
+      maxQuestions?: number;             // Default: null (unlimited)
     }
   ): Promise<StartSessionResponse> {
     try {
