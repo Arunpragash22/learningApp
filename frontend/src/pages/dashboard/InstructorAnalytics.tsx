@@ -303,9 +303,9 @@ export const InstructorAnalytics = () => {
   // Generate at-risk students based on time range
   const getAtRiskStudents = () => {
     const baseStudents = [
-      { id: '1', name: 'John Doe', engagement: 35, cluster: 'At-Risk Students', lastActive: '2 min ago' },
-      { id: '2', name: 'Jane Smith', engagement: 28, cluster: 'At-Risk Students', lastActive: '5 min ago' },
-      { id: '3', name: 'Bob Wilson', engagement: 42, cluster: 'At-Risk Students', lastActive: '1 min ago' },
+      { id: '1', name: 'Vimalan Arunpragash', engagement: 35, cluster: 'At-Risk Students', lastActive: '2 min ago' },
+      { id: '2', name: 'Shawmica Sivatharan', engagement: 28, cluster: 'At-Risk Students', lastActive: '5 min ago' },
+      { id: '3', name: 'Keranshama Shudharshan', engagement: 42, cluster: 'At-Risk Students', lastActive: '1 min ago' },
     ];
 
     if (selectedTimeRange === 'week') {
@@ -324,11 +324,11 @@ export const InstructorAnalytics = () => {
   // Moderate / Active students (for dropdown list)
   const moderateActiveStudents = useMemo(
     () => [
-      { id: 'm1', name: 'Alice Johnson', engagement: 72, cluster: 'Active Participants', lastActive: '2 min ago' },
-      { id: 'm2', name: 'Charlie Brown', engagement: 65, cluster: 'Moderate Participants', lastActive: '3 min ago' },
-      { id: 'm3', name: 'David Lee', engagement: 88, cluster: 'Active Participants', lastActive: '4 min ago' },
-      { id: 'm4', name: 'Emma Wilson', engagement: 91, cluster: 'Active Participants', lastActive: '5 min ago' },
-      { id: 'm5', name: 'Frank Miller', engagement: 68, cluster: 'Moderate Participants', lastActive: '6 min ago' },
+      { id: 'm1', name: 'Shawmica Sivatharan', engagement: 72, cluster: 'Active Participants', lastActive: '2 min ago' },
+      { id: 'm2', name: 'Vimalan Arunpragash', engagement: 65, cluster: 'Moderate Participants', lastActive: '3 min ago' },
+      { id: 'm3', name: 'Keranshama Shudharshan', engagement: 88, cluster: 'Active Participants', lastActive: '4 min ago' },
+      { id: 'm4', name: 'Prashanthy Kugathas', engagement: 91, cluster: 'Active Participants', lastActive: '5 min ago' },
+      { id: 'm5', name: 'Wafry Ahamed', engagement: 68, cluster: 'Moderate Participants', lastActive: '6 min ago' },
     ],
     [],
   );
