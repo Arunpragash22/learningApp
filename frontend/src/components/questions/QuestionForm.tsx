@@ -131,6 +131,10 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
       return;
     }
 
+    console.log('📝 Form data before submit:', formData);
+    console.log('📝 Question type:', formData.questionType);
+    console.log('📝 Target cluster:', formData.targetCluster);
+
     // Set category based on question type and target cluster
     let category = formData.category;
     if (formData.questionType === 'cluster' && formData.targetCluster) {

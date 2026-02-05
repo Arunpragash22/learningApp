@@ -97,6 +97,10 @@ export const QuestionManagement = () => {
         targetCluster: question.targetCluster,
       };
 
+      console.log('📤 Sending to API:', questionData);
+      console.log('📤 questionType:', questionData.questionType);
+      console.log('📤 targetCluster:', questionData.targetCluster);
+
       if (editingQuestion) {
         // Update existing question
         await questionService.updateQuestion(question.id, questionData);
