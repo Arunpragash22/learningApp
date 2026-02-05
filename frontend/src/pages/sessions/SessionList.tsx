@@ -919,20 +919,20 @@ export const SessionList = () => {
           <h3 className="text-gray-400 dark:text-gray-500">No meetings found</h3>
         </Card>
       ) : (
-        <div className="space-y-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
           {/* Standalone Meetings Section */}
-          {standaloneMeetings.length > 0 && (
-            <div>
-              <div className="mb-4">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <KeyIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                  Standalone Meetings
-                </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Meetings you've enrolled in with an enrollment key
-                </p>
-              </div>
+          <div>
+            <div className="mb-4">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <KeyIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                Standalone Meetings
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Meetings enrolled with enrollment key
+              </p>
+            </div>
+            {standaloneMeetings.length > 0 ? (
               <div className="space-y-4">
                 {standaloneMeetings.map((session) => (
                   <Card key={session.id} className="p-6">
@@ -1074,21 +1074,26 @@ export const SessionList = () => {
                   </Card>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <Card className="p-6 text-center text-gray-500">
+                <KeyIcon className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                <p>No standalone meetings</p>
+              </Card>
+            )}
+          </div>
 
           {/* Course-Based Meetings Section */}
-          {courseMeetings.length > 0 && (
-            <div>
-              <div className="mb-4">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <BookOpenIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  Course Meetings
-                </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Meetings from your enrolled courses
-                </p>
-              </div>
+          <div>
+            <div className="mb-4">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <BookOpenIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                Course Meetings
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Meetings from enrolled courses
+              </p>
+            </div>
+            {courseMeetings.length > 0 ? (
               <div className="space-y-4">
                 {courseMeetings.map((session) => (
                   <Card key={session.id} className="p-6">
@@ -1237,8 +1242,13 @@ export const SessionList = () => {
                   </Card>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <Card className="p-6 text-center text-gray-500">
+                <BookOpenIcon className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                <p>No course meetings</p>
+              </Card>
+            )}
+          </div>
         </div>
       )}
 
