@@ -346,21 +346,41 @@ export const InstructorAnalytics = () => {
 
   return (
     <div className="py-6">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Real-Time Analytics Dashboard</h1>
-            {selectedTimeRange === 'live' && isLive && (
-              <Badge variant="danger" className="animate-pulse w-fit">
-                <Radio className="h-3 w-3 mr-1" />
-                LIVE
-              </Badge>
-            )}
-          </div>
-          <p className="mt-1 text-xs sm:text-sm text-gray-500">
-            Monitor student engagement in real-time
-          </p>
+      {/* Title and subtitle at top */}
+      <div className="mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Real-Time Analytics Dashboard</h1>
+          {selectedTimeRange === 'live' && isLive && (
+            <Badge variant="danger" className="animate-pulse w-fit">
+              <Radio className="h-3 w-3 mr-1" />
+              LIVE
+            </Badge>
+          )}
         </div>
+        <p className="mt-1 text-xs sm:text-sm text-gray-500">
+          Monitor student engagement in real-time
+        </p>
+      </div>
+
+      {/* Session, View report, Download report — top control bar */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        {sessions.length > 0 && (
+          <div className="flex items-center gap-2">
+            <label htmlFor="analytics-session" className="text-sm font-medium text-gray-700">Session:</label>
+            <select
+              id="analytics-session"
+              value={selectedSession || ''}
+              onChange={(e) => setSelectedSession(e.target.value || null)}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 max-w-md"
+            >
+              {sessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title} ({s.status}) — {s.date}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         {selectedSession && (
           <div className="flex items-center gap-2 flex-shrink-0">
             <Button
@@ -387,25 +407,6 @@ export const InstructorAnalytics = () => {
           </div>
         )}
       </div>
-
-      {/* Session selector: pick which session to view analytics and report for */}
-      {sessions.length > 0 && (
-        <div className="mb-4 flex items-center gap-2">
-          <label htmlFor="analytics-session" className="text-sm font-medium text-gray-700">Session:</label>
-          <select
-            id="analytics-session"
-            value={selectedSession || ''}
-            onChange={(e) => setSelectedSession(e.target.value || null)}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 max-w-md"
-          >
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title} ({s.status}) — {s.date}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {loadingSessions && (
         <div className="py-8 text-center text-gray-500">Loading sessions...</div>

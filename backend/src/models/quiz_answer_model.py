@@ -202,9 +202,7 @@ class QuizAnswerModel:
             pass
 
         student_filter = {"studentId": student_id, "sessionId": {"$in": session_ids}}
-        session_filter = {"sessionId": {"$in": session_ids}}
-
-        cursor = database.quiz_answers.find(student_filter)
+        session_filter = {"sessionId": {"$in": session_ids}}        cursor = database.quiz_answers.find(student_filter)
         questions_answered = 0
         correct_answers = 0
         answered_question_ids = []
