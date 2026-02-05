@@ -204,8 +204,10 @@ async def get_session_report(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
         print(f"Error generating report: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate report")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
 
 
 @router.get("/{session_id}/report/download")
@@ -262,8 +264,10 @@ async def download_session_report(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
         print(f"Error downloading report: {e}")
-        raise HTTPException(status_code=500, detail="Failed to download report")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to download report: {str(e)}")
 
 
 @router.post("/{session_id}/report/send-email")
