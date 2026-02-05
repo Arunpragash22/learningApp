@@ -143,61 +143,42 @@ export const sessionService = {
       const pdfFilename = filename || `session_report_${sessionId}.pdf`;
       
       try {
-        // Create a temporary container for the HTML
-        const container = document.createElement('div');
-        container.innerHTML = htmlContent;
-        container.style.position = 'absolute';
-        container.style.left = '-9999px';
-        container.style.top = '0';
-        container.style.width = '210mm'; // A4 width
-        container.style.minHeight = '297mm'; // A4 height
-        container.style.background = '#ffffff';
-        container.style.padding = '20px';
-        document.body.appendChild(container);
+        // Create an iframe to render and print the HTML
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
         
-        // Wait for content to render
-        await new Promise(resolve => setTimeout(resolve, 800));
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!iframeDoc) {
+          throw new Error('Could not access iframe document');
+        }
         
-        // Import html2pdf dynamically
-        const html2pdfModule = await import('html2pdf.js');
-        const html2pdf = html2pdfModule.default;
+        // Write the HTML content to the iframe
+        iframeDoc.open();
+        iframeDoc.write(htmlContent);
+        iframeDoc.close();
         
-        // Generate PDF with promise wrapper for better error handling
-        await new Promise<void>((resolve, reject) => {
-          html2pdf()
-            .set({
-              margin: [10, 10, 10, 10],
-              filename: pdfFilename,
-              image: { type: 'jpeg', quality: 0.95 },
-              html2canvas: { 
-                scale: 2, 
-                useCORS: true, 
-                logging: false,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-                scrollX: 0,
-                scrollY: 0
-              },
-              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-              pagebreak: { mode: ['css', 'legacy'] }
-            })
-            .from(container)
-            .save()
-            .then(() => {
-              resolve();
-            })
-            .catch((err: Error) => {
-              reject(err);
-            });
-        });
+        // Wait for content to fully render
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Clean up
-        document.body.removeChild(container);
+        // Trigger print dialog (user can save as PDF)
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
         
-        return { success: true };
+        // Clean up after a delay
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1000);
+        
+        return { success: true, error: 'Use "Save as PDF" in the print dialog' };
       } catch (pdfError) {
         console.error("PDF generation error:", pdfError);
-        // Fallback to HTML download if PDF fails
+        // Fallback to HTML download if print fails
         const blob = new Blob([htmlContent], { type: 'text/html' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -207,7 +188,7 @@ export const sessionService = {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        return { success: true, error: 'Downloaded as HTML (PDF generation failed)' };
+        return { success: true, error: 'Downloaded as HTML' };
       }
     } catch (err) {
       console.error("Report download error:", err);
