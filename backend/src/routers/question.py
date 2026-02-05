@@ -18,6 +18,8 @@ class QuestionOption(BaseModel):
     tags: Optional[List[str]] = []
     timeLimit: Optional[int] = 30
     courseId: Optional[str] = None  # Optional: which course this question belongs to
+    questionType: Optional[str] = "generic"  # 'generic' or 'cluster'
+    targetCluster: Optional[str] = None  # 'passive', 'moderate', 'active' (only when questionType is 'cluster')
 
 
 class QuestionResponse(BaseModel):
@@ -32,6 +34,8 @@ class QuestionResponse(BaseModel):
     createdAt: Optional[str] = None
     instructorId: Optional[str] = None
     courseId: Optional[str] = None
+    questionType: Optional[str] = "generic"  # 'generic' or 'cluster'
+    targetCluster: Optional[str] = None  # 'passive', 'moderate', 'active'
 
 
 @router.post("/", response_model=QuestionResponse)
@@ -67,6 +71,8 @@ async def create_question(
             createdAt=created_question.get("createdAt"),
             instructorId=instructor_id,
             courseId=question_dict.get("courseId"),
+            questionType=created_question.get("questionType", "generic"),
+            targetCluster=created_question.get("targetCluster"),
         )
         
         return response
@@ -112,6 +118,8 @@ async def get_all_questions(
                 createdAt=q.get("createdAt"),
                 instructorId=q.get("instructorId"),
                 courseId=q.get("courseId"),
+                questionType=q.get("questionType", "generic"),
+                targetCluster=q.get("targetCluster"),
             ))
         
         return response
@@ -160,6 +168,8 @@ async def get_question_by_id(
             createdAt=question.get("createdAt"),
             instructorId=question.get("instructorId"),
             courseId=question.get("courseId"),
+            questionType=question.get("questionType", "generic"),
+            targetCluster=question.get("targetCluster"),
         )
     except HTTPException:
         raise
@@ -208,6 +218,8 @@ async def update_question(
             createdAt=updated_question.get("createdAt"),
             instructorId=updated_question.get("instructorId"),
             courseId=updated_question.get("courseId"),
+            questionType=updated_question.get("questionType", "generic"),
+            targetCluster=updated_question.get("targetCluster"),
         )
     except HTTPException:
         raise
