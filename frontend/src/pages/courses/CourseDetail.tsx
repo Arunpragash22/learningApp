@@ -531,23 +531,6 @@ export const CourseDetail = () => {
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Duration
-                      </label>
-                      <Select
-                        value={newSession.duration}
-                        onChange={(e) => setNewSession({ ...newSession, duration: e.target.value })}
-                        options={[
-                          { value: '30 min', label: '30 minutes' },
-                          { value: '60 min', label: '1 hour' },
-                          { value: '90 min', label: '1.5 hours' },
-                          { value: '120 min', label: '2 hours' },
-                          { value: '180 min', label: '3 hours' }
-                        ]}
-                      />
-                    </div>
-
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Description (optional)
