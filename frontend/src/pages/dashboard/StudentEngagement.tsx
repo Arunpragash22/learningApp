@@ -281,7 +281,7 @@ export const StudentEngagement = () => {
       {/* Session Reports Section — at the bottom, completed sessions only */}
       {completedSessions.length > 0 && (
         <div className="mt-6 pt-6 border-t border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">My Session Reports</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Session Reports</h2>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50 p-4 rounded-lg">
             <div className="flex items-center gap-2">
               <label htmlFor="student-session-report" className="text-sm font-medium text-gray-700">Session:</label>
