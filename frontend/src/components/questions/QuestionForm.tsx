@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { X, Plus, Trash2, Users, Target } from 'lucide-react';
 import { Question } from './QuestionBank';
 
 interface QuestionFormProps {
@@ -26,7 +26,9 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
     difficulty: question?.difficulty || 'medium',
     category: question?.category || '',
     tags: question?.tags || [],
-    timeLimit: question?.timeLimit || 30
+    timeLimit: question?.timeLimit || 30,
+    questionType: question?.questionType || 'generic',
+    targetCluster: question?.targetCluster || undefined
   });
 
   const [newTag, setNewTag] = useState('');
@@ -50,7 +52,9 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
       difficulty: prefillQuestion.difficulty || 'medium',
       category: prefillCategory || prefillQuestion.category || '',
       tags: prefillQuestion.tags || [],
-      timeLimit: prefillQuestion.timeLimit || 30
+      timeLimit: prefillQuestion.timeLimit || 30,
+      questionType: prefillQuestion.questionType || 'generic',
+      targetCluster: prefillQuestion.targetCluster || undefined
     });
   }, [prefillQuestion, prefillCategory, question]);
 
@@ -215,6 +219,78 @@ export const QuestionForm: React.FC<QuestionFormProps> = ({
             </select>
           </div>
         </div>
+
+        {/* Question Type - Generic or Cluster-wise */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Question Target
+          </label>
+          <div className="flex gap-4">
+            <label className={`flex-1 flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+              formData.questionType === 'generic' 
+                ? 'border-indigo-500 bg-indigo-50' 
+                : 'border-gray-200 hover:border-gray-300'
+            }`}>
+              <input
+                type="radio"
+                name="questionType"
+                value="generic"
+                checked={formData.questionType === 'generic'}
+                onChange={() => setFormData({ ...formData, questionType: 'generic', targetCluster: undefined })}
+                className="sr-only"
+              />
+              <Users className={`h-5 w-5 ${formData.questionType === 'generic' ? 'text-indigo-600' : 'text-gray-400'}`} />
+              <div>
+                <p className={`font-medium ${formData.questionType === 'generic' ? 'text-indigo-900' : 'text-gray-700'}`}>
+                  Generic
+                </p>
+                <p className="text-sm text-gray-500">Send to all students</p>
+              </div>
+            </label>
+            <label className={`flex-1 flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+              formData.questionType === 'cluster' 
+                ? 'border-indigo-500 bg-indigo-50' 
+                : 'border-gray-200 hover:border-gray-300'
+            }`}>
+              <input
+                type="radio"
+                name="questionType"
+                value="cluster"
+                checked={formData.questionType === 'cluster'}
+                onChange={() => setFormData({ ...formData, questionType: 'cluster', targetCluster: 'passive' })}
+                className="sr-only"
+              />
+              <Target className={`h-5 w-5 ${formData.questionType === 'cluster' ? 'text-indigo-600' : 'text-gray-400'}`} />
+              <div>
+                <p className={`font-medium ${formData.questionType === 'cluster' ? 'text-indigo-900' : 'text-gray-700'}`}>
+                  Cluster-wise
+                </p>
+                <p className="text-sm text-gray-500">Target specific cluster</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        {/* Target Cluster Dropdown - Only shown when cluster-wise is selected */}
+        {formData.questionType === 'cluster' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Target Cluster *
+            </label>
+            <select
+              value={formData.targetCluster || 'passive'}
+              onChange={(e) => setFormData({ ...formData, targetCluster: e.target.value as 'passive' | 'moderate' | 'active' })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="passive">Passive (At-Risk / Low Engagement)</option>
+              <option value="moderate">Moderate (Medium Engagement)</option>
+              <option value="active">Active (Highly Engaged)</option>
+            </select>
+            <p className="mt-1 text-sm text-gray-500">
+              This question will only be sent to students in the selected engagement cluster.
+            </p>
+          </div>
+        )}
 
         {/* Options */}
         <div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { Plus, Edit, Trash2, Search, Filter, Tag, Target, Clock, Zap, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Filter, Tag, Target, Clock, Zap, Loader2, Users } from 'lucide-react';
 
 export interface Question {
   id: string;
@@ -14,6 +14,8 @@ export interface Question {
   tags: string[];
   timeLimit?: number;
   createdAt: string;
+  questionType?: 'generic' | 'cluster';  // Generic = all students, Cluster = specific cluster
+  targetCluster?: 'passive' | 'moderate' | 'active';  // Only used when questionType is 'cluster'
 }
 
 interface QuestionBankProps {
@@ -151,7 +153,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
             <Card key={question.id} className="p-4 hover:shadow-lg transition-shadow">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2">
+                  <div className="flex items-center flex-wrap gap-2 mb-2">
                     <Badge variant={getDifficultyColor(question.difficulty) as any} size="sm">
                       {getDifficultyLabel(question.difficulty)}
                     </Badge>
@@ -159,6 +161,20 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
                       <Tag className="h-3 w-3 mr-1" />
                       {question.category}
                     </Badge>
+                    {/* Question Target Badge */}
+                    {question.questionType === 'cluster' ? (
+                      <Badge variant="warning" size="sm">
+                        <Target className="h-3 w-3 mr-1" />
+                        {question.targetCluster === 'passive' && 'Passive'}
+                        {question.targetCluster === 'moderate' && 'Moderate'}
+                        {question.targetCluster === 'active' && 'Active'}
+                      </Badge>
+                    ) : (
+                      <Badge variant="info" size="sm">
+                        <Users className="h-3 w-3 mr-1" />
+                        Generic
+                      </Badge>
+                    )}
                   </div>
                   <h4 className="font-semibold text-gray-900 mb-2">{question.question}</h4>
                   <div className="space-y-1">
