@@ -32,11 +32,55 @@ async def trigger_question(meeting_id: str):
     """
 
     try:
-        # 1) Fetch all questions from MongoDB
-        questions = await db.database.questions.find({}).to_list(length=None)
+        # First, find the session to get its MongoDB ID for filtering questions
+        session_doc = None
+        session_mongo_id = None
+        
+        # Try to find the session document
+        if meeting_id.isdigit():
+            try:
+                session_doc = await db.database.sessions.find_one({"zoomMeetingId": int(meeting_id)})
+            except:
+                pass
+        
+        if not session_doc:
+            session_doc = await db.database.sessions.find_one({"zoomMeetingId": meeting_id})
+        
+        if not session_doc:
+            try:
+                if len(meeting_id) == 24:
+                    session_doc = await db.database.sessions.find_one({"_id": ObjectId(meeting_id)})
+            except:
+                pass
+        
+        if session_doc:
+            session_mongo_id = str(session_doc["_id"])
+        
+        # 1) Fetch questions - first try session-specific, then fall back to instructor's questions
+        questions = []
+        
+        # Try to get questions specific to this session
+        if session_mongo_id:
+            questions = await db.database.questions.find({"sessionId": session_mongo_id}).to_list(length=None)
+            print(f"📝 Found {len(questions)} questions for session {session_mongo_id}")
+        
+        # If no session-specific questions, get instructor's general questions (without sessionId)
+        if not questions and session_doc:
+            instructor_id = session_doc.get("instructorId")
+            if instructor_id:
+                questions = await db.database.questions.find({
+                    "instructorId": instructor_id,
+                    "$or": [{"sessionId": None}, {"sessionId": {"$exists": False}}]
+                }).to_list(length=None)
+                print(f"📝 Found {len(questions)} general questions from instructor")
+        
+        # Final fallback: get all questions
+        if not questions:
+            questions = await db.database.questions.find({}).to_list(length=None)
+            print(f"📝 Fallback: Found {len(questions)} total questions")
 
         if not questions:
-            return {"success": False, "message": "No questions found in DB"}
+            return {"success": False, "message": "No questions found for this session"}
 
         # 2) Get all participants in this session
         # Students might be connected using either zoomMeetingId or MongoDB sessionId
@@ -217,44 +261,74 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
     Reliable delivery via WebSocket broadcast; works regardless of student page/tab.
     """
     try:
-        questions = await db.database.questions.find({}).to_list(length=None)
-        if not questions:
-            return {"success": False, "message": "No questions found in DB"}
-
-        participants = ws_manager.get_session_participants(meeting_id)
+        # First, find the session to get its MongoDB ID for filtering questions
+        session_doc = None
+        session_mongo_id = None
         effective_meeting_id = meeting_id
         session_ids_to_check = [meeting_id]
+        
+        # Try to find the session document
+        if meeting_id.isdigit():
+            try:
+                session_doc = await db.database.sessions.find_one({"zoomMeetingId": int(meeting_id)})
+            except:
+                pass
+        
+        if not session_doc:
+            session_doc = await db.database.sessions.find_one({"zoomMeetingId": meeting_id})
+        
+        if not session_doc and len(meeting_id) == 24:
+            try:
+                session_doc = await db.database.sessions.find_one({"_id": ObjectId(meeting_id)})
+            except:
+                pass
+        
+        if session_doc:
+            session_mongo_id = str(session_doc["_id"])
+            zoom_id = str(session_doc.get("zoomMeetingId", "")) if session_doc.get("zoomMeetingId") is not None else None
+            if zoom_id and zoom_id not in session_ids_to_check:
+                session_ids_to_check.append(zoom_id)
+            if session_mongo_id and session_mongo_id not in session_ids_to_check:
+                session_ids_to_check.append(session_mongo_id)
+        
+        # Fetch questions - first try session-specific, then fall back to instructor's questions
+        questions = []
+        
+        # Try to get questions specific to this session
+        if session_mongo_id:
+            questions = await db.database.questions.find({"sessionId": session_mongo_id}).to_list(length=None)
+            print(f"📝 trigger-same: Found {len(questions)} questions for session {session_mongo_id}")
+        
+        # If no session-specific questions, get instructor's general questions (without sessionId)
+        if not questions and session_doc:
+            instructor_id = session_doc.get("instructorId")
+            if instructor_id:
+                questions = await db.database.questions.find({
+                    "instructorId": instructor_id,
+                    "$or": [{"sessionId": None}, {"sessionId": {"$exists": False}}]
+                }).to_list(length=None)
+                print(f"📝 trigger-same: Found {len(questions)} general questions from instructor")
+        
+        # Final fallback: get all questions
+        if not questions:
+            questions = await db.database.questions.find({}).to_list(length=None)
+            print(f"📝 trigger-same: Fallback - Found {len(questions)} total questions")
+        
+        if not questions:
+            return {"success": False, "message": "No questions found for this session"}
+
+        participants = ws_manager.get_session_participants(meeting_id)
 
         if not participants:
             try:
-                session_doc = None
-                if meeting_id.isdigit():
-                    try:
-                        session_doc = await db.database.sessions.find_one({"zoomMeetingId": int(meeting_id)})
-                    except Exception:
-                        pass
-                if not session_doc:
-                    session_doc = await db.database.sessions.find_one({"zoomMeetingId": meeting_id})
-                if not session_doc and len(meeting_id) == 24:
-                    try:
-                        session_doc = await db.database.sessions.find_one({"_id": ObjectId(meeting_id)})
-                    except Exception:
-                        pass
-                if session_doc:
-                    zoom_id = str(session_doc.get("zoomMeetingId", "")) if session_doc.get("zoomMeetingId") is not None else None
-                    mongo_id = str(session_doc["_id"])
-                    if zoom_id and zoom_id not in session_ids_to_check:
-                        session_ids_to_check.append(zoom_id)
-                    if mongo_id and mongo_id not in session_ids_to_check:
-                        session_ids_to_check.append(mongo_id)
-                    participants = ws_manager.get_session_participants_by_multiple_ids(session_ids_to_check)
-                    if participants:
-                        participant_counts = {}
-                        for p in participants:
-                            sid = p.get("sessionId", meeting_id)
-                            participant_counts[sid] = participant_counts.get(sid, 0) + 1
-                        if participant_counts:
-                            effective_meeting_id = max(participant_counts.items(), key=lambda x: x[1])[0]
+                participants = ws_manager.get_session_participants_by_multiple_ids(session_ids_to_check)
+                if participants:
+                    participant_counts = {}
+                    for p in participants:
+                        sid = p.get("sessionId", meeting_id)
+                        participant_counts[sid] = participant_counts.get(sid, 0) + 1
+                    if participant_counts:
+                        effective_meeting_id = max(participant_counts.items(), key=lambda x: x[1])[0]
             except Exception as lookup_error:
                 print(f"⚠️ trigger-same: resolve error: {lookup_error}")
 

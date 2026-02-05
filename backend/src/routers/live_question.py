@@ -44,6 +44,33 @@ async def trigger_question(
     - Sends to Zoom chat
     """
     try:
+        from bson import ObjectId
+        from ..database.connection import db
+        
+        # Find the session to get its MongoDB ID for filtering questions
+        session_doc = None
+        session_mongo_id = None
+        zoom_meeting_id = request_data.zoomMeetingId
+        
+        # Try to find the session document by zoom meeting ID
+        if zoom_meeting_id.isdigit():
+            try:
+                session_doc = await db.database.sessions.find_one({"zoomMeetingId": int(zoom_meeting_id)})
+            except:
+                pass
+        
+        if not session_doc:
+            session_doc = await db.database.sessions.find_one({"zoomMeetingId": zoom_meeting_id})
+        
+        if not session_doc and len(zoom_meeting_id) == 24:
+            try:
+                session_doc = await db.database.sessions.find_one({"_id": ObjectId(zoom_meeting_id)})
+            except:
+                pass
+        
+        if session_doc:
+            session_mongo_id = str(session_doc["_id"])
+        
         # Get the question
         if request_data.questionId:
             question = await Question.find_by_id(request_data.questionId)
@@ -53,12 +80,33 @@ async def trigger_question(
                     detail="Question not found"
                 )
         else:
-            # Pick random question
-            questions = await Question.find_all()
+            # Pick random question - prioritize session-specific questions
+            questions = []
+            
+            # Try to get questions specific to this session
+            if session_mongo_id:
+                questions = await Question.find_by_session(session_mongo_id, current_user["id"])
+                print(f"📝 live-questions trigger: Found {len(questions)} questions for session {session_mongo_id}")
+            
+            # Fallback to instructor's questions without sessionId
+            if not questions:
+                questions = await Question.find_by_instructor(
+                    current_user["id"],
+                    session_id=None  # Get questions without sessionId
+                )
+                # Filter to only questions without sessionId
+                questions = [q for q in questions if not q.get("sessionId")]
+                print(f"📝 live-questions trigger: Found {len(questions)} general questions from instructor")
+            
+            # Final fallback: get all questions
+            if not questions:
+                questions = await Question.find_all()
+                print(f"📝 live-questions trigger: Fallback - Found {len(questions)} total questions")
+            
             if not questions:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="No questions available"
+                    detail="No questions available for this session"
                 )
             question = random.choice(questions)
         

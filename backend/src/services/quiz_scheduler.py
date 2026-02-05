@@ -189,17 +189,53 @@ class QuizScheduler:
         """
         Trigger a random question to all students in the session.
         Ensures no duplicate questions are sent.
+        Questions are filtered by sessionId first, then instructor's general questions.
         """
         # Import here to avoid circular imports
         from ..database.connection import db
         from .ws_manager import ws_manager
+        from bson import ObjectId
         
         try:
-            # Get all questions from database
-            questions = await db.database.questions.find({}).to_list(length=None)
+            # Find the session to get instructor info
+            session_doc = None
+            try:
+                if len(session_id) == 24:
+                    session_doc = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
+            except:
+                pass
+            
+            if not session_doc and zoom_meeting_id:
+                try:
+                    session_doc = await db.database.sessions.find_one({"zoomMeetingId": int(zoom_meeting_id)})
+                except:
+                    session_doc = await db.database.sessions.find_one({"zoomMeetingId": zoom_meeting_id})
+            
+            # Get questions - first try session-specific, then instructor's general questions
+            questions = []
+            
+            # Try to get questions specific to this session
+            if session_id:
+                questions = await db.database.questions.find({"sessionId": session_id}).to_list(length=None)
+                print(f"📝 Auto-trigger: Found {len(questions)} questions for session {session_id}")
+            
+            # If no session-specific questions, get instructor's general questions
+            if not questions and session_doc:
+                instructor_id = session_doc.get("instructorId")
+                if instructor_id:
+                    questions = await db.database.questions.find({
+                        "instructorId": instructor_id,
+                        "$or": [{"sessionId": None}, {"sessionId": {"$exists": False}}]
+                    }).to_list(length=None)
+                    print(f"📝 Auto-trigger: Found {len(questions)} general questions from instructor")
+            
+            # Final fallback: get all questions
+            if not questions:
+                questions = await db.database.questions.find({}).to_list(length=None)
+                print(f"📝 Auto-trigger: Fallback - Found {len(questions)} total questions")
             
             if not questions:
-                return {"success": False, "message": "No questions in database"}
+                return {"success": False, "message": "No questions found for this session"}
             
             # Filter out already-sent questions for this session
             sent_ids = self.sent_questions.get(session_id, set())

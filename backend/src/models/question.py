@@ -88,6 +88,46 @@ class Question:
         return questions
 
     @staticmethod
+    async def find_by_session(session_id: str, instructor_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Find questions for a specific session.
+        First tries session-specific questions, then falls back to instructor's general questions.
+        """
+        database = get_database()
+        if database is None:
+            return []
+        
+        questions = []
+        
+        # First, try to find questions specific to this session
+        async for question in database.questions.find({"sessionId": session_id}):
+            q = dict(question)
+            q["id"] = str(q["_id"])
+            del q["_id"]
+            questions.append(q)
+        
+        # If no session-specific questions and instructor_id provided, get general questions
+        if not questions and instructor_id:
+            query = {
+                "$or": [{"instructorId": instructor_id}, {"createdBy": instructor_id}],
+                "$or": [{"sessionId": None}, {"sessionId": {"$exists": False}}]
+            }
+            # Need to use $and for multiple $or conditions
+            query = {
+                "$and": [
+                    {"$or": [{"instructorId": instructor_id}, {"createdBy": instructor_id}]},
+                    {"$or": [{"sessionId": None}, {"sessionId": {"$exists": False}}]}
+                ]
+            }
+            async for question in database.questions.find(query):
+                q = dict(question)
+                q["id"] = str(q["_id"])
+                del q["_id"]
+                questions.append(q)
+        
+        return questions
+
+    @staticmethod
     async def find_by_instructor(instructor_id: str, course_id: Optional[str] = None, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Find questions by instructor (instructorId or legacy createdBy), optionally by courseId or sessionId."""
         database = get_database()
