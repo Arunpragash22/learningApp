@@ -283,38 +283,62 @@ export const SessionReport = () => {
         </CardContent>
       </Card>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card className="p-4 text-center">
-          <div className="flex justify-center mb-2">
-            <UsersIcon className="h-8 w-8 text-blue-500" />
-          </div>
-          <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            {report.totalParticipants}
-          </p>
-          <p className="text-sm text-gray-500">Participants</p>
-        </Card>
-        
-        <Card className="p-4 text-center">
-          <div className="flex justify-center mb-2">
-            <HelpCircleIcon className="h-8 w-8 text-blue-500" />
-          </div>
-          <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            {report.totalQuestionsAsked}
-          </p>
-          <p className="text-sm text-gray-500">Questions Asked</p>
-        </Card>
-        
-        <Card className="p-4 text-center">
-          <div className="flex justify-center mb-2">
-            <CheckCircleIcon className="h-8 w-8 text-blue-500" />
-          </div>
-          <p className="text-3xl font-bold text-blue-600">
-            {report.engagementSummary?.highly_engaged || 0}
-          </p>
-          <p className="text-sm text-gray-500">Highly Engaged</p>
-        </Card>
-      </div>
+      {/* Stats Cards - Different for instructors and students */}
+      {isInstructor ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card className="p-4 text-center">
+            <div className="flex justify-center mb-2">
+              <UsersIcon className="h-8 w-8 text-blue-500" />
+            </div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+              {report.totalParticipants}
+            </p>
+            <p className="text-sm text-gray-500">Participants</p>
+          </Card>
+          
+          <Card className="p-4 text-center">
+            <div className="flex justify-center mb-2">
+              <HelpCircleIcon className="h-8 w-8 text-blue-500" />
+            </div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+              {report.totalQuestionsAsked}
+            </p>
+            <p className="text-sm text-gray-500">Questions Asked</p>
+          </Card>
+          
+          <Card className="p-4 text-center">
+            <div className="flex justify-center mb-2">
+              <CheckCircleIcon className="h-8 w-8 text-blue-500" />
+            </div>
+            <p className="text-3xl font-bold text-blue-600">
+              {report.engagementSummary?.highly_engaged || 0}
+            </p>
+            <p className="text-sm text-gray-500">Highly Engaged</p>
+          </Card>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <Card className="p-4 text-center">
+            <div className="flex justify-center mb-2">
+              <HelpCircleIcon className="h-8 w-8 text-blue-500" />
+            </div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+              {report.students?.[0]?.totalQuestions || report.totalQuestionsAsked || 0}
+            </p>
+            <p className="text-sm text-gray-500">Total Questions</p>
+          </Card>
+          
+          <Card className="p-4 text-center">
+            <div className="flex justify-center mb-2">
+              <CheckCircleIcon className="h-8 w-8 text-green-500" />
+            </div>
+            <p className="text-3xl font-bold text-green-600">
+              {report.students?.[0]?.correctAnswers || 0}
+            </p>
+            <p className="text-sm text-gray-500">Correct Answers</p>
+          </Card>
+        </div>
+      )}
 
       {/* Engagement Summary - Only for instructors */}
       {isInstructor && (
