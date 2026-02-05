@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-d
 import { useAuth } from '../../context/AuthContext';
 import { useSessionConnection } from '../../context/SessionConnectionContext';
 import { QuizPopup } from '../quiz/QuizPopup';
+import { Footer } from './Footer';
 import { BookOpenIcon, CalendarIcon, MenuIcon, XIcon, HomeIcon, GraduationCapIcon, BellIcon, LogOutIcon, BarChart3Icon, ActivityIcon, TargetIcon, KeyIcon, ChevronDownIcon } from 'lucide-react';
 
 export const DashboardLayout = () => {
@@ -123,7 +124,7 @@ export const DashboardLayout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#eff6ff] dark:bg-gray-900">
+    <div className="min-h-screen bg-[#eff6ff] dark:bg-gray-900 flex flex-col">
       {/* Top Navigation Bar */}
       <nav className="bg-gradient-to-r from-[#3B82F6] via-[#2563eb] to-[#1d4ed8] shadow-lg fixed top-0 left-0 right-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -135,7 +136,7 @@ export const DashboardLayout = () => {
                   <GraduationCapIcon className="h-6 w-6 text-white" />
                 </div>
                 <div className="hidden sm:block">
-                  <h1 className="text-lg font-bold text-white">Learning Platform</h1>
+                  <h1 className="text-lg font-bold text-white">ClassPulse</h1>
                 </div>
               </Link>
             </div>
@@ -304,13 +305,16 @@ export const DashboardLayout = () => {
       </nav>
 
       {/* Main Content */}
-      <main className="pt-16 min-h-screen">
+      <main className="pt-16 flex-1">
         <div className="py-6">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <Outlet />
           </div>
         </div>
       </main>
+
+      {/* Footer */}
+      <Footer />
 
       {/* Global quiz popup: students receive instructor-triggered questions on any page */}
       {isStudent && incomingQuiz && (
