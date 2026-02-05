@@ -154,7 +154,7 @@ export const CourseDetail = () => {
 
   const tabs = [
     { id: 'sessions', label: 'Lessons', icon: CalendarIcon },
-    { id: 'materials', label: 'Materials', icon: FileTextIcon },
+    { id: 'materials', label: 'Learning Materials', icon: FileTextIcon },
   ];
 
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
