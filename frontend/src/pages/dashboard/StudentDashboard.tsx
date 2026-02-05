@@ -303,14 +303,6 @@ export const StudentDashboard = () => {
               <span className="text-sm font-medium">In meeting</span>
             </Link>
           )}
-          <Link to="/dashboard/sessions" className="text-sm font-medium text-gray-600 hover:underline">
-            Manage on Meetings
-          </Link>
-          <Link to="/dashboard/student/engagement" className="w-full sm:w-auto">
-            <Button variant="primary" leftIcon={<ActivityIcon className="h-4 w-4" />} fullWidth className="sm:w-auto">
-              View Engagement
-            </Button>
-          </Link>
         </div>
       </div>
 
@@ -364,9 +356,6 @@ export const StudentDashboard = () => {
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-medium text-gray-900">Upcoming Meetings</h3>
-          <Link to="/dashboard/sessions" className="text-sm font-medium hover:opacity-80" style={{ color: "#3B82F6" }}>
-            Join from Meetings →
-          </Link>
         </div>
         <p className="text-sm text-gray-500">
           View-only. Go to <Link to="/dashboard/sessions" className="text-blue-600 hover:underline">Meetings</Link> to join.
