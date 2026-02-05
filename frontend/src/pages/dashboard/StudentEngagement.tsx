@@ -63,24 +63,26 @@ export const StudentEngagement = () => {
     return () => clearInterval(interval);
   }, [activeSessionId, user?.id]);
 
-  // Fetch completed sessions for the reports section
+  // Fetch sessions the student participated in (from reports API)
   useEffect(() => {
-    const fetchSessions = async () => {
-      const list = await sessionService.getAllSessions();
-      const completed = (list || [])
-        .filter((s: { status: string }) => s.status === 'completed')
-        .map((s: { id: string; title: string; date: string; status: string }) => ({
-          id: s.id,
-          title: s.title,
-          date: s.date,
-          status: s.status
+    const fetchParticipatedSessions = async () => {
+      try {
+        const { reports } = await sessionService.getAllReports();
+        const participated = (reports || []).map((r: { sessionId: string; sessionTitle: string; sessionDate: string }) => ({
+          id: r.sessionId,
+          title: r.sessionTitle || 'Session',
+          date: r.sessionDate || '',
+          status: 'completed'
         }));
-      setCompletedSessions(completed);
-      if (completed.length > 0 && !selectedReportSession) {
-        setSelectedReportSession(completed[0].id);
+        setCompletedSessions(participated);
+        if (participated.length > 0 && !selectedReportSession) {
+          setSelectedReportSession(participated[0].id);
+        }
+      } catch (err) {
+        console.error('Failed to fetch participated sessions:', err);
       }
     };
-    fetchSessions();
+    fetchParticipatedSessions();
   }, []);
 
   const handleDownloadReport = async () => {
@@ -197,37 +199,27 @@ export const StudentEngagement = () => {
             Track your engagement, receive personalized feedback, and improve your learning
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<FileText className="h-4 w-4" />}
-            onClick={() => navigate('/dashboard/student/reports')}
-          >
-            My Reports
-          </Button>
-          {activeSessionId && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                leftIcon={<FileText className="h-4 w-4" />}
-                onClick={() => navigate(`/dashboard/sessions/${activeSessionId}/report`)}
-              >
-                View report
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                leftIcon={downloadingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                onClick={handleDownloadReport}
-                disabled={downloadingReport}
-              >
-                {downloadingReport ? 'Downloading...' : 'Download report'}
-              </Button>
-            </>
-          )}
-        </div>
+        {activeSessionId && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<FileText className="h-4 w-4" />}
+              onClick={() => navigate(`/dashboard/sessions/${activeSessionId}/report`)}
+            >
+              View report
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              leftIcon={downloadingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              onClick={handleDownloadReport}
+              disabled={downloadingReport}
+            >
+              {downloadingReport ? 'Downloading...' : 'Download report'}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Engagement Overview */}
