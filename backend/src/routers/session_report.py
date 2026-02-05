@@ -489,7 +489,8 @@ def _generate_report_html(report: dict, user_role: str) -> str:
         </div>
         '''}
         
-        <!-- Engagement Summary -->
+        {"" if not is_instructor else f'''
+        <!-- Engagement Summary - Instructors only -->
         <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px;">
             <div style="padding: 15px 20px; border-bottom: 1px solid #e5e7eb;">
                 <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: #111827;">Engagement Summary</h3>
@@ -515,6 +516,7 @@ def _generate_report_html(report: dict, user_role: str) -> str:
                 </table>
             </div>
         </div>
+        '''}
         
         <!-- Footer -->
         <div style="text-align: center; padding: 24px; color: #9ca3af; font-size: 12px;">

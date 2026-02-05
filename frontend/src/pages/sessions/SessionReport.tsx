@@ -316,36 +316,38 @@ export const SessionReport = () => {
         </Card>
       </div>
 
-      {/* Engagement Summary */}
-      <Card className="mb-6">
-        <CardHeader>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Engagement Summary
-          </h3>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
-              <p className="text-2xl font-bold text-blue-600">
-                {report.engagementSummary?.highly_engaged || 0}
-              </p>
-              <p className="text-sm text-blue-800 dark:text-blue-300">Highly Engaged</p>
+      {/* Engagement Summary - Only for instructors */}
+      {isInstructor && (
+        <Card className="mb-6">
+          <CardHeader>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Engagement Summary
+            </h3>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
+                <p className="text-2xl font-bold text-blue-600">
+                  {report.engagementSummary?.highly_engaged || 0}
+                </p>
+                <p className="text-sm text-blue-800 dark:text-blue-300">Highly Engaged</p>
+              </div>
+              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-center">
+                <p className="text-2xl font-bold text-yellow-600">
+                  {report.engagementSummary?.moderately_engaged || 0}
+                </p>
+                <p className="text-sm text-yellow-800 dark:text-yellow-300">Moderately Engaged</p>
+              </div>
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-center">
+                <p className="text-2xl font-bold text-red-600">
+                  {report.engagementSummary?.at_risk || 0}
+                </p>
+                <p className="text-sm text-red-800 dark:text-red-300">At Risk</p>
+              </div>
             </div>
-            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-center">
-              <p className="text-2xl font-bold text-yellow-600">
-                {report.engagementSummary?.moderately_engaged || 0}
-              </p>
-              <p className="text-sm text-yellow-800 dark:text-yellow-300">Moderately Engaged</p>
-            </div>
-            <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-center">
-              <p className="text-2xl font-bold text-red-600">
-                {report.engagementSummary?.at_risk || 0}
-              </p>
-              <p className="text-sm text-red-800 dark:text-red-300">At Risk</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Instructor View: Student Performance Table */}
       {isInstructor && (
