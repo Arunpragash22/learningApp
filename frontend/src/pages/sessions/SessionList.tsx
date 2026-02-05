@@ -967,7 +967,7 @@ export const SessionList = () => {
 
                       {/* Buttons */}
                       <div className="flex flex-col gap-3">
-                        {isInstructor && (
+                        {isInstructor && session.status !== 'completed' && (
                           <Button
                             variant="outline"
                             leftIcon={<EditIcon className="h-4 w-4" />}
@@ -1124,7 +1124,7 @@ export const SessionList = () => {
                       {/* Buttons */}
                       <div className="flex flex-col gap-3">
 
-                        {isInstructor && (
+                        {isInstructor && session.status !== 'completed' && (
                           <Button
                             variant="outline"
                             leftIcon={<EditIcon className="h-4 w-4" />}
