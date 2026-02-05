@@ -29,12 +29,12 @@ export const Footer = () => {
             {/* Address */}
             <div className="flex flex-col items-center gap-2 border-x-0 md:border-x border-white/30">
               <MapPinIcon className="h-6 w-6" />
-              <span className="font-semibold">Colombo, Sri Lanka</span>
+              <span className="font-semibold">Mihintale, Sri Lanka</span>
             </div>
             {/* Email */}
             <div className="flex flex-col items-center gap-2">
               <MailIcon className="h-6 w-6" />
-              <span className="font-semibold">info@techsnatcherrs.com</span>
+              <span className="font-semibold">techsnatchers@gmail.com</span>
             </div>
           </div>
         </div>
