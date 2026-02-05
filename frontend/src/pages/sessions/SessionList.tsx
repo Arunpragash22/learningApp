@@ -1053,7 +1053,7 @@ export const SessionList = () => {
                           </>
                         )}
 
-                        {isInstructor && (
+                        {isInstructor && session.status === 'completed' && (
                           <Button
                             variant="outline"
                             leftIcon={<FileTextIcon className="h-4 w-4" />}
@@ -1061,13 +1061,6 @@ export const SessionList = () => {
                           >
                             View Report
                           </Button>
-                        )}
-
-                        {isInstructor && session.status === 'completed' && (
-                          <div className="flex items-center gap-2 text-blue-600 text-sm">
-                            <CheckCircleIcon className="h-4 w-4" />
-                            <span>Report Available</span>
-                          </div>
                         )}
                       </div>
                     </div>
@@ -1218,8 +1211,8 @@ export const SessionList = () => {
                           </>
                         )}
 
-                        {/* VIEW REPORT - ONLY for instructors */}
-                        {isInstructor && (
+                        {/* VIEW REPORT - ONLY for instructors and completed sessions */}
+                        {isInstructor && session.status === 'completed' && (
                           <Button
                             variant="outline"
                             leftIcon={<FileTextIcon className="h-4 w-4" />}
@@ -1227,14 +1220,6 @@ export const SessionList = () => {
                           >
                             View Report
                           </Button>
-                        )}
-
-                        {/* Show completed indicator for instructors */}
-                        {isInstructor && session.status === 'completed' && (
-                          <div className="flex items-center gap-2 text-blue-600 text-sm">
-                            <CheckCircleIcon className="h-4 w-4" />
-                            <span>Report Available</span>
-                          </div>
                         )}
                       </div>
                     </div>
