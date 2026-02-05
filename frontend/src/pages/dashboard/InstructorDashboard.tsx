@@ -207,8 +207,8 @@ export const InstructorDashboard = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Trigger Question: send one random question to all joined students (one click, no duplicate) */}
-          {(selectedSession || sessions[0]) ? (
+          {/* Trigger Question: send one random question to all joined students (only when session is live) */}
+          {(selectedSession?.status === 'live' || sessions.some(s => s.status === 'live')) && (
             <Button
               variant="primary"
               size="sm"
@@ -218,7 +218,7 @@ export const InstructorDashboard = () => {
             >
               {triggerLoading ? "Sending…" : "Trigger Question"}
             </Button>
-          ) : null}
+          )}
         </div>
       </div>
 
