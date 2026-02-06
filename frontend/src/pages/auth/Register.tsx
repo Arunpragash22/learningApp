@@ -612,7 +612,7 @@ export const Register = () => {
                     </span>
                   </div>
                   <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                    I agree that ClassPulse may monitor my network connection quality during live sessions 
+                    I agree that ClassPulse may monitor my network connection quality during live meetings 
                     to provide better learning analytics and engagement tracking. This data helps instructors 
                     understand if poor engagement is due to network issues rather than disinterest.
                   </p>
