@@ -17,6 +17,7 @@ import { QuestionNotificationPopup } from '../../components/notifications/Questi
 import { useSessionSocket, QuizNotification } from '../../hooks/useSessionSocket';
 import { useLatencyMonitor, ConnectionQuality } from '../../hooks/useLatencyMonitor';
 import { ConnectionQualityIndicator, ConnectionQualityBadge } from '../../components/engagement/ConnectionQualityIndicator';
+import { NetworkWarningPopup } from '../../components/notifications/NetworkWarningPopup';
 
 const DEFAULT_SESSION_QUESTIONS: Question[] = [
   {
@@ -170,11 +171,22 @@ export const LiveSession = () => {
     autoConnect: false // 🎯 Disabled - must be explicitly enabled when student joins
   });
 
+  // 📶 Network warning popup state
+  const [showNetworkWarning, setShowNetworkWarning] = useState(false);
+  const [networkWarningQuality, setNetworkWarningQuality] = useState<ConnectionQuality>('unknown');
+  const networkWarningShownRef = React.useRef<Set<string>>(new Set());
+
   // 📶 WebRTC-aware Connection Latency Monitoring
   // This monitors network quality during the Zoom session to contextualize engagement analysis
   const handleConnectionQualityChange = useCallback((quality: ConnectionQuality, stats: any) => {
-    if (quality === 'poor' || quality === 'critical') {
-      toast.warning(`⚠️ Connection quality: ${quality}. Engagement metrics will be contextualized.`);
+    // Show network warning popup for fair, poor, or critical quality (without sound)
+    if (quality === 'fair' || quality === 'poor' || quality === 'critical') {
+      // Only show the popup once per quality level per session
+      if (!networkWarningShownRef.current.has(quality)) {
+        networkWarningShownRef.current.add(quality);
+        setNetworkWarningQuality(quality);
+        setShowNetworkWarning(true);
+      }
     }
   }, []);
 
@@ -616,6 +628,14 @@ export const LiveSession = () => {
             clearNotification();
             // User will be redirected to question page
           }}
+        />
+      )}
+
+      {/* 📶 Network Warning Popup for Students (no sound) */}
+      {!isInstructor && showNetworkWarning && (
+        <NetworkWarningPopup
+          quality={networkWarningQuality}
+          onClose={() => setShowNetworkWarning(false)}
         />
       )}
       
