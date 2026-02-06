@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { AuthLayout } from '../../components/auth/AuthLayout';
-import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Loader2, GraduationCap, BookOpen, CheckCircle2, MailCheck } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Loader2, GraduationCap, BookOpen, CheckCircle2, MailCheck, Wifi } from 'lucide-react';
 
 interface FormData {
   firstName: string;
@@ -12,6 +12,7 @@ interface FormData {
   confirmPassword: string;
   passwordHint: string;
   role: 'student' | 'instructor' | 'admin';
+  networkMonitoringConsent: boolean;
 }
 
 interface FormErrors {
@@ -21,6 +22,7 @@ interface FormErrors {
   password?: string;
   confirmPassword?: string;
   role?: string;
+  networkMonitoringConsent?: string;
 }
 
 const passwordRequirements = [
@@ -40,7 +42,8 @@ export const Register = () => {
     password: '',
     confirmPassword: '',
     passwordHint: '',
-    role: 'student'
+    role: 'student',
+    networkMonitoringConsent: false
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -100,6 +103,10 @@ export const Register = () => {
       newErrors.confirmPassword = 'Please confirm your password';
     } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    if (!formData.networkMonitoringConsent) {
+      newErrors.networkMonitoringConsent = 'You must agree to network monitoring to continue';
     }
     
     setErrors(newErrors);
@@ -565,6 +572,58 @@ export const Register = () => {
             )}
             {errors.confirmPassword && (
               <p className="text-sm text-red-500 animate-shake">{errors.confirmPassword}</p>
+            )}
+          </div>
+
+          {/* Network Monitoring Consent */}
+          <div className="space-y-3">
+            <div className={`
+              p-4 rounded-xl border-2 transition-all duration-200
+              ${formData.networkMonitoringConsent
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                : errors.networkMonitoringConsent
+                  ? 'border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/10'
+                  : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'
+              }
+            `}>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <div className="flex-shrink-0 pt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={formData.networkMonitoringConsent}
+                    onChange={(e) => {
+                      setFormData({ ...formData, networkMonitoringConsent: e.target.checked });
+                      if (errors.networkMonitoringConsent) {
+                        setErrors({ ...errors, networkMonitoringConsent: undefined });
+                      }
+                    }}
+                    className="
+                      w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600
+                      text-blue-600 focus:ring-blue-500 focus:ring-offset-0
+                      transition-colors cursor-pointer
+                    "
+                  />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Wifi className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <span className="font-medium text-gray-900 dark:text-white text-sm">
+                      Network Quality Monitoring Agreement
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                    I agree that ClassPulse may monitor my network connection quality during live sessions 
+                    to provide better learning analytics and engagement tracking. This data helps instructors 
+                    understand if poor engagement is due to network issues rather than disinterest.
+                  </p>
+                </div>
+              </label>
+            </div>
+            {errors.networkMonitoringConsent && (
+              <p className="text-sm text-red-500 animate-shake flex items-center gap-1">
+                <CheckCircle2 className="w-4 h-4" />
+                {errors.networkMonitoringConsent}
+              </p>
             )}
           </div>
 
