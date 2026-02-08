@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { ConnectionStabilityBar, InlineStabilityBar, StabilityHistoryEntry } from './ConnectionStabilityBar';
 
 // VITE_API_URL already includes /api, so we check for that
 const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
@@ -45,6 +46,7 @@ interface StudentLatency {
   samples_count: number;
   last_updated: string | null;
   needs_attention: boolean;
+  stability_history?: StabilityHistoryEntry[];  // Recent sample-level quality for stability bar
 }
 
 interface SessionLatencySummary {
@@ -72,6 +74,44 @@ interface StudentNetworkMonitorProps {
   showDemoData?: boolean; // Show demo data for testing
 }
 
+/**
+ * Generate demo stability history for testing
+ * Creates realistic-looking connection quality timeline data
+ */
+const generateDemoHistory = (
+  baseQuality: 'excellent' | 'good' | 'fair' | 'poor' | 'critical',
+  count: number,
+  volatility: number = 0.2
+): StabilityHistoryEntry[] => {
+  const qualityLevels: Array<'excellent' | 'good' | 'fair' | 'poor' | 'critical'> = 
+    ['excellent', 'good', 'fair', 'poor', 'critical'];
+  const baseIndex = qualityLevels.indexOf(baseQuality);
+  const rttRanges = { excellent: [20, 100], good: [100, 250], fair: [250, 400], poor: [400, 800], critical: [800, 2000] };
+  const scoreRanges = { excellent: [85, 100], good: [70, 90], fair: [50, 75], poor: [30, 55], critical: [5, 35] };
+
+  const history: StabilityHistoryEntry[] = [];
+  const now = Date.now();
+
+  for (let i = 0; i < count; i++) {
+    // Occasionally shift quality based on volatility
+    let qIdx = baseIndex;
+    if (Math.random() < volatility) {
+      qIdx = Math.max(0, Math.min(4, baseIndex + (Math.random() > 0.5 ? 1 : -1)));
+    }
+    const quality = qualityLevels[qIdx];
+    const [minRtt, maxRtt] = rttRanges[quality];
+    const [minScore, maxScore] = scoreRanges[quality];
+
+    history.push({
+      quality,
+      rtt_ms: Math.round((minRtt + Math.random() * (maxRtt - minRtt)) * 10) / 10,
+      stability_score: Math.round(minScore + Math.random() * (maxScore - minScore)),
+      timestamp: new Date(now - (count - i) * 3000).toISOString()
+    });
+  }
+  return history;
+};
+
 // Demo data for testing/demonstration
 const DEMO_STUDENTS: StudentLatency[] = [
   {
@@ -86,7 +126,8 @@ const DEMO_STUDENTS: StudentLatency[] = [
     stability_score: 92,
     samples_count: 25,
     last_updated: new Date().toISOString(),
-    needs_attention: false
+    needs_attention: false,
+    stability_history: generateDemoHistory('good', 25, 0.1)
   },
   {
     student_id: 'student_sarah_smith_456',
@@ -100,7 +141,8 @@ const DEMO_STUDENTS: StudentLatency[] = [
     stability_score: 68,
     samples_count: 20,
     last_updated: new Date().toISOString(),
-    needs_attention: false
+    needs_attention: false,
+    stability_history: generateDemoHistory('fair', 20, 0.3)
   },
   {
     student_id: 'student_mike_wilson_789',
@@ -114,7 +156,8 @@ const DEMO_STUDENTS: StudentLatency[] = [
     stability_score: 35,
     samples_count: 18,
     last_updated: new Date().toISOString(),
-    needs_attention: true
+    needs_attention: true,
+    stability_history: generateDemoHistory('critical', 18, 0.4)
   },
   {
     student_id: 'student_emma_davis_012',
@@ -128,7 +171,8 @@ const DEMO_STUDENTS: StudentLatency[] = [
     stability_score: 98,
     samples_count: 30,
     last_updated: new Date().toISOString(),
-    needs_attention: false
+    needs_attention: false,
+    stability_history: generateDemoHistory('excellent', 30, 0.05)
   },
   {
     student_id: 'student_alex_brown_345',
@@ -142,7 +186,8 @@ const DEMO_STUDENTS: StudentLatency[] = [
     stability_score: 52,
     samples_count: 22,
     last_updated: new Date().toISOString(),
-    needs_attention: true
+    needs_attention: true,
+    stability_history: generateDemoHistory('poor', 22, 0.35)
   }
 ];
 
@@ -344,12 +389,21 @@ export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
               {studentsNeedingAttention.slice(0, 3).map(student => (
                 <div 
                   key={student.student_id} 
-                  className="flex items-center justify-between text-xs p-2 bg-red-50 dark:bg-red-900/20 rounded"
+                  className="text-xs p-2 bg-red-50 dark:bg-red-900/20 rounded"
                 >
-                  <span className="truncate max-w-[120px]" title={student.student_name || student.student_id}>
-                    {student.student_name || student.student_id.slice(0, 8) + '...'}
-                  </span>
-                  <span className="text-red-600 dark:text-red-400">{Math.round(student.avg_rtt_ms)}ms</span>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="truncate max-w-[120px] font-medium" title={student.student_name || student.student_id}>
+                      {student.student_name || student.student_id.slice(0, 8) + '...'}
+                    </span>
+                    <span className="text-red-600 dark:text-red-400">{Math.round(student.avg_rtt_ms)}ms</span>
+                  </div>
+                  {student.stability_history && student.stability_history.length > 0 && (
+                    <InlineStabilityBar
+                      stabilityHistory={student.stability_history}
+                      stabilityScore={student.stability_score}
+                      maxSegments={15}
+                    />
+                  )}
                 </div>
               ))}
               {studentsNeedingAttention.length > 3 && (
@@ -577,20 +631,22 @@ export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
                     {student.jitter_ms.toFixed(1)}ms
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2 mr-2">
-                        <div 
-                          className={`h-2 rounded-full ${
-                            student.stability_score >= 70 ? 'bg-blue-500' :
-                            student.stability_score >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${Math.min(100, student.stability_score)}%` }}
-                        />
-                      </div>
-                      <span className="text-sm text-gray-900 dark:text-gray-100">
-                        {Math.round(student.stability_score)}%
-                      </span>
-                    </div>
+                    {student.stability_history && student.stability_history.length > 0 ? (
+                      <ConnectionStabilityBar
+                        stabilityHistory={student.stability_history}
+                        stabilityScore={student.stability_score}
+                        maxSegments={20}
+                        size="sm"
+                        showLabel={false}
+                        showPercentage={true}
+                      />
+                    ) : (
+                      <InlineStabilityBar
+                        stabilityHistory={[]}
+                        stabilityScore={student.stability_score}
+                        maxSegments={20}
+                      />
+                    )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {student.needs_attention ? (

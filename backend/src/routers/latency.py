@@ -540,6 +540,23 @@ async def get_all_students_latency(session_id: str):
         stats = get_student_stats_from_cache(session_id, student_id)
         if stats:
             quality_counts[stats.quality] += 1
+            
+            # Build stability history from recent samples (last 30 samples)
+            # Each entry is the quality level of that individual sample
+            stability_history = []
+            samples = latency_cache[session_id].get(student_id, [])
+            recent_samples = samples[-30:]  # Last 30 samples for the stability bar
+            for sample in recent_samples:
+                sample_rtt = sample.get("rtt_ms", 0)
+                sample_jitter = sample.get("jitter_ms", 0)
+                sample_quality = assess_connection_quality(sample_rtt, sample_jitter)
+                stability_history.append({
+                    "quality": sample_quality.quality,
+                    "rtt_ms": round(sample_rtt, 1),
+                    "stability_score": sample_quality.stability_score,
+                    "timestamp": sample.get("timestamp", datetime.now()).isoformat() if isinstance(sample.get("timestamp"), datetime) else str(sample.get("timestamp", ""))
+                })
+            
             students_list.append({
                 "student_id": stats.student_id,
                 "student_name": stats.student_name,  # ✅ Include student name!
@@ -552,7 +569,8 @@ async def get_all_students_latency(session_id: str):
                 "stability_score": stats.stability_score,
                 "samples_count": stats.samples_count,
                 "last_updated": stats.last_updated.isoformat() if stats.last_updated else None,
-                "needs_attention": stats.needs_attention
+                "needs_attention": stats.needs_attention,
+                "stability_history": stability_history  # ✅ Include stability timeline for bar
             })
     
     # Sort by quality (worst first) for instructor attention
