@@ -2,16 +2,16 @@
  * ConnectionStabilityBar Component
  * =================================
  * 
- * A visual stability timeline bar that shows connection quality changes
- * over time using colored segments. Similar to a timeline/heatmap bar
- * where each segment represents a sample and its color indicates the
- * connection quality at that point.
+ * A smooth, animated connection stability bar that actively moves/updates
+ * in real-time to show each student's network stability on the instructor side.
  * 
- * Used in the instructor's Student Network Monitor to show per-student
- * connection stability at a glance.
+ * Designed to match the student-side "Connection Stability" bar style:
+ * - Smooth colored fill that grows/shrinks based on stability score
+ * - Active shimmer animation to show it's live/monitoring
+ * - Color changes smoothly based on quality (blue -> yellow -> red)
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 export interface StabilityHistoryEntry {
   quality: 'excellent' | 'good' | 'fair' | 'poor' | 'critical';
@@ -21,18 +21,18 @@ export interface StabilityHistoryEntry {
 }
 
 interface ConnectionStabilityBarProps {
-  /** Array of recent quality samples to display as segments */
+  /** Array of recent quality samples */
   stabilityHistory: StabilityHistoryEntry[];
   /** Overall stability score (0-100) */
   stabilityScore: number;
-  /** Total number of segments to show (pads with empty if fewer samples) */
-  maxSegments?: number;
-  /** Height of the bar in pixels */
-  height?: number;
+  /** Overall connection quality */
+  quality?: 'excellent' | 'good' | 'fair' | 'poor' | 'critical';
   /** Whether to show the label */
   showLabel?: boolean;
-  /** Whether to show the percentage text */
+  /** Whether to show percentage text */
   showPercentage?: boolean;
+  /** Whether monitoring is active (shows animation) */
+  isActive?: boolean;
   /** Additional CSS classes */
   className?: string;
   /** Size variant */
@@ -40,182 +40,217 @@ interface ConnectionStabilityBarProps {
 }
 
 /**
- * Get the color for a quality level
+ * Get the fill color based on stability score
  */
-const getQualityColor = (quality: string): string => {
-  switch (quality) {
-    case 'excellent': return '#3b82f6'; // blue-500
-    case 'good': return '#60a5fa';      // blue-400
-    case 'fair': return '#eab308';      // yellow-500
-    case 'poor': return '#f97316';      // orange-500
-    case 'critical': return '#ef4444';  // red-500
-    default: return '#d1d5db';          // gray-300
+const getBarFillColor = (score: number, quality?: string): string => {
+  // Use quality if provided for more accurate color
+  if (quality) {
+    switch (quality) {
+      case 'excellent': return '#3b82f6'; // blue-500
+      case 'good': return '#60a5fa';      // blue-400
+      case 'fair': return '#eab308';      // yellow-500
+      case 'poor': return '#f97316';      // orange-500
+      case 'critical': return '#ef4444';  // red-500
+    }
   }
+  // Fallback to score-based color
+  if (score >= 80) return '#3b82f6';
+  if (score >= 60) return '#60a5fa';
+  if (score >= 40) return '#eab308';
+  if (score >= 20) return '#f97316';
+  return '#ef4444';
 };
 
 /**
- * Get the background color class for overall stability
+ * Get text color class based on score
  */
-const getStabilityBarColor = (score: number): string => {
-  if (score >= 80) return 'from-blue-400 to-blue-500';
-  if (score >= 60) return 'from-blue-400 to-yellow-500';
-  if (score >= 40) return 'from-yellow-500 to-orange-500';
-  if (score >= 20) return 'from-orange-500 to-red-500';
-  return 'from-red-500 to-red-600';
+const getScoreColorClass = (score: number): string => {
+  if (score >= 80) return 'text-blue-500';
+  if (score >= 60) return 'text-blue-400';
+  if (score >= 40) return 'text-yellow-500';
+  if (score >= 20) return 'text-orange-500';
+  return 'text-red-500';
 };
 
 /**
- * Get warning indicator color
+ * Get warning icon for low stability
  */
-const getStabilityIndicator = (score: number): { color: string; label: string } => {
-  if (score >= 80) return { color: 'text-blue-500', label: 'Stable' };
-  if (score >= 60) return { color: 'text-blue-400', label: 'Moderate' };
-  if (score >= 40) return { color: 'text-yellow-500', label: 'Unstable' };
-  if (score >= 20) return { color: 'text-orange-500', label: 'Poor' };
-  return { color: 'text-red-500', label: 'Critical' };
+const getWarningIcon = (score: number): string | null => {
+  if (score < 40) return '⚠';
+  return null;
 };
 
 export const ConnectionStabilityBar: React.FC<ConnectionStabilityBarProps> = ({
   stabilityHistory,
   stabilityScore,
-  maxSegments = 30,
-  height,
+  quality,
   showLabel = false,
   showPercentage = true,
+  isActive = true,
   className = '',
   size = 'sm'
 }) => {
-  // Determine dimensions based on size
-  const barHeight = height || (size === 'lg' ? 12 : size === 'md' ? 8 : 6);
-  const gap = size === 'lg' ? 1.5 : size === 'md' ? 1 : 0.5;
+  // Animate the bar width smoothly
+  const [animatedWidth, setAnimatedWidth] = useState(0);
   
-  // Pad or trim history to maxSegments
-  const segments = stabilityHistory.length > 0
-    ? stabilityHistory.slice(-maxSegments)
-    : [];
-  
-  // Fill remaining slots with empty segments
-  const emptyCount = Math.max(0, maxSegments - segments.length);
-  
-  const indicator = getStabilityIndicator(stabilityScore);
+  useEffect(() => {
+    // Small delay to trigger CSS transition on mount
+    const timer = setTimeout(() => {
+      setAnimatedWidth(Math.min(100, Math.max(0, stabilityScore)));
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [stabilityScore]);
+
+  const barHeight = size === 'lg' ? 10 : size === 'md' ? 7 : 5;
+  const fillColor = getBarFillColor(stabilityScore, quality);
+  const scoreColor = getScoreColorClass(stabilityScore);
+  const warningIcon = getWarningIcon(stabilityScore);
+  const samplesCount = stabilityHistory.length;
 
   return (
     <div className={`${className}`}>
-      {/* Label */}
+      {/* Label row */}
       {showLabel && (
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-            Connection Stability
-          </span>
-          <span className={`text-xs font-medium ${indicator.color}`}>
-            {indicator.label}
-          </span>
+        <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-0.5 font-medium">
+          Connection Stability
         </div>
       )}
 
       <div className="flex items-center gap-1.5">
-        {/* Segmented Timeline Bar */}
+        {/* Smooth animated bar */}
         <div 
-          className="flex-1 flex items-center rounded-sm overflow-hidden bg-gray-100 dark:bg-gray-700/50"
-          style={{ height: `${barHeight}px`, gap: `${gap}px`, padding: '0 1px' }}
-          title={`Stability: ${Math.round(stabilityScore)}% | ${segments.length} samples`}
+          className="flex-1 relative overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+          style={{ height: `${barHeight}px` }}
+          title={`Stability: ${Math.round(stabilityScore)}% | Samples: ${samplesCount}`}
         >
-          {/* Empty segments (no data yet) */}
-          {Array.from({ length: emptyCount }).map((_, i) => (
+          {/* Main fill - smooth animated */}
+          <div
+            className="absolute inset-y-0 left-0 rounded-full"
+            style={{
+              width: `${animatedWidth}%`,
+              backgroundColor: fillColor,
+              transition: 'width 1s ease-in-out, background-color 0.8s ease',
+            }}
+          />
+
+          {/* Active shimmer/pulse overlay - shows it's live */}
+          {isActive && animatedWidth > 0 && (
             <div
-              key={`empty-${i}`}
-              className="flex-1 rounded-[1px] bg-gray-200 dark:bg-gray-600 opacity-30"
-              style={{ height: `${barHeight - 2}px`, minWidth: '2px' }}
-            />
-          ))}
-          
-          {/* Actual data segments */}
-          {segments.map((entry, i) => (
-            <div
-              key={`seg-${i}`}
-              className="flex-1 rounded-[1px] transition-colors duration-300"
-              style={{ 
-                height: `${barHeight - 2}px`,
-                minWidth: '2px',
-                backgroundColor: getQualityColor(entry.quality),
-                opacity: 0.6 + (i / segments.length) * 0.4 // Newer segments more opaque
-              }}
-              title={`RTT: ${entry.rtt_ms}ms | Quality: ${entry.quality} | Score: ${Math.round(entry.stability_score)}%`}
-            />
-          ))}
+              className="absolute inset-y-0 left-0 rounded-full overflow-hidden"
+              style={{ width: `${animatedWidth}%` }}
+            >
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: `linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)`,
+                  animation: 'stabilityShimmer 2s ease-in-out infinite',
+                }}
+              />
+            </div>
+          )}
         </div>
 
-        {/* Percentage */}
+        {/* Score with warning */}
         {showPercentage && (
-          <span className={`text-xs font-semibold tabular-nums min-w-[36px] text-right ${indicator.color}`}>
+          <span className={`text-xs font-semibold tabular-nums min-w-[40px] text-right ${scoreColor}`}>
             {Math.round(stabilityScore)}%
+            {warningIcon && <span className="ml-0.5">{warningIcon}</span>}
           </span>
         )}
       </div>
 
-      {/* Samples info (only for md/lg sizes) */}
+      {/* Samples count for md/lg */}
       {(size === 'md' || size === 'lg') && (
-        <div className="flex items-center justify-between mt-1">
-          <span className="text-[10px] text-gray-400 dark:text-gray-500">
-            Samples: {segments.length}
-          </span>
-          {segments.length > 0 && (
-            <span className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center">
+        <div className="flex items-center justify-between mt-0.5">
+          <span className="text-[10px] text-gray-400">Samples: {samplesCount}</span>
+          {isActive && (
+            <span className="text-[10px] text-gray-400 flex items-center">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse mr-1" />
-              Monitoring
+              Live
             </span>
           )}
         </div>
       )}
+
+      {/* CSS animation keyframes */}
+      <style>{`
+        @keyframes stabilityShimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+      `}</style>
     </div>
   );
 };
 
 /**
  * Compact inline stability bar for table rows
- * Shows just the colored bar segments with minimal chrome
+ * A small, smooth, animated bar perfect for the student table
  */
 export const InlineStabilityBar: React.FC<{
   stabilityHistory: StabilityHistoryEntry[];
   stabilityScore: number;
-  maxSegments?: number;
+  quality?: 'excellent' | 'good' | 'fair' | 'poor' | 'critical';
+  isActive?: boolean;
   className?: string;
-}> = ({ stabilityHistory, stabilityScore, maxSegments = 20, className = '' }) => {
-  const segments = stabilityHistory.slice(-maxSegments);
-  const emptyCount = Math.max(0, maxSegments - segments.length);
-  const indicator = getStabilityIndicator(stabilityScore);
+}> = ({ stabilityHistory, stabilityScore, quality, isActive = true, className = '' }) => {
+  const [animatedWidth, setAnimatedWidth] = useState(0);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAnimatedWidth(Math.min(100, Math.max(0, stabilityScore)));
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [stabilityScore]);
+
+  const fillColor = getBarFillColor(stabilityScore, quality);
+  const scoreColor = getScoreColorClass(stabilityScore);
+  const warningIcon = getWarningIcon(stabilityScore);
 
   return (
     <div className={`flex items-center gap-1.5 ${className}`}>
-      {/* Mini segmented bar */}
+      {/* Smooth animated mini bar */}
       <div 
-        className="flex items-center rounded-sm overflow-hidden bg-gray-100 dark:bg-gray-700/50"
-        style={{ width: '80px', height: '6px', gap: '0.5px', padding: '0 0.5px' }}
+        className="relative overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+        style={{ width: '80px', height: '5px' }}
         title={`Stability: ${Math.round(stabilityScore)}%`}
       >
-        {Array.from({ length: emptyCount }).map((_, i) => (
+        {/* Animated fill */}
+        <div
+          className="absolute inset-y-0 left-0 rounded-full"
+          style={{
+            width: `${animatedWidth}%`,
+            backgroundColor: fillColor,
+            transition: 'width 1s ease-in-out, background-color 0.8s ease',
+          }}
+        />
+        {/* Shimmer */}
+        {isActive && animatedWidth > 0 && (
           <div
-            key={`e-${i}`}
-            className="flex-1 bg-gray-200 dark:bg-gray-600 opacity-30"
-            style={{ height: '4px', minWidth: '1.5px' }}
-          />
-        ))}
-        {segments.map((entry, i) => (
-          <div
-            key={`s-${i}`}
-            className="flex-1 transition-colors duration-300"
-            style={{ 
-              height: '4px',
-              minWidth: '1.5px',
-              backgroundColor: getQualityColor(entry.quality),
-              opacity: 0.5 + (i / segments.length) * 0.5
-            }}
-          />
-        ))}
+            className="absolute inset-y-0 left-0 rounded-full overflow-hidden"
+            style={{ width: `${animatedWidth}%` }}
+          >
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%)`,
+                animation: 'stabilityShimmer 2s ease-in-out infinite',
+              }}
+            />
+          </div>
+        )}
       </div>
-      <span className={`text-xs font-medium tabular-nums ${indicator.color}`}>
-        {Math.round(stabilityScore)}%
+      {/* Score */}
+      <span className={`text-xs font-semibold tabular-nums ${scoreColor}`}>
+        {Math.round(stabilityScore)}%{warningIcon && <span className="ml-0.5">{warningIcon}</span>}
       </span>
+
+      <style>{`
+        @keyframes stabilityShimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+      `}</style>
     </div>
   );
 };

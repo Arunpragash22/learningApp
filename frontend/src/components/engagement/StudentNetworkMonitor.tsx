@@ -256,20 +256,34 @@ export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
     fetchStudentLatency();
   }, [sessionId]);
 
-  // 🎯 OPTIMIZED: Event-driven updates instead of polling
-  // Use WebSocket events or manual refresh instead of continuous polling
-  // Only fetch when explicitly requested or when session state changes
+  // 🔄 Auto-refresh polling for real-time stability bar updates
+  // Polls every refreshInterval so instructor sees live moving stability bars
   useEffect(() => {
     if (useDemoData) {
       return;
     }
 
-    // Initial fetch only
+    // Initial fetch
     fetchStudentLatency();
     
-    // Optional: Manual refresh can be triggered by parent component
-    // No automatic polling - updates should come via WebSocket events
-  }, [sessionId, useDemoData]); // Only refetch when sessionId changes
+    // Auto-refresh polling for live stability bar animation
+    if (isAutoRefreshing) {
+      const interval = setInterval(() => {
+        fetchStudentLatency();
+        setNextRefreshIn(refreshInterval / 1000);
+      }, refreshInterval);
+      
+      // Countdown timer for UI
+      const countdown = setInterval(() => {
+        setNextRefreshIn(prev => Math.max(0, prev - 1));
+      }, 1000);
+      
+      return () => {
+        clearInterval(interval);
+        clearInterval(countdown);
+      };
+    }
+  }, [sessionId, useDemoData, isAutoRefreshing, refreshInterval]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Refetch when demo mode changes
   useEffect(() => {
@@ -397,13 +411,12 @@ export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
                     </span>
                     <span className="text-red-600 dark:text-red-400">{Math.round(student.avg_rtt_ms)}ms</span>
                   </div>
-                  {student.stability_history && student.stability_history.length > 0 && (
-                    <InlineStabilityBar
-                      stabilityHistory={student.stability_history}
-                      stabilityScore={student.stability_score}
-                      maxSegments={15}
-                    />
-                  )}
+                  <InlineStabilityBar
+                    stabilityHistory={student.stability_history || []}
+                    stabilityScore={student.stability_score}
+                    quality={student.quality}
+                    isActive={true}
+                  />
                 </div>
               ))}
               {studentsNeedingAttention.length > 3 && (
@@ -631,22 +644,15 @@ export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
                     {student.jitter_ms.toFixed(1)}ms
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {student.stability_history && student.stability_history.length > 0 ? (
-                      <ConnectionStabilityBar
-                        stabilityHistory={student.stability_history}
-                        stabilityScore={student.stability_score}
-                        maxSegments={20}
-                        size="sm"
-                        showLabel={false}
-                        showPercentage={true}
-                      />
-                    ) : (
-                      <InlineStabilityBar
-                        stabilityHistory={[]}
-                        stabilityScore={student.stability_score}
-                        maxSegments={20}
-                      />
-                    )}
+                    <ConnectionStabilityBar
+                      stabilityHistory={student.stability_history || []}
+                      stabilityScore={student.stability_score}
+                      quality={student.quality}
+                      size="sm"
+                      showLabel={false}
+                      showPercentage={true}
+                      isActive={true}
+                    />
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {student.needs_attention ? (
