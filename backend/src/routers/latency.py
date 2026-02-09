@@ -557,6 +557,32 @@ async def get_all_students_latency(session_id: str):
                     "timestamp": sample.get("timestamp", datetime.now()).isoformat() if isinstance(sample.get("timestamp"), datetime) else str(sample.get("timestamp", ""))
                 })
             
+            # Calculate trend data from recent vs older samples
+            rtt_trend = "stable"
+            quality_trend = "stable"
+            if len(recent_samples) >= 8:
+                mid = len(recent_samples) // 2
+                older_half = recent_samples[:mid]
+                newer_half = recent_samples[mid:]
+                older_avg_rtt = sum(s.get("rtt_ms", 0) for s in older_half) / len(older_half)
+                newer_avg_rtt = sum(s.get("rtt_ms", 0) for s in newer_half) / len(newer_half)
+                rtt_diff = newer_avg_rtt - older_avg_rtt
+                if rtt_diff < -20:
+                    rtt_trend = "improving"
+                elif rtt_diff > 20:
+                    rtt_trend = "degrading"
+                
+                quality_order_map = {"excellent": 4, "good": 3, "fair": 2, "poor": 1, "critical": 0}
+                older_qualities = [assess_connection_quality(s.get("rtt_ms", 0), s.get("jitter_ms", 0)).quality for s in older_half]
+                newer_qualities = [assess_connection_quality(s.get("rtt_ms", 0), s.get("jitter_ms", 0)).quality for s in newer_half]
+                older_avg_q = sum(quality_order_map.get(q, 0) for q in older_qualities) / len(older_qualities)
+                newer_avg_q = sum(quality_order_map.get(q, 0) for q in newer_qualities) / len(newer_qualities)
+                q_diff = newer_avg_q - older_avg_q
+                if q_diff > 0.3:
+                    quality_trend = "improving"
+                elif q_diff < -0.3:
+                    quality_trend = "degrading"
+            
             students_list.append({
                 "student_id": stats.student_id,
                 "student_name": stats.student_name,  # ✅ Include student name!
@@ -570,7 +596,9 @@ async def get_all_students_latency(session_id: str):
                 "samples_count": stats.samples_count,
                 "last_updated": stats.last_updated.isoformat() if stats.last_updated else None,
                 "needs_attention": stats.needs_attention,
-                "stability_history": stability_history  # ✅ Include stability timeline for bar
+                "stability_history": stability_history,  # ✅ Include stability timeline for bar
+                "rtt_trend": rtt_trend,  # ✅ Trend: improving/degrading/stable
+                "quality_trend": quality_trend  # ✅ Quality trend for live progress bars
             })
     
     # Sort by quality (worst first) for instructor attention

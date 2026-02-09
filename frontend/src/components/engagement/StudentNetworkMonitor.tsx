@@ -23,11 +23,14 @@ import {
   SignalLow,
   SignalMedium,
   SignalHigh,
-  Activity
+  Activity,
+  LayoutGrid,
+  LayoutList
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { ConnectionStabilityBar, InlineStabilityBar, StabilityHistoryEntry } from './ConnectionStabilityBar';
+import { LiveNetworkProgressBars, LiveStudentNetworkData } from './LiveNetworkProgressBars';
 
 // VITE_API_URL already includes /api, so we check for that
 const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
@@ -47,6 +50,8 @@ interface StudentLatency {
   last_updated: string | null;
   needs_attention: boolean;
   stability_history?: StabilityHistoryEntry[];  // Recent sample-level quality for stability bar
+  rtt_trend?: 'improving' | 'degrading' | 'stable';  // RTT trend from backend
+  quality_trend?: 'improving' | 'degrading' | 'stable';  // Quality trend from backend
 }
 
 interface SessionLatencySummary {
@@ -127,7 +132,9 @@ const DEMO_STUDENTS: StudentLatency[] = [
     samples_count: 25,
     last_updated: new Date().toISOString(),
     needs_attention: false,
-    stability_history: generateDemoHistory('good', 25, 0.1)
+    stability_history: generateDemoHistory('good', 25, 0.1),
+    rtt_trend: 'stable',
+    quality_trend: 'stable'
   },
   {
     student_id: 'student_sarah_smith_456',
@@ -142,7 +149,9 @@ const DEMO_STUDENTS: StudentLatency[] = [
     samples_count: 20,
     last_updated: new Date().toISOString(),
     needs_attention: false,
-    stability_history: generateDemoHistory('fair', 20, 0.3)
+    stability_history: generateDemoHistory('fair', 20, 0.3),
+    rtt_trend: 'degrading',
+    quality_trend: 'degrading'
   },
   {
     student_id: 'student_mike_wilson_789',
@@ -157,7 +166,9 @@ const DEMO_STUDENTS: StudentLatency[] = [
     samples_count: 18,
     last_updated: new Date().toISOString(),
     needs_attention: true,
-    stability_history: generateDemoHistory('critical', 18, 0.4)
+    stability_history: generateDemoHistory('critical', 18, 0.4),
+    rtt_trend: 'degrading',
+    quality_trend: 'degrading'
   },
   {
     student_id: 'student_emma_davis_012',
@@ -172,7 +183,9 @@ const DEMO_STUDENTS: StudentLatency[] = [
     samples_count: 30,
     last_updated: new Date().toISOString(),
     needs_attention: false,
-    stability_history: generateDemoHistory('excellent', 30, 0.05)
+    stability_history: generateDemoHistory('excellent', 30, 0.05),
+    rtt_trend: 'improving',
+    quality_trend: 'stable'
   },
   {
     student_id: 'student_alex_brown_345',
@@ -187,7 +200,9 @@ const DEMO_STUDENTS: StudentLatency[] = [
     samples_count: 22,
     last_updated: new Date().toISOString(),
     needs_attention: true,
-    stability_history: generateDemoHistory('poor', 22, 0.35)
+    stability_history: generateDemoHistory('poor', 22, 0.35),
+    rtt_trend: 'degrading',
+    quality_trend: 'degrading'
   }
 ];
 
@@ -206,6 +221,7 @@ export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
   const [useDemoData, setUseDemoData] = useState(showDemoData);
   const [nextRefreshIn, setNextRefreshIn] = useState(refreshInterval / 1000);
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(autoRefresh);
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards'); // Default to cards for live progress bars
 
   const fetchStudentLatency = useCallback(async () => {
     if (!sessionId) return;
@@ -459,6 +475,33 @@ export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
                 {lastRefresh.toLocaleTimeString()}
               </span>
             )}
+            {/* View mode toggle */}
+            <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
+              <button
+                onClick={() => setViewMode('cards')}
+                className={`px-2 py-1 text-xs flex items-center gap-1 transition-colors ${
+                  viewMode === 'cards'
+                    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
+                    : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+                }`}
+                title="Live Cards View"
+              >
+                <LayoutGrid className="h-3 w-3" />
+                <span className="hidden sm:inline">Live</span>
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`px-2 py-1 text-xs flex items-center gap-1 transition-colors ${
+                  viewMode === 'table'
+                    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
+                    : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+                }`}
+                title="Table View"
+              >
+                <LayoutList className="h-3 w-3" />
+                <span className="hidden sm:inline">Table</span>
+              </button>
+            </div>
             <button
               onClick={() => setUseDemoData(!useDemoData)}
               className={`px-2 py-1 text-xs rounded ${
@@ -576,7 +619,39 @@ export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
           <p>No students connected yet</p>
           <p className="text-sm mt-1">Network data will appear when students join the session</p>
         </div>
+      ) : viewMode === 'cards' ? (
+        /* ======= LIVE CARDS VIEW with Progress Bars ======= */
+        <div className="p-4">
+          {/* Live indicator */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-2.5 w-2.5 rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+            </span>
+            <span className="text-xs font-medium text-green-700 dark:text-green-400">
+              Live Network Monitoring - {students.length} student{students.length !== 1 ? 's' : ''} connected
+            </span>
+            {isAutoRefreshing && (
+              <span className="text-[10px] text-gray-400">
+                (updates every {refreshInterval / 1000}s)
+              </span>
+            )}
+          </div>
+          
+          {/* Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {students.map((student) => (
+              <LiveNetworkProgressBars
+                key={student.student_id}
+                student={student as LiveStudentNetworkData}
+                isActive={isAutoRefreshing}
+                showSparkline={true}
+              />
+            ))}
+          </div>
+        </div>
       ) : (
+        /* ======= TABLE VIEW (original) ======= */
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900">
