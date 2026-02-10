@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSessionConnection } from '../../context/SessionConnectionContext';
 import { QuizPopup } from '../quiz/QuizPopup';
 import { Footer } from './Footer';
-import { BookOpenIcon, CalendarIcon, MenuIcon, XIcon, HomeIcon, GraduationCapIcon, BellIcon, LogOutIcon, BarChart3Icon, ActivityIcon, TargetIcon, KeyIcon, ChevronDownIcon } from 'lucide-react';
+import { BookOpenIcon, CalendarIcon, MenuIcon, XIcon, HomeIcon, GraduationCapIcon, LogOutIcon, BarChart3Icon, ActivityIcon, TargetIcon, KeyIcon, ChevronDownIcon } from 'lucide-react';
 
 export const DashboardLayout = () => {
   const location = useLocation();
@@ -164,14 +164,6 @@ export const DashboardLayout = () => {
 
             {/* Right Side - User Menu & Notifications */}
             <div className="flex items-center space-x-2">
-              {/* Notifications */}
-              <button
-                className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/50 transition-colors"
-                aria-label="View notifications"
-              >
-                <BellIcon className="h-5 w-5" />
-              </button>
-
               {/* User Menu */}
               <div className="relative">
                 <button
