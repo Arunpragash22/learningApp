@@ -3,6 +3,12 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 /* DO NOT DELETE THESE TAILWIND IMPORTS, OTHERWISE THE STYLING WILL NOT RENDER AT ALL */
+/* Hide browser's built-in password reveal button (Edge/Chrome) to avoid duplicate eye icons */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
 @layer base {
   :root {
     /* #3B82F6 - Blue Theme */
