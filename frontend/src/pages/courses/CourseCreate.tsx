@@ -242,7 +242,7 @@ export const CourseCreate = () => {
                       name="duration"
                       value={formData.duration}
                       onChange={handleChange}
-                      placeholder="e.g., 8 weeks, 3 months"
+                      placeholder="e.g., 8 weeks"
                     />
                   </div>
                 </div>
