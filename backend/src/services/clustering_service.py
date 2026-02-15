@@ -97,6 +97,7 @@ class ClusteringService:
         Returns None if there is no data to predict on.
         """
         # 1. Fetch preprocessed engagement docs from MongoDB
+        print(f"🔄 _predict_clusters: fetching preprocessed data for session {session_id}")
         preprocessed = await self._preprocessing.get_preprocessed(session_id)
 
         if not preprocessed:
@@ -104,13 +105,21 @@ class ClusteringService:
                   f"Run preprocessing first.")
             return None
 
+        print(f"📊 _predict_clusters: got {len(preprocessed)} preprocessed docs")
+
         # 2. Predict using KMeans model
         try:
             student_labels, cluster_students = (
                 self._predictor.predict_students(preprocessed)
             )
         except Exception as e:
+            import traceback
             print(f"❌ KMeans prediction failed: {e}")
+            traceback.print_exc()
+            return None
+
+        if not student_labels:
+            print(f"⚠️  KMeans returned empty results for session {session_id}")
             return None
 
         # 3. Build StudentCluster objects
@@ -130,6 +139,10 @@ class ClusteringService:
                     students=students,
                 )
             )
+
+        print(f"✅ _predict_clusters: built {len(clusters)} clusters for session {session_id}")
+        for c in clusters:
+            print(f"   {c.engagementLevel}: {c.studentCount} students {c.students}")
 
         return clusters
 

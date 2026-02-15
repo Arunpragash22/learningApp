@@ -111,9 +111,11 @@ class KMeansPredictor:
         2. cluster_students: { "high": [sid, ...], "medium": [...], "low": [...] }
         """
         if not preprocessed_docs:
+            print("⚠️  predict_students: no preprocessed docs received")
             return {}, {"high": [], "medium": [], "low": []}
 
         df = pd.DataFrame(preprocessed_docs)
+        print(f"📊 predict_students: {len(df)} rows, columns: {list(df.columns)}")
 
         # ── Aggregate per student (mean of features across questions) ──
         agg_cols = {col: "mean" for col in MODEL_FEATURES if col in df.columns}
@@ -127,7 +129,14 @@ class KMeansPredictor:
             )
             agg_cols["engagement_score_scaled"] = "mean"
 
+        if not agg_cols:
+            print(f"❌ predict_students: MODEL_FEATURES {MODEL_FEATURES} "
+                  f"not found in columns {list(df.columns)}")
+            return {}, {"high": [], "medium": [], "low": []}
+
         student_df = df.groupby("studentId").agg(agg_cols).reset_index()
+        print(f"📊 predict_students: {len(student_df)} unique students")
+        print(f"📊 Student engagement values: {student_df['engagement_score_scaled'].tolist()}")
 
         if student_df.empty:
             return {}, {"high": [], "medium": [], "low": []}
@@ -135,6 +144,7 @@ class KMeansPredictor:
         # ── Predict ────────────────────────────────────────────────────
         labels = self.predict(student_df)
         label_map = self.get_label_mapping()
+        print(f"📊 KMeans labels: {labels.tolist()}, mapping: {label_map}")
 
         # ── Build results ──────────────────────────────────────────────
         student_labels: Dict[str, str] = {}
@@ -142,10 +152,16 @@ class KMeansPredictor:
             "high": [], "medium": [], "low": []
         }
 
-        for i, row in student_df.iterrows():
-            sid = row["studentId"]
-            level = label_map[int(labels[i])]
+        student_ids = student_df["studentId"].tolist()
+        for idx in range(len(student_ids)):
+            sid = student_ids[idx]
+            level = label_map[int(labels[idx])]
             student_labels[sid] = level
             cluster_students[level].append(sid)
+
+        print(f"✅ predict_students result: "
+              f"high={len(cluster_students['high'])}, "
+              f"medium={len(cluster_students['medium'])}, "
+              f"low={len(cluster_students['low'])}")
 
         return student_labels, cluster_students

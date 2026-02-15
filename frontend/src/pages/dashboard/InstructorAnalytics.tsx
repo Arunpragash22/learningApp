@@ -72,22 +72,22 @@ export const InstructorAnalytics = () => {
       }));
       setSessions(mapped);
       if (mapped.length && !cancelled) {
-        // For reports section, default to first completed session
+        // Prefer live session for real-time clustering, fallback to completed
+        const live = mapped.find(s => s.status === 'live');
         const completed = mapped.find(s => s.status === 'completed');
-        setSelectedSession(completed?.id ?? null);
+        setSelectedSession(live?.id ?? completed?.id ?? mapped[0]?.id ?? null);
       }
       setLoadingSessions(false);
     })();
     return () => { cancelled = true; };
   }, []);
 
-  // Initialize selected session to first completed session for reports
+  // Initialize selected session: prefer live, then completed, then first
   useEffect(() => {
     if (!selectedSession && sessions.length) {
+      const live = sessions.find(s => s.status === 'live');
       const completed = sessions.find(s => s.status === 'completed');
-      if (completed) {
-        setSelectedSession(completed.id);
-      }
+      setSelectedSession(live?.id ?? completed?.id ?? sessions[0]?.id ?? null);
     }
   }, [sessions, selectedSession]);
 
@@ -203,11 +203,19 @@ export const InstructorAnalytics = () => {
     setLoadingClusters(false);
   }, []);
 
-  // Refetch clusters when the selected session changes
+  // Fetch clusters on session change + poll every 5s for real-time updates
   useEffect(() => {
-    if (selectedSession) {
+    if (!selectedSession) return;
+
+    // Fetch immediately
+    fetchClusters(selectedSession);
+
+    // Poll every 5 seconds so instructor sees live cluster updates
+    const interval = setInterval(() => {
       fetchClusters(selectedSession);
-    }
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [selectedSession, fetchClusters]);
 
   // Generate engagement trends data

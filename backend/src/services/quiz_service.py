@@ -123,20 +123,25 @@ class QuizService:
             from .clustering_service import ClusteringService
 
             # Step 1: Preprocess (compute engagement scores)
+            print(f"🔄 [BG] Step 1: Preprocessing for session {session_id}...")
             preprocessing = PreprocessingService()
             docs = await preprocessing.run(session_id)
+            print(f"{'✅' if docs else '⚠️'} [BG] Preprocessing: {len(docs) if docs else 0} rows")
 
             if docs:
                 # Step 2: Run KMeans model and update clusters
+                print(f"🔄 [BG] Step 2: Running KMeans clustering...")
                 clustering = ClusteringService()
                 clusters = await clustering.update_clusters(session_id)
-                print(f"✅ Auto-clustering complete for session {session_id}: "
-                      f"{len(clusters)} clusters updated")
+                print(f"✅ [BG] Clustering complete for session {session_id}: "
+                      f"{len(clusters)} clusters → "
+                      f"[{', '.join(f'{c.engagementLevel}:{c.studentCount}' for c in clusters)}]")
             else:
-                print(f"⚠️  No data to cluster for session {session_id}")
+                print(f"⚠️  [BG] No data to cluster for session {session_id}")
         except Exception as e:
-            # Never let background task crash the server
-            print(f"⚠️  Background preprocessing/clustering error: {e}")
+            import traceback
+            print(f"❌ [BG] Background preprocessing/clustering error: {e}")
+            traceback.print_exc()
 
     async def get_performance(self, question_id: str, session_id: str) -> QuizPerformance:
         """Get performance data from MongoDB"""
