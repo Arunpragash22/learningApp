@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional
 from datetime import datetime
 import random
+import asyncio
 from ..models.question import Question
 from ..models.quiz_answer import QuizAnswer
 from ..models.quiz_answer_model import QuizAnswerModel
@@ -100,10 +101,42 @@ class QuizService:
             activation_version=activation_version
         )
 
+        # ── Auto-trigger preprocessing + KMeans clustering (background) ──
+        # Runs in background so student gets instant response
+        asyncio.create_task(
+            self._run_preprocessing_and_clustering(answer.sessionId)
+        )
+
         return {
             "success": True,
             "isCorrect": is_correct or False,
         }
+
+    async def _run_preprocessing_and_clustering(self, session_id: str) -> None:
+        """
+        Background task: preprocess engagement data and run KMeans clustering.
+        Called automatically after each quiz answer submission.
+        Non-blocking — errors are logged but never propagated.
+        """
+        try:
+            from ..models.preprocessing import PreprocessingService
+            from .clustering_service import ClusteringService
+
+            # Step 1: Preprocess (compute engagement scores)
+            preprocessing = PreprocessingService()
+            docs = await preprocessing.run(session_id)
+
+            if docs:
+                # Step 2: Run KMeans model and update clusters
+                clustering = ClusteringService()
+                clusters = await clustering.update_clusters(session_id)
+                print(f"✅ Auto-clustering complete for session {session_id}: "
+                      f"{len(clusters)} clusters updated")
+            else:
+                print(f"⚠️  No data to cluster for session {session_id}")
+        except Exception as e:
+            # Never let background task crash the server
+            print(f"⚠️  Background preprocessing/clustering error: {e}")
 
     async def get_performance(self, question_id: str, session_id: str) -> QuizPerformance:
         """Get performance data from MongoDB"""
