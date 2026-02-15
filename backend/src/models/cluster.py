@@ -2,7 +2,9 @@ from typing import List, Literal
 from pydantic import BaseModel
 
 
+
 class StudentCluster(BaseModel):
+    
     id: str
     name: str
     description: str

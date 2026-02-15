@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Card, CardHeader, CardContent } from '../../components/ui/Card';
@@ -7,6 +7,7 @@ import { Users, AlertCircle, Target, Radio, Download, FileText, Loader2 } from '
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { sessionService } from '../../services/sessionService';
+import { clusteringService, StudentCluster } from '../../services/clusteringService';
 import { toast } from 'sonner';
 
 interface EngagementData {
@@ -50,6 +51,8 @@ export const InstructorAnalytics = () => {
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [liveParticipantCount, setLiveParticipantCount] = useState<number | null>(null);
   const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
+  const [clusters, setClusters] = useState<ClusterData[]>([]);
+  const [loadingClusters, setLoadingClusters] = useState(false);
 
   // Fetch sessions from API
   useEffect(() => {
@@ -174,102 +177,38 @@ export const InstructorAnalytics = () => {
     setDownloadingReportId(null);
   };
 
-  // Generate clusters data based on time range
-  const getClustersData = (): ClusterData[] => {
-    const baseClusters = {
-      live: [
-        {
-          id: '1',
-          name: 'Active Participants',
-          description: 'Highly engaged students',
-          studentCount: 18 + Math.floor(Math.random() * 3),
-          engagementLevel: 'high' as const,
-          color: '#22c55e',
-          prediction: 'stable' as const
-        },
-        {
-          id: '2',
-          name: 'Moderate Participants',
-          description: 'Moderately engaged students',
-          studentCount: 10 + Math.floor(Math.random() * 3),
-          engagementLevel: 'medium' as const,
-          color: '#f59e0b',
-          prediction: 'improving' as const
-        },
-        {
-          id: '3',
-          name: 'At-Risk Students',
-          description: 'Low engagement, need support',
-          studentCount: 4 + Math.floor(Math.random() * 2),
-          engagementLevel: 'low' as const,
-          color: '#ef4444',
-          prediction: 'declining' as const
-        }
-      ],
-      session: [
-        {
-          id: '1',
-          name: 'Active Participants',
-          description: 'Highly engaged students',
-          studentCount: 16,
-          engagementLevel: 'high' as const,
-          color: '#22c55e',
-          prediction: 'stable' as const
-        },
-        {
-          id: '2',
-          name: 'Moderate Participants',
-          description: 'Moderately engaged students',
-          studentCount: 9,
-          engagementLevel: 'medium' as const,
-          color: '#f59e0b',
-          prediction: 'improving' as const
-        },
-        {
-          id: '3',
-          name: 'At-Risk Students',
-          description: 'Low engagement, need support',
-          studentCount: 3,
-          engagementLevel: 'low' as const,
-          color: '#ef4444',
-          prediction: 'declining' as const
-        }
-      ],
-      week: [
-        {
-          id: '1',
-          name: 'Active Participants',
-          description: 'Highly engaged students',
-          studentCount: 68,
-          engagementLevel: 'high' as const,
-          color: '#22c55e',
-          prediction: 'stable' as const
-        },
-        {
-          id: '2',
-          name: 'Moderate Participants',
-          description: 'Moderately engaged students',
-          studentCount: 42,
-          engagementLevel: 'medium' as const,
-          color: '#f59e0b',
-          prediction: 'improving' as const
-        },
-        {
-          id: '3',
-          name: 'At-Risk Students',
-          description: 'Low engagement, need support',
-          studentCount: 15,
-          engagementLevel: 'low' as const,
-          color: '#ef4444',
-          prediction: 'declining' as const
-        }
-      ]
-    };
+  // ── Fetch real cluster data from KMeans API ──────────────────────
+  const fetchClusters = useCallback(async (sessionId: string) => {
+    setLoadingClusters(true);
+    try {
+      const data = await clusteringService.getClusters(sessionId);
+      if (data && data.length > 0) {
+        setClusters(data.map((c: StudentCluster) => ({
+          id: c.id,
+          name: c.name,
+          description: c.description,
+          studentCount: c.studentCount,
+          engagementLevel: c.engagementLevel,
+          color: c.color,
+          prediction: c.prediction,
+        })));
+      } else {
+        // No cluster data yet — show empty defaults
+        setClusters(clusteringService.getDefaultClusters());
+      }
+    } catch (error) {
+      console.error('Error fetching clusters:', error);
+      setClusters(clusteringService.getDefaultClusters());
+    }
+    setLoadingClusters(false);
+  }, []);
 
-    return baseClusters[selectedTimeRange];
-  };
-
-  const clusters = useMemo(() => getClustersData(), [selectedTimeRange, lastUpdate]);
+  // Refetch clusters when the selected session changes
+  useEffect(() => {
+    if (selectedSession) {
+      fetchClusters(selectedSession);
+    }
+  }, [selectedSession, fetchClusters]);
 
   // Generate engagement trends data
   const getEngagementTrend = () => {

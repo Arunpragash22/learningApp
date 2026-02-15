@@ -27,6 +27,17 @@ async def lifespan(app: FastAPI):
     # Connect to MySQL (backup - optional, non-blocking)
     # If MySQL is unavailable, the app continues with MongoDB only
     await connect_to_mysql_backup()
+
+    # Load KMeans ML model (optional, non-blocking)
+    try:
+        from src.ml_models.kmeans_predictor import KMeansPredictor
+        predictor = KMeansPredictor()
+        predictor.load()
+    except FileNotFoundError as e:
+        print(f"⚠️  KMeans model not loaded: {e}")
+        print("   Clustering will use default clusters until the model file is available.")
+    except Exception as e:
+        print(f"⚠️  KMeans model loading error: {e}")
     
     yield
     
@@ -111,7 +122,8 @@ from src.routers import (
     session,
     push_notification,  # ⭐ NEW ROUTER
     latency,  # 📶 WebRTC-aware latency monitoring
-    session_report  # 📊 Session reports with download
+    session_report,  # 📊 Session reports with download
+    preprocessing  # 📊 Preprocessing engagement data
 )
 
 app.include_router(auth.router)
@@ -128,6 +140,7 @@ app.include_router(push_notification.router)  # ⭐ ADD THIS
 app.include_router(latency.router)  # 📶 WebRTC-aware latency monitoring
 app.include_router(session_report.router)  # 📊 Session reports with download
 app.include_router(session_report.reports_router)  # 📊 All reports API
+app.include_router(preprocessing.router)  # 📊 Preprocessing engagement data
 
 # 📊 Role-based Reports
 from src.routers import instructor_reports, student_reports

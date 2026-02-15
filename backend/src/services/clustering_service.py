@@ -2,39 +2,146 @@ from typing import Dict, List, Optional
 from ..models.cluster import StudentCluster
 from ..models.cluster_model import ClusterModel
 from ..models.latency_metrics import LatencyMetricsModel
+from ..models.preprocessing import PreprocessingService
+from ..ml_models.kmeans_predictor import KMeansPredictor
+
+# ── Cluster metadata (label → display info) ─────────────────────
+CLUSTER_META = {
+    "high": {
+        "name": "Active Participants",
+        "description": "Highly engaged students",
+        "color": "#10b981",
+        "prediction": "stable",
+    },
+    "medium": {
+        "name": "Moderate Participants",
+        "description": "Moderately engaged students",
+        "color": "#f59e0b",
+        "prediction": "improving",
+    },
+    "low": {
+        "name": "At-Risk Students",
+        "description": "Low engagement, need support",
+        "color": "#ef4444",
+        "prediction": "declining",
+    },
+}
 
 
 class ClusteringService:
     """
     Clustering service for student engagement analysis.
-    
-    This service now incorporates WebRTC-aware connection latency monitoring
-    to contextualize engagement analysis. Students with poor network conditions
-    are not misclassified as disengaged, improving fairness and reliability.
+
+    Uses a pre-trained KMeans (k=3) model to assign students to
+    engagement clusters based on preprocessed engagement scores.
+
+    Also incorporates WebRTC-aware connection latency monitoring
+    to contextualize engagement analysis. Students with poor network
+    conditions are not misclassified as disengaged.
     """
     _instance = None
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(ClusteringService, cls).__new__(cls)
+            cls._instance._predictor = KMeansPredictor()
+            cls._instance._preprocessing = PreprocessingService()
         return cls._instance
 
+    # ── GET clusters (from DB or run prediction) ────────────────────
     async def get_clusters(self, session_id: str) -> List[StudentCluster]:
         """Get clusters from MongoDB or create default ones"""
         # Try to get clusters from database
         cluster_docs = await ClusterModel.find_by_session(session_id)
-        
+
         if len(cluster_docs) > 0:
-            # Convert to StudentCluster objects
             return [StudentCluster(**doc) for doc in cluster_docs]
 
-        # Initialize default clusters if none exist
-        default_clusters = [
+        # No clusters saved yet → return defaults (will be replaced
+        # once update_clusters / predict_clusters is called)
+        default_clusters = self._build_default_clusters()
+        await ClusterModel.update_clusters_for_session(session_id, default_clusters)
+        return default_clusters
+
+    # ── UPDATE clusters using KMeans model ──────────────────────────
+    async def update_clusters(
+        self,
+        session_id: str,
+        quiz_performance: Optional[Dict] = None
+    ) -> List[StudentCluster]:
+        """
+        Re-cluster students for a session using the KMeans model.
+
+        1. Fetch preprocessed engagement data from MongoDB
+        2. Run KMeans prediction
+        3. Build StudentCluster objects with real student lists
+        4. Save to MongoDB and return
+        """
+        # Try ML-based clustering first
+        clusters = await self._predict_clusters(session_id)
+
+        if clusters:
+            await ClusterModel.update_clusters_for_session(session_id, clusters)
+            return clusters
+
+        # Fallback: if no preprocessed data or model not available,
+        # keep existing clusters
+        return await self.get_clusters(session_id)
+
+    # ── Core ML prediction ──────────────────────────────────────────
+    async def _predict_clusters(
+        self, session_id: str
+    ) -> Optional[List[StudentCluster]]:
+        """
+        Run KMeans prediction on preprocessed data for a session.
+        Returns None if there is no data to predict on.
+        """
+        # 1. Fetch preprocessed engagement docs from MongoDB
+        preprocessed = await self._preprocessing.get_preprocessed(session_id)
+
+        if not preprocessed:
+            print(f"⚠️  No preprocessed data for session {session_id}. "
+                  f"Run preprocessing first.")
+            return None
+
+        # 2. Predict using KMeans model
+        try:
+            student_labels, cluster_students = (
+                self._predictor.predict_students(preprocessed)
+            )
+        except Exception as e:
+            print(f"❌ KMeans prediction failed: {e}")
+            return None
+
+        # 3. Build StudentCluster objects
+        clusters: List[StudentCluster] = []
+        for idx, level in enumerate(["high", "medium", "low"], start=1):
+            meta = CLUSTER_META[level]
+            students = cluster_students.get(level, [])
+            clusters.append(
+                StudentCluster(
+                    id=str(idx),
+                    name=meta["name"],
+                    description=meta["description"],
+                    studentCount=len(students),
+                    engagementLevel=level,
+                    color=meta["color"],
+                    prediction=meta["prediction"],
+                    students=students,
+                )
+            )
+
+        return clusters
+
+    # ── Default clusters (before any data exists) ───────────────────
+    @staticmethod
+    def _build_default_clusters() -> List[StudentCluster]:
+        return [
             StudentCluster(
                 id="1",
                 name="Active Participants",
                 description="Highly engaged students",
-                studentCount=18,
+                studentCount=0,
                 engagementLevel="high",
                 color="#10b981",
                 prediction="stable",
@@ -44,7 +151,7 @@ class ClusteringService:
                 id="2",
                 name="Moderate Participants",
                 description="Moderately engaged students",
-                studentCount=10,
+                studentCount=0,
                 engagementLevel="medium",
                 color="#f59e0b",
                 prediction="improving",
@@ -54,102 +161,13 @@ class ClusteringService:
                 id="3",
                 name="At-Risk Students",
                 description="Low engagement, need support",
-                studentCount=4,
+                studentCount=0,
                 engagementLevel="low",
                 color="#ef4444",
                 prediction="declining",
                 students=[],
             ),
         ]
-
-        # Save default clusters to database
-        await ClusterModel.update_clusters_for_session(session_id, default_clusters)
-        return default_clusters
-
-    async def update_clusters(
-        self,
-        session_id: str,
-        quiz_performance: Optional[Dict] = None
-    ) -> List[StudentCluster]:
-        """Update clusters in MongoDB"""
-        clusters = await self.get_clusters(session_id)
-
-        if quiz_performance:
-            # Update clusters based on quiz performance
-            clusters = self._recalculate_clusters(clusters, quiz_performance)
-            # Save to database
-            await ClusterModel.update_clusters_for_session(session_id, clusters)
-
-        return clusters
-
-    def _recalculate_clusters(
-        self,
-        current_clusters: List[StudentCluster],
-        quiz_performance: Dict
-    ) -> List[StudentCluster]:
-        # Simple clustering algorithm based on quiz performance
-        # In a real implementation, this would consider:
-        # - Quiz performance
-        # - Response time
-        # - Engagement metrics
-        # - Historical data
-
-        performance = quiz_performance.get("correctPercentage", 0)
-
-        # Adjust cluster sizes based on performance
-        # High performance (>80%) -> more students in active cluster
-        # Low performance (<60%) -> more students in at-risk cluster
-
-        total_students = sum(c.studentCount for c in current_clusters)
-
-        if performance >= 80:
-            # High performance: shift students to active cluster
-            return [
-                StudentCluster(
-                    **current_clusters[0].model_dump(),
-                    studentCount=min(total_students, int(total_students * 0.6)),
-                    prediction="stable",
-                ),
-                StudentCluster(
-                    **current_clusters[1].model_dump(),
-                    studentCount=int(total_students * 0.3),
-                    prediction="improving",
-                ),
-                StudentCluster(
-                    **current_clusters[2].model_dump(),
-                    studentCount=max(
-                        0,
-                        total_students
-                        - int(total_students * 0.6)
-                        - int(total_students * 0.3)
-                    ),
-                    prediction="declining",
-                ),
-            ]
-        elif performance < 60:
-            # Low performance: shift students to at-risk cluster
-            return [
-                StudentCluster(
-                    **current_clusters[0].model_dump(),
-                    studentCount=int(total_students * 0.4),
-                    prediction="stable",
-                ),
-                StudentCluster(
-                    **current_clusters[1].model_dump(),
-                    studentCount=int(total_students * 0.3),
-                    prediction="declining",
-                ),
-                StudentCluster(
-                    **current_clusters[2].model_dump(),
-                    studentCount=total_students
-                    - int(total_students * 0.4)
-                    - int(total_students * 0.3),
-                    prediction="declining",
-                ),
-            ]
-
-        # Medium performance: keep current distribution
-        return current_clusters
 
     async def get_student_cluster(
         self, student_id: str, session_id: str
@@ -261,38 +279,25 @@ class ClusteringService:
     ) -> List[StudentCluster]:
         """
         Recalculate clusters considering latency data.
-        
+
         This method updates cluster assignments while considering
         connection quality. Students with poor connections who appear
         disengaged may be given the benefit of the doubt.
         """
-        clusters = await self.get_clusters(session_id)
-        
         # Get latency summary for the session
         latency_summary = await LatencyMetricsModel.get_session_summary(session_id)
         students_with_issues = latency_summary.get("students_needing_attention", [])
-        
-        # If there are students with connectivity issues, we may need to
-        # reconsider their cluster assignments
-        if students_with_issues and quiz_performance:
-            # For students with poor connectivity who are in "at-risk" cluster,
-            # consider moving them to "moderate" if their adjusted engagement is higher
+
+        # Log connectivity-affected students for instructor awareness
+        if students_with_issues:
             for student_info in students_with_issues:
                 student_id = student_info.get("student_id")
                 adjustment_factor = student_info.get("adjustment_factor", 1.0)
-                
-                # If the adjustment factor is low (poor connection),
-                # this student's cluster assignment should be lenient
                 if adjustment_factor < 0.8:
-                    # Log this for instructor awareness
                     print(f"📶 Student {student_id} has connectivity issues "
                           f"(adjustment_factor={adjustment_factor}). "
                           f"Cluster assignment will be contextualized.")
-        
-        # Proceed with normal cluster calculation
-        if quiz_performance:
-            clusters = self._recalculate_clusters(clusters, quiz_performance)
-            await ClusterModel.update_clusters_for_session(session_id, clusters)
-        
-        return clusters
+
+        # Use ML-based clustering (same as update_clusters)
+        return await self.update_clusters(session_id, quiz_performance)
 
