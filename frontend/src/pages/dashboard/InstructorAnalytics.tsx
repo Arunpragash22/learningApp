@@ -26,6 +26,7 @@ interface ClusterData {
   engagementLevel: 'high' | 'medium' | 'low';
   color: string;
   prediction: 'stable' | 'improving' | 'declining';
+  students: string[];  // Real student IDs from KMeans model
 }
 
 interface Session {
@@ -191,14 +192,15 @@ export const InstructorAnalytics = () => {
           engagementLevel: c.engagementLevel,
           color: c.color,
           prediction: c.prediction,
+          students: c.students || [],
         })));
       } else {
         // No cluster data yet — show empty defaults
-        setClusters(clusteringService.getDefaultClusters());
+        setClusters(clusteringService.getDefaultClusters().map(c => ({ ...c, students: [] })));
       }
     } catch (error) {
       console.error('Error fetching clusters:', error);
-      setClusters(clusteringService.getDefaultClusters());
+      setClusters(clusteringService.getDefaultClusters().map(c => ({ ...c, students: [] })));
     }
     setLoadingClusters(false);
   }, []);
@@ -243,41 +245,87 @@ export const InstructorAnalytics = () => {
 
   const engagementTrend = useMemo(() => getEngagementTrend(), [selectedTimeRange, lastUpdate]);
 
-  // Generate at-risk students based on time range
-  const getAtRiskStudents = () => {
-    const baseStudents = [
-      { id: '1', name: 'Vimalan Arunpragash', engagement: 35, cluster: 'At-Risk Students', lastActive: '2 min ago' },
-      { id: '2', name: 'Shawmica Sivatharan', engagement: 28, cluster: 'At-Risk Students', lastActive: '5 min ago' },
-      { id: '3', name: 'Keranshama Shudharshan', engagement: 42, cluster: 'At-Risk Students', lastActive: '1 min ago' },
-    ];
+  // ── Build student lists from REAL cluster data ──────────────────
+  // At-Risk students = students in the "low" engagement cluster
+  const atRiskStudents = useMemo(() => {
+    const lowCluster = clusters.find(c => c.engagementLevel === 'low');
+    if (!lowCluster || !lowCluster.students || lowCluster.students.length === 0) {
+      return [];
+    }
+    return lowCluster.students.map((studentId, i) => ({
+      id: studentId,
+      name: `Student ${studentId.slice(0, 8)}`,
+      engagement: 0,
+      cluster: 'At-Risk Students',
+      lastActive: 'In session',
+    }));
+  }, [clusters]);
 
-    if (selectedTimeRange === 'week') {
-      return [
-        ...baseStudents,
-        { id: '4', name: 'Alice Brown', engagement: 38, cluster: 'At-Risk Students', lastActive: '3 days ago' },
-        { id: '5', name: 'Charlie Davis', engagement: 31, cluster: 'At-Risk Students', lastActive: '2 days ago' },
-      ];
+  // Active + Moderate students (from high and medium clusters)
+  const moderateActiveStudents = useMemo(() => {
+    const result: { id: string; name: string; engagement: number; cluster: string; lastActive: string }[] = [];
+
+    const highCluster = clusters.find(c => c.engagementLevel === 'high');
+    if (highCluster?.students) {
+      highCluster.students.forEach(sid => {
+        result.push({
+          id: sid,
+          name: `Student ${sid.slice(0, 8)}`,
+          engagement: 0,
+          cluster: 'Active Participants',
+          lastActive: 'In session',
+        });
+      });
     }
 
-    return baseStudents;
-  };
+    const medCluster = clusters.find(c => c.engagementLevel === 'medium');
+    if (medCluster?.students) {
+      medCluster.students.forEach(sid => {
+        result.push({
+          id: sid,
+          name: `Student ${sid.slice(0, 8)}`,
+          engagement: 0,
+          cluster: 'Moderate Participants',
+          lastActive: 'In session',
+        });
+      });
+    }
 
-  const atRiskStudents = useMemo(() => getAtRiskStudents(), [selectedTimeRange]);
+    return result;
+  }, [clusters]);
 
-  // Moderate / Active students (for dropdown list)
-  const moderateActiveStudents = useMemo(
-    () => [
-      { id: 'm1', name: 'Shawmica Sivatharan', engagement: 72, cluster: 'Active Participants', lastActive: '2 min ago' },
-      { id: 'm2', name: 'Vimalan Arunpragash', engagement: 65, cluster: 'Moderate Participants', lastActive: '3 min ago' },
-      { id: 'm3', name: 'Keranshama Shudharshan', engagement: 88, cluster: 'Active Participants', lastActive: '4 min ago' },
-      { id: 'm4', name: 'Prashanthy Kugathas', engagement: 91, cluster: 'Active Participants', lastActive: '5 min ago' },
-      { id: 'm5', name: 'Wafry Ahamed', engagement: 68, cluster: 'Moderate Participants', lastActive: '6 min ago' },
-    ],
-    [],
-  );
+  // Active-only students (from high cluster)
+  const activeStudents = useMemo(() => {
+    const highCluster = clusters.find(c => c.engagementLevel === 'high');
+    if (!highCluster?.students) return [];
+    return highCluster.students.map(sid => ({
+      id: sid,
+      name: `Student ${sid.slice(0, 8)}`,
+      engagement: 0,
+      cluster: 'Active Participants',
+      lastActive: 'In session',
+    }));
+  }, [clusters]);
 
-  const [studentListView, setStudentListView] = useState<'at-risk' | 'moderate-active'>('at-risk');
-  const displayedStudents = studentListView === 'at-risk' ? atRiskStudents : moderateActiveStudents;
+  // Moderate-only students (from medium cluster)
+  const moderateStudents = useMemo(() => {
+    const medCluster = clusters.find(c => c.engagementLevel === 'medium');
+    if (!medCluster?.students) return [];
+    return medCluster.students.map(sid => ({
+      id: sid,
+      name: `Student ${sid.slice(0, 8)}`,
+      engagement: 0,
+      cluster: 'Moderate Participants',
+      lastActive: 'In session',
+    }));
+  }, [clusters]);
+
+  const [studentListView, setStudentListView] = useState<'at-risk' | 'moderate' | 'active'>('at-risk');
+  const displayedStudents = studentListView === 'at-risk'
+    ? atRiskStudents
+    : studentListView === 'moderate'
+      ? moderateStudents
+      : activeStudents;
   const isAtRiskView = studentListView === 'at-risk';
 
   // Format last update time
@@ -358,15 +406,20 @@ export const InstructorAnalytics = () => {
           <div className="p-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                {isAtRiskView ? (
+                {studentListView === 'at-risk' ? (
                   <>
                     <AlertCircle className="h-5 w-5 mr-2 text-red-600" />
-                    At-Risk Students
+                    At-Risk Students (Passive)
+                  </>
+                ) : studentListView === 'moderate' ? (
+                  <>
+                    <Target className="h-5 w-5 mr-2 text-yellow-500" />
+                    Moderate Students
                   </>
                 ) : (
                   <>
                     <Target className="h-5 w-5 mr-2 text-green-600" />
-                    Moderate Active Students
+                    Active Students
                   </>
                 )}
               </h3>
@@ -375,33 +428,45 @@ export const InstructorAnalytics = () => {
                 <select
                   id="student-list-view"
                   value={studentListView}
-                  onChange={(e) => setStudentListView(e.target.value as 'at-risk' | 'moderate-active')}
+                  onChange={(e) => setStudentListView(e.target.value as 'at-risk' | 'moderate' | 'active')}
                   className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
-                  <option value="at-risk">At-Risk Students</option>
-                  <option value="moderate-active">Moderate Active Students</option>
+                  <option value="at-risk">At-Risk / Passive</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="active">Active</option>
                 </select>
-                <Badge variant={isAtRiskView ? 'danger' : 'success'}>{displayedStudents.length}</Badge>
+                <Badge variant={studentListView === 'at-risk' ? 'danger' : studentListView === 'moderate' ? 'warning' : 'success'}>
+                  {displayedStudents.length}
+                </Badge>
               </div>
             </div>
             <div className="space-y-3">
+              {displayedStudents.length === 0 && (
+                <div className="text-center py-6 text-gray-400">
+                  <p className="text-sm">No students clustered yet.</p>
+                  <p className="text-xs mt-1">Clusters will appear after students submit quiz answers.</p>
+                </div>
+              )}
               {displayedStudents.map((student) => (
                 <div
                   key={student.id}
                   className={`flex items-center justify-between p-3 rounded-lg ${
-                    isAtRiskView ? 'bg-red-50' : 'bg-green-50'
+                    studentListView === 'at-risk' ? 'bg-red-50' :
+                    studentListView === 'moderate' ? 'bg-yellow-50' : 'bg-green-50'
                   }`}
                 >
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">{student.name}</p>
                     <div className="flex items-center space-x-2 mt-1">
-                      <span className="text-xs text-gray-500">Engagement: {student.engagement}%</span>
+                      <span className="text-xs text-gray-500">ID: {student.id.slice(0, 12)}...</span>
                       <span className="text-xs text-gray-400">•</span>
                       <span className="text-xs text-gray-500">{student.lastActive}</span>
                       {!isAtRiskView && (
                         <>
                           <span className="text-xs text-gray-400">•</span>
-                          <span className="text-xs text-gray-500">{student.cluster}</span>
+                          <span className={`text-xs font-medium ${
+                            student.cluster === 'Active Participants' ? 'text-green-600' : 'text-yellow-600'
+                          }`}>{student.cluster}</span>
                         </>
                       )}
                     </div>
