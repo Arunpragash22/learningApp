@@ -199,15 +199,24 @@ export const StudentEngagement = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Current Engagement</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Your Cluster</h3>
             <Activity className="h-6 w-6 text-indigo-600" />
           </div>
-          <EngagementIndicator
-            engagementLevel={studentData.engagementLevel}
-            engagementScore={studentData.engagementScore}
-            cluster={studentData.cluster}
-            showCluster={true}
-          />
+          <div className="flex items-center space-x-3">
+            <div className={`rounded-full p-2.5 text-white ${
+              studentData.engagementLevel === 'high' ? 'bg-green-500' :
+              studentData.engagementLevel === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
+            }`}>
+              <Activity className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-gray-900">{studentData.cluster}</p>
+              <p className="text-sm text-gray-500">
+                {studentData.engagementLevel === 'high' ? 'Highly engaged' :
+                 studentData.engagementLevel === 'medium' ? 'Moderately engaged' : 'Needs improvement'}
+              </p>
+            </div>
+          </div>
         </Card>
 
         <Card className="p-6">
