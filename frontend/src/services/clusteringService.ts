@@ -33,14 +33,14 @@ const getAuthHeaders = () => ({
 });
 
 export const clusteringService = {
-  // Get default clusters (fallback)
+  // Get default clusters (shown before any real data exists)
   getDefaultClusters(): StudentCluster[] {
     return [
       {
         id: '1',
         name: 'Active Participants',
         description: 'Highly engaged students',
-        studentCount: 18,
+        studentCount: 0,
         engagementLevel: 'high',
         color: '#22c55e',
         prediction: 'stable',
@@ -50,7 +50,7 @@ export const clusteringService = {
         id: '2',
         name: 'Moderate Participants',
         description: 'Moderately engaged students',
-        studentCount: 10,
+        studentCount: 0,
         engagementLevel: 'medium',
         color: '#f59e0b',
         prediction: 'improving',
@@ -60,7 +60,7 @@ export const clusteringService = {
         id: '3',
         name: 'At-Risk Students',
         description: 'Low engagement, need support',
-        studentCount: 4,
+        studentCount: 0,
         engagementLevel: 'low',
         color: '#ef4444',
         prediction: 'declining',
