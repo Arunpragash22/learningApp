@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from pydantic import BaseModel
 from bson import ObjectId
 from ..services.clustering_service import ClusteringService
+from ..services.ws_manager import ws_manager
 from ..models.cluster import StudentCluster
 from ..middleware.auth import get_current_user
 from ..database.connection import get_database
@@ -190,7 +191,9 @@ async def get_student_cluster(
 
 
 async def _compute_realtime_stats(session_id: str) -> dict:
-    """Compute real-time student count and question count for a session."""
+    """Compute real-time student count and question count for a session.
+    Uses WebSocket manager (in-memory) as the primary source for live
+    connected students, then falls back to MongoDB collections."""
     db = get_database()
     if db is None:
         return {"totalStudents": 0, "activeStudents": 0, "totalQuestions": 0, "totalAnswers": 0}
@@ -200,22 +203,33 @@ async def _compute_realtime_stats(session_id: str) -> dict:
         id_filter = {"sessionId": {"$in": all_ids}}
         print(f"📊 realtime-stats: session_id={session_id}, resolved IDs={all_ids}")
 
-        # ── Students from all sources ────────────────────────────────
-        participant_sids: set = set()
+        # ── Students: PRIMARY SOURCE = WebSocket manager (live connections) ──
+        # This is the same data source as the Student Network Monitor
+        ws_participants = ws_manager.get_session_participants_by_multiple_ids(all_ids)
+        ws_student_ids = set()
+        for p in ws_participants:
+            sid = p.get("studentId")
+            if sid:
+                ws_student_ids.add(sid)
+        print(f"📊 WebSocket live participants: {len(ws_student_ids)} across IDs {all_ids}")
+
+        # ── Students: SECONDARY SOURCE = MongoDB collections ─────────
+        db_student_ids: set = set()
         active_sids: set = set()
         async for p in db.session_participants.find(id_filter, {"studentId": 1, "status": 1}):
             sid = p.get("studentId")
             if sid:
-                participant_sids.add(sid)
+                db_student_ids.add(sid)
                 if p.get("status") == "active":
                     active_sids.add(sid)
 
         assignment_sids = set(await db.question_assignments.distinct("studentId", id_filter))
         answer_sids = set(await db.quiz_answers.distinct("studentId", id_filter))
 
-        all_student_ids = participant_sids | assignment_sids | answer_sids
+        # Union of ALL sources
+        all_student_ids = ws_student_ids | db_student_ids | assignment_sids | answer_sids
 
-        # Filter out instructors/admins from the count
+        # Filter out instructors/admins
         if all_student_ids:
             non_student_ids = set()
             obj_ids = []
@@ -231,10 +245,13 @@ async def _compute_realtime_stats(session_id: str) -> dict:
                 ):
                     non_student_ids.add(str(u["_id"]))
             all_student_ids -= non_student_ids
+            ws_student_ids -= non_student_ids
             active_sids -= non_student_ids
 
         total_students = len(all_student_ids)
-        active_students = len(active_sids) if active_sids else total_students
+        # Active = WebSocket-connected students (most accurate for "right now")
+        # Fall back to session_participants active, then total
+        active_students = len(ws_student_ids) if ws_student_ids else (len(active_sids) if active_sids else total_students)
 
         # ── Questions SENT ───────────────────────────────────────────
         questions_from_assignments = set(await db.question_assignments.distinct("questionId", id_filter))
