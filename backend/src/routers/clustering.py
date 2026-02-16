@@ -163,3 +163,88 @@ async def get_student_cluster(
             detail="Internal server error"
         )
 
+
+async def _resolve_session_ids(db, session_id: str) -> List[str]:
+    """Resolve all possible session IDs (MongoDB _id + zoomMeetingId)."""
+    ids = [session_id]
+    try:
+        if len(session_id) == 24:
+            doc = await db.sessions.find_one(
+                {"_id": ObjectId(session_id)}, {"zoomMeetingId": 1}
+            )
+            if doc and doc.get("zoomMeetingId"):
+                zoom_id = str(doc["zoomMeetingId"])
+                if zoom_id not in ids:
+                    ids.append(zoom_id)
+        else:
+            query = {"zoomMeetingId": int(session_id)} if session_id.isdigit() else {"zoomMeetingId": session_id}
+            doc = await db.sessions.find_one(query, {"_id": 1})
+            if doc:
+                mongo_id = str(doc["_id"])
+                if mongo_id not in ids:
+                    ids.append(mongo_id)
+    except Exception:
+        pass
+    return ids
+
+
+@router.get("/session/{session_id}/realtime-stats")
+async def get_realtime_stats(
+    session_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Get real-time session stats: participant count and question count from DB."""
+    try:
+        db = get_database()
+        if db is None:
+            raise HTTPException(status_code=500, detail="Database not connected")
+
+        all_ids = await _resolve_session_ids(db, session_id)
+        id_filter = {"sessionId": {"$in": all_ids}}
+
+        # ── Students ─────────────────────────────────────────────────
+        # Count from session_participants
+        active_from_participants = await db.session_participants.count_documents(
+            {**id_filter, "status": "active"}
+        )
+        total_from_participants = await db.session_participants.count_documents(id_filter)
+
+        # Also count distinct students from quiz_answers (some students
+        # answer quizzes but may not appear in session_participants)
+        students_from_answers = await db.quiz_answers.distinct("studentId", id_filter)
+
+        # Merge: get distinct student IDs from session_participants too
+        participant_student_ids: List[str] = []
+        async for p in db.session_participants.find(id_filter, {"studentId": 1}):
+            sid = p.get("studentId")
+            if sid and sid not in participant_student_ids:
+                participant_student_ids.append(sid)
+
+        # Union of both sources
+        all_student_ids = set(participant_student_ids) | set(students_from_answers)
+        total_students = len(all_student_ids)
+        active_students = max(active_from_participants, len(students_from_answers)) if total_from_participants == 0 else active_from_participants
+
+        # ── Questions ────────────────────────────────────────────────
+        # Distinct questions triggered in this session
+        distinct_questions = await db.quiz_answers.distinct("questionId", id_filter)
+        total_questions = len(distinct_questions)
+
+        # Total quiz answer submissions
+        total_answers = await db.quiz_answers.count_documents(id_filter)
+
+        return {
+            "totalStudents": total_students,
+            "activeStudents": active_students,
+            "totalQuestions": total_questions,
+            "totalAnswers": total_answers,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting realtime stats: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
