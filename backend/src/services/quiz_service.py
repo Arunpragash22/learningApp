@@ -129,7 +129,7 @@ class QuizService:
             # We need to store clusters under BOTH IDs so both sides can find them.
             mongo_session_id = session_id
             db = get_database()
-            if db:
+            if db is not None:
                 # Try to find session by zoomMeetingId
                 session_doc = await db.sessions.find_one({"zoomMeetingId": session_id})
                 if not session_doc and session_id.isdigit():
