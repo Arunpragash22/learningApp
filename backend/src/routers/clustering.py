@@ -24,11 +24,12 @@ def _is_valid_object_id(sid: str) -> bool:
 
 
 async def _resolve_student_info(student_ids: List[str]) -> tuple:
-    """Look up student names and roles from the users collection.
+    """Look up student names from the users collection.
+    ONLY keeps IDs that are registered students on the website.
     Returns (names_dict, non_student_ids_set):
-      - names_dict: studentId -> 'firstName lastName'
-      - non_student_ids_set: set of IDs that are NOT students
-        (instructors, admins, or non-ObjectId IDs like 'instructor_xxx')
+      - names_dict: studentId -> 'firstName lastName' (website-registered students only)
+      - non_student_ids_set: set of IDs to exclude (instructors, admins,
+        Zoom-only accounts, or any ID not found as a student in the DB)
     """
     names: Dict[str, str] = {}
     non_student_ids: set = set()
@@ -40,28 +41,34 @@ async def _resolve_student_info(student_ids: List[str]) -> tuple:
     if db is None:
         return names, non_student_ids
 
+    # 1. Any ID that isn't a valid ObjectId is not a website-registered user
+    valid_sids: List[str] = []
     object_ids = []
     for sid in student_ids:
         if not _is_valid_object_id(sid):
-            # IDs like "instructor_6..." are not real students
             non_student_ids.add(sid)
             continue
+        valid_sids.append(sid)
         object_ids.append(ObjectId(sid))
 
+    # 2. Look up ONLY users with role "student" in the website DB
+    found_student_ids: set = set()
     if object_ids:
         async for user in db.users.find(
-            {"_id": {"$in": object_ids}},
-            {"firstName": 1, "lastName": 1, "role": 1}
+            {"_id": {"$in": object_ids}, "role": "student"},
+            {"firstName": 1, "lastName": 1}
         ):
             uid = str(user["_id"])
-            role = user.get("role", "student")
             first = user.get("firstName", "")
             last = user.get("lastName", "")
+            names[uid] = f"{first} {last}".strip() or f"Student {uid[:8]}"
+            found_student_ids.add(uid)
 
-            if role in ("instructor", "admin"):
-                non_student_ids.add(uid)
-            else:
-                names[uid] = f"{first} {last}".strip() or f"Student {uid[:8]}"
+    # 3. Any valid ObjectId NOT found as a student → exclude
+    #    (could be instructor, admin, or Zoom-only account not in DB)
+    for sid in valid_sids:
+        if sid not in found_student_ids:
+            non_student_ids.add(sid)
 
     return names, non_student_ids
 
@@ -242,7 +249,7 @@ async def _compute_realtime_stats(session_id: str) -> dict:
         # Union of ALL sources
         all_student_ids = ws_student_ids | db_student_ids | assignment_sids | answer_sids
 
-        # Filter out instructors/admins and non-ObjectId IDs (e.g. "instructor_xxx")
+        # Keep ONLY website-registered students (role="student" in users collection)
         if all_student_ids:
             non_student_ids = set()
             obj_ids = []
@@ -251,12 +258,21 @@ async def _compute_realtime_stats(session_id: str) -> dict:
                     non_student_ids.add(sid)
                     continue
                 obj_ids.append(ObjectId(sid))
+
+            # Find IDs that ARE registered students
+            registered_student_ids: set = set()
             if obj_ids:
                 async for u in db.users.find(
-                    {"_id": {"$in": obj_ids}, "role": {"$in": ["instructor", "admin"]}},
+                    {"_id": {"$in": obj_ids}, "role": "student"},
                     {"_id": 1}
                 ):
-                    non_student_ids.add(str(u["_id"]))
+                    registered_student_ids.add(str(u["_id"]))
+
+            # Anything not a registered student gets excluded
+            for sid in list(all_student_ids):
+                if sid not in registered_student_ids:
+                    non_student_ids.add(sid)
+
             all_student_ids -= non_student_ids
             ws_student_ids -= non_student_ids
             active_sids -= non_student_ids
