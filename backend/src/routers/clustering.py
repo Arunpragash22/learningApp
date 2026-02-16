@@ -11,17 +11,22 @@ router = APIRouter(prefix="/api/clustering", tags=["clustering"])
 clustering_service = ClusteringService()
 
 
-async def _resolve_student_names(student_ids: List[str]) -> Dict[str, str]:
-    """Look up student names from the users collection.
-    Returns a dict mapping studentId -> 'firstName lastName'."""
+async def _resolve_student_info(student_ids: List[str]) -> tuple:
+    """Look up student names and roles from the users collection.
+    Returns (names_dict, instructor_ids_set):
+      - names_dict: studentId -> 'firstName lastName'
+      - instructor_ids_set: set of IDs that are NOT students (instructor/admin)
+    """
+    names: Dict[str, str] = {}
+    non_student_ids: set = set()
+
     if not student_ids:
-        return {}
+        return names, non_student_ids
 
     db = get_database()
     if db is None:
-        return {}
+        return names, non_student_ids
 
-    names: Dict[str, str] = {}
     object_ids = []
     for sid in student_ids:
         try:
@@ -32,14 +37,19 @@ async def _resolve_student_names(student_ids: List[str]) -> Dict[str, str]:
     if object_ids:
         async for user in db.users.find(
             {"_id": {"$in": object_ids}},
-            {"firstName": 1, "lastName": 1}
+            {"firstName": 1, "lastName": 1, "role": 1}
         ):
             uid = str(user["_id"])
+            role = user.get("role", "student")
             first = user.get("firstName", "")
             last = user.get("lastName", "")
-            names[uid] = f"{first} {last}".strip() or f"Student {uid[:8]}"
 
-    return names
+            if role in ("instructor", "admin"):
+                non_student_ids.add(uid)
+            else:
+                names[uid] = f"{first} {last}".strip() or f"Student {uid[:8]}"
+
+    return names, non_student_ids
 
 
 class UpdateClustersRequest(BaseModel):
@@ -65,19 +75,25 @@ async def get_clusters(
         clusters = await clustering_service.get_clusters(session_id)
         print(f"Returning {len(clusters)} clusters for session {session_id}")
 
-        # Resolve student names from the users collection
+        # Resolve student names and identify non-students (instructors/admins)
         all_student_ids = []
         for c in clusters:
             all_student_ids.extend(c.students)
-        student_names = await _resolve_student_names(list(set(all_student_ids)))
+        student_names, non_student_ids = await _resolve_student_info(list(set(all_student_ids)))
 
-        # Attach names to each cluster before returning
+        if non_student_ids:
+            print(f"🚫 Filtering out non-student IDs from clusters: {non_student_ids}")
+
+        # Attach names to each cluster, filtering out instructors/admins
         enriched = []
         for c in clusters:
+            filtered_students = [sid for sid in c.students if sid not in non_student_ids]
             cluster_dict = c.model_dump()
+            cluster_dict["students"] = filtered_students
+            cluster_dict["studentCount"] = len(filtered_students)
             cluster_dict["studentNames"] = {
                 sid: student_names.get(sid, f"Student {sid[:8]}")
-                for sid in c.students
+                for sid in filtered_students
             }
             enriched.append(cluster_dict)
 
@@ -119,18 +135,21 @@ async def update_clusters(
             request_data.quizPerformance
         )
 
-        # Resolve student names
+        # Resolve student names and filter out instructors/admins
         all_student_ids = []
         for c in clusters:
             all_student_ids.extend(c.students)
-        student_names = await _resolve_student_names(list(set(all_student_ids)))
+        student_names, non_student_ids = await _resolve_student_info(list(set(all_student_ids)))
 
         enriched = []
         for c in clusters:
+            filtered_students = [sid for sid in c.students if sid not in non_student_ids]
             cluster_dict = c.model_dump()
+            cluster_dict["students"] = filtered_students
+            cluster_dict["studentCount"] = len(filtered_students)
             cluster_dict["studentNames"] = {
                 sid: student_names.get(sid, f"Student {sid[:8]}")
-                for sid in c.students
+                for sid in filtered_students
             }
             enriched.append(cluster_dict)
 
@@ -195,6 +214,25 @@ async def _compute_realtime_stats(session_id: str) -> dict:
         answer_sids = set(await db.quiz_answers.distinct("studentId", id_filter))
 
         all_student_ids = participant_sids | assignment_sids | answer_sids
+
+        # Filter out instructors/admins from the count
+        if all_student_ids:
+            non_student_ids = set()
+            obj_ids = []
+            for sid in all_student_ids:
+                try:
+                    obj_ids.append(ObjectId(sid))
+                except Exception:
+                    pass
+            if obj_ids:
+                async for u in db.users.find(
+                    {"_id": {"$in": obj_ids}, "role": {"$in": ["instructor", "admin"]}},
+                    {"_id": 1}
+                ):
+                    non_student_ids.add(str(u["_id"]))
+            all_student_ids -= non_student_ids
+            active_sids -= non_student_ids
+
         total_students = len(all_student_ids)
         active_students = len(active_sids) if active_sids else total_students
 
