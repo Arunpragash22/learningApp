@@ -83,7 +83,7 @@ export const ClusterVisualization: React.FC<ClusterVisualizationProps> = ({
                     {cluster.studentCount}
                   </span>
                   <span className="text-sm text-gray-500">
-                    ({((cluster.studentCount / totalStudents) * 100).toFixed(1)}%)
+                    ({totalStudents > 0 ? ((cluster.studentCount / totalStudents) * 100).toFixed(1) : '0.0'}%)
                   </span>
                 </div>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -101,7 +101,7 @@ export const ClusterVisualization: React.FC<ClusterVisualizationProps> = ({
                   <div
                     className="h-2 rounded-full transition-all"
                     style={{
-                      width: `${(cluster.studentCount / totalStudents) * 100}%`,
+                      width: `${totalStudents > 0 ? (cluster.studentCount / totalStudents) * 100 : 0}%`,
                       backgroundColor: cluster.color
                     }}
                   />
