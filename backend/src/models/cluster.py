@@ -1,4 +1,4 @@
-from typing import List, Literal
+from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel
 
 
@@ -13,4 +13,5 @@ class StudentCluster(BaseModel):
     color: str
     prediction: Literal["stable", "improving", "declining"]
     students: List[str]  # Student IDs
+    studentNames: Optional[Dict[str, str]] = None  # studentId -> "firstName lastName"
 

@@ -9,6 +9,7 @@ export interface StudentCluster {
   color: string;
   prediction: 'stable' | 'improving' | 'declining';
   students: string[]; // Student IDs
+  studentNames?: Record<string, string>; // studentId -> "firstName lastName"
 }
 
 export interface ClusterUpdate {

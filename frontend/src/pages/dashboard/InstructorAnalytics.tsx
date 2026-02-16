@@ -27,6 +27,7 @@ interface ClusterData {
   color: string;
   prediction: 'stable' | 'improving' | 'declining';
   students: string[];  // Real student IDs from KMeans model
+  studentNames?: Record<string, string>; // studentId -> "firstName lastName"
 }
 
 interface Session {
@@ -193,6 +194,7 @@ export const InstructorAnalytics = () => {
           color: c.color,
           prediction: c.prediction,
           students: c.students || [],
+          studentNames: c.studentNames || {},
         })));
       } else {
         // No cluster data yet — show empty defaults
@@ -245,6 +247,21 @@ export const InstructorAnalytics = () => {
 
   const engagementTrend = useMemo(() => getEngagementTrend(), [selectedTimeRange, lastUpdate]);
 
+  // ── Build a combined name map from all clusters ─────────────────
+  const studentNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of clusters) {
+      if (c.studentNames) {
+        Object.assign(map, c.studentNames);
+      }
+    }
+    return map;
+  }, [clusters]);
+
+  const getStudentName = useCallback((sid: string) => {
+    return studentNameMap[sid] || `Student ${sid.slice(0, 8)}`;
+  }, [studentNameMap]);
+
   // ── Build student lists from REAL cluster data ──────────────────
   // At-Risk students = students in the "low" engagement cluster
   const atRiskStudents = useMemo(() => {
@@ -252,14 +269,14 @@ export const InstructorAnalytics = () => {
     if (!lowCluster || !lowCluster.students || lowCluster.students.length === 0) {
       return [];
     }
-    return lowCluster.students.map((studentId, i) => ({
+    return lowCluster.students.map((studentId) => ({
       id: studentId,
-      name: `Student ${studentId.slice(0, 8)}`,
+      name: getStudentName(studentId),
       engagement: 0,
       cluster: 'At-Risk Students',
       lastActive: 'In session',
     }));
-  }, [clusters]);
+  }, [clusters, getStudentName]);
 
   // Active + Moderate students (from high and medium clusters)
   const moderateActiveStudents = useMemo(() => {
@@ -270,7 +287,7 @@ export const InstructorAnalytics = () => {
       highCluster.students.forEach(sid => {
         result.push({
           id: sid,
-          name: `Student ${sid.slice(0, 8)}`,
+          name: getStudentName(sid),
           engagement: 0,
           cluster: 'Active Participants',
           lastActive: 'In session',
@@ -283,7 +300,7 @@ export const InstructorAnalytics = () => {
       medCluster.students.forEach(sid => {
         result.push({
           id: sid,
-          name: `Student ${sid.slice(0, 8)}`,
+          name: getStudentName(sid),
           engagement: 0,
           cluster: 'Moderate Participants',
           lastActive: 'In session',
@@ -292,7 +309,7 @@ export const InstructorAnalytics = () => {
     }
 
     return result;
-  }, [clusters]);
+  }, [clusters, getStudentName]);
 
   // Active-only students (from high cluster)
   const activeStudents = useMemo(() => {
@@ -300,12 +317,12 @@ export const InstructorAnalytics = () => {
     if (!highCluster?.students) return [];
     return highCluster.students.map(sid => ({
       id: sid,
-      name: `Student ${sid.slice(0, 8)}`,
+      name: getStudentName(sid),
       engagement: 0,
       cluster: 'Active Participants',
       lastActive: 'In session',
     }));
-  }, [clusters]);
+  }, [clusters, getStudentName]);
 
   // Moderate-only students (from medium cluster)
   const moderateStudents = useMemo(() => {
@@ -313,12 +330,12 @@ export const InstructorAnalytics = () => {
     if (!medCluster?.students) return [];
     return medCluster.students.map(sid => ({
       id: sid,
-      name: `Student ${sid.slice(0, 8)}`,
+      name: getStudentName(sid),
       engagement: 0,
       cluster: 'Moderate Participants',
       lastActive: 'In session',
     }));
-  }, [clusters]);
+  }, [clusters, getStudentName]);
 
   const [studentListView, setStudentListView] = useState<'at-risk' | 'moderate' | 'active'>('at-risk');
   const displayedStudents = studentListView === 'at-risk'

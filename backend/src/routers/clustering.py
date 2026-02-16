@@ -1,12 +1,45 @@
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from pydantic import BaseModel
+from bson import ObjectId
 from ..services.clustering_service import ClusteringService
 from ..models.cluster import StudentCluster
 from ..middleware.auth import get_current_user
+from ..database.connection import get_database
 
 router = APIRouter(prefix="/api/clustering", tags=["clustering"])
 clustering_service = ClusteringService()
+
+
+async def _resolve_student_names(student_ids: List[str]) -> Dict[str, str]:
+    """Look up student names from the users collection.
+    Returns a dict mapping studentId -> 'firstName lastName'."""
+    if not student_ids:
+        return {}
+
+    db = get_database()
+    if db is None:
+        return {}
+
+    names: Dict[str, str] = {}
+    object_ids = []
+    for sid in student_ids:
+        try:
+            object_ids.append(ObjectId(sid))
+        except Exception:
+            pass
+
+    if object_ids:
+        async for user in db.users.find(
+            {"_id": {"$in": object_ids}},
+            {"firstName": 1, "lastName": 1}
+        ):
+            uid = str(user["_id"])
+            first = user.get("firstName", "")
+            last = user.get("lastName", "")
+            names[uid] = f"{first} {last}".strip() or f"Student {uid[:8]}"
+
+    return names
 
 
 class UpdateClustersRequest(BaseModel):
@@ -32,7 +65,23 @@ async def get_clusters(
         clusters = await clustering_service.get_clusters(session_id)
         print(f"Returning {len(clusters)} clusters for session {session_id}")
 
-        return clusters
+        # Resolve student names from the users collection
+        all_student_ids = []
+        for c in clusters:
+            all_student_ids.extend(c.students)
+        student_names = await _resolve_student_names(list(set(all_student_ids)))
+
+        # Attach names to each cluster before returning
+        enriched = []
+        for c in clusters:
+            cluster_dict = c.model_dump()
+            cluster_dict["studentNames"] = {
+                sid: student_names.get(sid, f"Student {sid[:8]}")
+                for sid in c.students
+            }
+            enriched.append(cluster_dict)
+
+        return enriched
     except Exception as e:
         print(f"Error getting clusters: {e}")
         raise HTTPException(
@@ -64,7 +113,22 @@ async def update_clusters(
             request_data.quizPerformance
         )
 
-        return clusters
+        # Resolve student names
+        all_student_ids = []
+        for c in clusters:
+            all_student_ids.extend(c.students)
+        student_names = await _resolve_student_names(list(set(all_student_ids)))
+
+        enriched = []
+        for c in clusters:
+            cluster_dict = c.model_dump()
+            cluster_dict["studentNames"] = {
+                sid: student_names.get(sid, f"Student {sid[:8]}")
+                for sid in c.students
+            }
+            enriched.append(cluster_dict)
+
+        return enriched
     except Exception as e:
         print(f"Error updating clusters: {e}")
         raise HTTPException(
