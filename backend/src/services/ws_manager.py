@@ -3,11 +3,16 @@ WebSocket Connection Manager Service
 Manages real-time WebSocket connections with SESSION-BASED ROOMS
 Only students who join a session will receive quiz questions for that session
 """
+import asyncio
 from fastapi import WebSocket
 from typing import Dict, Set, Optional, List
 from datetime import datetime
 from ..models.session_participant_model import SessionParticipantModel
 from ..database.connection import get_database
+
+# Grace period (seconds) before fully removing a disconnected student.
+# If the student reconnects within this window, they remain in the session.
+DISCONNECT_GRACE_PERIOD = 60
 
 
 class WebSocketManager:
@@ -38,6 +43,11 @@ class WebSocketManager:
         # session_id -> { student_id -> {"message": {...}, "sent_at": datetime} }
         self.last_student_quiz: Dict[str, Dict[str, dict]] = {}
 
+        # ⏳ Pending disconnect timers: {(session_id, student_id): asyncio.Task}
+        # When a student's WebSocket drops, we wait DISCONNECT_GRACE_PERIOD before
+        # actually removing them. If they reconnect in time, the timer is cancelled.
+        self._disconnect_timers: Dict[tuple, asyncio.Task] = {}
+
     # =========================================================
     # 🎯 SESSION ROOM HANDLERS (NEW - For Quiz Delivery)
     # =========================================================
@@ -61,7 +71,19 @@ class WebSocketManager:
         if session_id not in self.session_rooms:
             self.session_rooms[session_id] = {}
 
+        # Cancel any pending disconnect grace period for this student
+        # (they reconnected before the timer expired)
+        self.cancel_disconnect_timer(session_id, student_id)
+
         final_student_name = student_name or f"Student {student_id[:8]}"
+
+        # Check if student was already in the room (reconnecting)
+        was_in_room = student_id in self.session_rooms[session_id]
+        if was_in_room:
+            old_data = self.session_rooms[session_id][student_id]
+            if old_data.get("websocket") is None:
+                print(f"🔄 Student {final_student_name} reconnected to session {session_id} "
+                      f"(was in grace period)")
 
         participant = {
             "websocket": websocket,
@@ -228,6 +250,65 @@ class WebSocketManager:
             
             return True
         return False
+
+    # ─── Grace-period disconnect handling ────────────────────────────
+
+    def start_disconnect_grace_period(self, session_id: str, student_id: str):
+        """
+        Start a grace period timer when a student's WebSocket disconnects.
+        Instead of removing them immediately, we:
+          1. Mark their WebSocket as None (so broadcasts skip them)
+          2. Wait DISCONNECT_GRACE_PERIOD seconds
+          3. If they haven't reconnected, THEN fully remove them.
+        If the student reconnects within the window, the timer is cancelled
+        automatically by join_session_room / cancel_disconnect_timer.
+        """
+        key = (session_id, student_id)
+
+        # Cancel any existing timer for this student
+        self.cancel_disconnect_timer(session_id, student_id)
+
+        # Mark the student's websocket as None so they don't receive
+        # broadcasts, but keep them in the room (status stays "joined")
+        if (session_id in self.session_rooms
+                and student_id in self.session_rooms[session_id]):
+            self.session_rooms[session_id][student_id]["websocket"] = None
+            name = self.session_rooms[session_id][student_id].get("studentName", student_id[:8])
+            print(f"⏳ Student {name} disconnected from session {session_id} — "
+                  f"grace period {DISCONNECT_GRACE_PERIOD}s started")
+        else:
+            return  # Not in room, nothing to do
+
+        async def _grace_timer():
+            try:
+                await asyncio.sleep(DISCONNECT_GRACE_PERIOD)
+                # Timer expired — student did NOT reconnect in time
+                if (session_id in self.session_rooms
+                        and student_id in self.session_rooms[session_id]):
+                    participant = self.session_rooms[session_id][student_id]
+                    # Only remove if they still have no websocket (didn't reconnect)
+                    if participant.get("websocket") is None:
+                        name = participant.get("studentName", student_id[:8])
+                        print(f"⌛ Grace period expired for {name} in session {session_id} — removing")
+                        await self.leave_session_room(session_id, student_id)
+                        self.remove_from_session_room(session_id, student_id)
+                    else:
+                        print(f"✅ Student {student_id[:8]} reconnected before grace period expired")
+            except asyncio.CancelledError:
+                pass  # Timer was cancelled because student reconnected
+            finally:
+                self._disconnect_timers.pop(key, None)
+
+        self._disconnect_timers[key] = asyncio.create_task(_grace_timer())
+
+    def cancel_disconnect_timer(self, session_id: str, student_id: str):
+        """Cancel a pending disconnect grace period (called when student reconnects)."""
+        key = (session_id, student_id)
+        timer = self._disconnect_timers.pop(key, None)
+        if timer and not timer.done():
+            timer.cancel()
+            print(f"✅ Cancelled disconnect timer for student {student_id[:8]} "
+                  f"in session {session_id} — reconnected in time")
 
     def is_in_session_room(self, session_id: str, student_id: str) -> bool:
         """Check if student is an active participant in session room"""
@@ -411,7 +492,6 @@ class WebSocketManager:
         dead_connections = []
         
         # Build ordered list of (student_id, task) for JOINED only so results align with student_id
-        import asyncio
         joined_student_ids: List[str] = []
         send_tasks = []
 
@@ -468,12 +548,8 @@ class WebSocketManager:
                 # else: transient error, don't remove connection
 
         for student_id in dead_connections:
-            try:
-                await self.leave_session_room(session_id, student_id)
-                self.remove_from_session_room(session_id, student_id)
-            except Exception as cleanup_error:
-                print(f"   ⚠️ Error cleaning up dead connection for {student_id}: {cleanup_error}")
-                self.remove_from_session_room(session_id, student_id)
+            # Use grace period instead of immediate removal — student may reconnect
+            self.start_disconnect_grace_period(session_id, student_id)
 
         # 📬 Store last quiz for this session so reconnecting students can receive it
         if message.get("type") == "quiz":

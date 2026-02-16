@@ -325,10 +325,12 @@ async def websocket_session(
                 # Continue loop; do not break – keep connection alive
 
     except WebSocketDisconnect:
-        # Immediately mark student offline and remove from room so they receive no further questions
-        await ws_manager.leave_session_room(session_id, student_id)
-        ws_manager.remove_from_session_room(session_id, student_id)
-        print(f"👋 Student {student_id} disconnected from session {session_id} (removed from room)")
+        # Start a grace period instead of removing immediately.
+        # If the student reconnects within 60 seconds (e.g. network blip,
+        # phone screen off), they stay in the session and keep receiving questions.
+        ws_manager.start_disconnect_grace_period(session_id, student_id)
+        print(f"👋 Student {student_id} WebSocket disconnected from session {session_id} "
+              f"(grace period started — will be removed if no reconnect)")
 
 
 # --------------------------------------------------------
