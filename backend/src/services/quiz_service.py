@@ -13,6 +13,8 @@ from ..models.session_participant_model import SessionParticipantModel
 
 class QuizService:
     _instance = None
+    # Per-session lock to prevent concurrent preprocessing/clustering
+    _clustering_locks: Dict[str, asyncio.Lock] = {}
 
     def __new__(cls):
         if cls._instance is None:
@@ -117,57 +119,66 @@ class QuizService:
         Background task: preprocess engagement data and run KMeans clustering.
         Called automatically after each quiz answer submission.
         Non-blocking — errors are logged but never propagated.
+
+        Uses a per-session lock so that concurrent submissions don't
+        create duplicate cluster documents (race condition).
         """
-        try:
-            from ..models.preprocessing import PreprocessingService
-            from .clustering_service import ClusteringService
-            from ..database.connection import get_database
+        # Get or create a lock for this session
+        if session_id not in self._clustering_locks:
+            self._clustering_locks[session_id] = asyncio.Lock()
+        lock = self._clustering_locks[session_id]
 
-            # ── Resolve session ID ──────────────────────────────────────
-            # Students may submit with Zoom meeting ID (e.g. "82970220279")
-            # but the frontend uses MongoDB _id (e.g. "698236d3a02b8cac27617bfe").
-            # We need to store clusters under BOTH IDs so both sides can find them.
-            mongo_session_id = session_id
-            db = get_database()
-            if db is not None:
-                # Try to find session by zoomMeetingId
-                session_doc = await db.sessions.find_one({"zoomMeetingId": session_id})
-                if not session_doc and session_id.isdigit():
-                    session_doc = await db.sessions.find_one({"zoomMeetingId": int(session_id)})
-                if session_doc:
-                    mongo_session_id = str(session_doc["_id"])
-                    print(f"🔗 [BG] Resolved Zoom ID {session_id} → MongoDB ID {mongo_session_id}")
+        # If another task is already running for this session, skip.
+        # The running task will pick up all the latest data anyway.
+        if lock.locked():
+            print(f"⏭️  [BG] Skipping clustering for {session_id} — already in progress")
+            return
 
-            # Step 1: Preprocess with the original session ID (quiz_answers use this ID)
-            print(f"🔄 [BG] Step 1: Preprocessing for session {session_id}...")
-            preprocessing = PreprocessingService()
-            docs = await preprocessing.run(session_id)
-            print(f"{'✅' if docs else '⚠️'} [BG] Preprocessing: {len(docs) if docs else 0} rows")
+        async with lock:
+            try:
+                from ..models.preprocessing import PreprocessingService
+                from .clustering_service import ClusteringService
+                from ..database.connection import get_database
 
-            if docs:
-                # Step 2: Run KMeans model and update clusters
-                print(f"🔄 [BG] Step 2: Running KMeans clustering...")
-                clustering = ClusteringService()
+                # ── Resolve session ID ──────────────────────────────────
+                mongo_session_id = session_id
+                db = get_database()
+                if db is not None:
+                    session_doc = await db.sessions.find_one({"zoomMeetingId": session_id})
+                    if not session_doc and session_id.isdigit():
+                        session_doc = await db.sessions.find_one({"zoomMeetingId": int(session_id)})
+                    if session_doc:
+                        mongo_session_id = str(session_doc["_id"])
+                        print(f"🔗 [BG] Resolved Zoom ID {session_id} → MongoDB ID {mongo_session_id}")
 
-                # Store clusters under the ORIGINAL session ID (Zoom ID)
-                clusters = await clustering.update_clusters(session_id)
-                print(f"✅ [BG] Clustering complete for session {session_id}: "
-                      f"{len(clusters)} clusters → "
-                      f"[{', '.join(f'{c.engagementLevel}:{c.studentCount}' for c in clusters)}]")
+                # Step 1: Preprocess
+                print(f"🔄 [BG] Step 1: Preprocessing for session {session_id}...")
+                preprocessing = PreprocessingService()
+                docs = await preprocessing.run(session_id)
+                print(f"{'✅' if docs else '⚠️'} [BG] Preprocessing: {len(docs) if docs else 0} rows")
 
-                # Also store clusters under MongoDB session ID if different
-                # (the instructor's frontend uses this ID)
-                if mongo_session_id != session_id:
-                    print(f"🔗 [BG] Also storing clusters under MongoDB ID: {mongo_session_id}")
-                    from ..models.cluster_model import ClusterModel
-                    await ClusterModel.update_clusters_for_session(mongo_session_id, clusters)
-                    print(f"✅ [BG] Clusters also saved under MongoDB ID: {mongo_session_id}")
-            else:
-                print(f"⚠️  [BG] No data to cluster for session {session_id}")
-        except Exception as e:
-            import traceback
-            print(f"❌ [BG] Background preprocessing/clustering error: {e}")
-            traceback.print_exc()
+                if docs:
+                    # Step 2: Run KMeans model and update clusters
+                    print(f"🔄 [BG] Step 2: Running KMeans clustering...")
+                    clustering = ClusteringService()
+
+                    clusters = await clustering.update_clusters(session_id)
+                    print(f"✅ [BG] Clustering complete for session {session_id}: "
+                          f"{len(clusters)} clusters → "
+                          f"[{', '.join(f'{c.engagementLevel}:{c.studentCount}' for c in clusters)}]")
+
+                    # Also store under MongoDB ID (for the instructor frontend)
+                    if mongo_session_id != session_id:
+                        print(f"🔗 [BG] Also storing clusters under MongoDB ID: {mongo_session_id}")
+                        from ..models.cluster_model import ClusterModel
+                        await ClusterModel.update_clusters_for_session(mongo_session_id, clusters)
+                        print(f"✅ [BG] Clusters also saved under MongoDB ID: {mongo_session_id}")
+                else:
+                    print(f"⚠️  [BG] No data to cluster for session {session_id}")
+            except Exception as e:
+                import traceback
+                print(f"❌ [BG] Background preprocessing/clustering error: {e}")
+                traceback.print_exc()
 
     async def get_performance(self, question_id: str, session_id: str) -> QuizPerformance:
         """Get performance data from MongoDB"""
