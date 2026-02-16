@@ -23,6 +23,10 @@ class QuizScheduler:
     - first_delay_seconds: Delay before first question (default: 120 = 2 minutes)
     - interval_seconds: Interval between subsequent questions (default: 600 = 10 minutes)
     - max_questions: Maximum questions to auto-trigger (default: None = unlimited)
+    - stagger_window_seconds: Time window within which each student receives the
+      question at a DIFFERENT random time (default: 1/3 of interval_seconds).
+      E.g. interval=1800s (30 min) → stagger_window=600s (10 min):
+      each student gets the question at a random time within those first 10 minutes.
     """
     
     def __init__(self):
@@ -36,6 +40,7 @@ class QuizScheduler:
         self.default_first_delay = 120  # 2 minutes
         self.default_interval = 600     # 10 minutes
         self.default_max_questions = None  # Unlimited
+        self.default_stagger_window = None  # None = auto (1/3 of interval)
     
     async def start_automation(
         self,
@@ -43,7 +48,8 @@ class QuizScheduler:
         zoom_meeting_id: Optional[str] = None,
         first_delay_seconds: int = None,
         interval_seconds: int = None,
-        max_questions: int = None
+        max_questions: int = None,
+        stagger_window_seconds: int = None
     ) -> dict:
         """
         Start automated question triggering for a session.
@@ -54,6 +60,8 @@ class QuizScheduler:
             first_delay_seconds: Delay before first question (default: 120s = 2min)
             interval_seconds: Interval between questions (default: 600s = 10min)
             max_questions: Max questions to send (default: unlimited)
+            stagger_window_seconds: Time window for staggered delivery (default: 1/3 of interval).
+                Each student receives the question at a random time within this window.
         
         Returns:
             Status dict with success and schedule info
@@ -62,11 +70,27 @@ class QuizScheduler:
         if session_id in self.active_schedules:
             await self.stop_automation(session_id)
         
+        effective_interval = interval_seconds or self.default_interval
+
+        # Stagger window: if not provided, use 1/3 of the interval
+        if stagger_window_seconds is not None:
+            effective_stagger = stagger_window_seconds
+        elif self.default_stagger_window is not None:
+            effective_stagger = self.default_stagger_window
+        else:
+            effective_stagger = effective_interval // 3
+
+        # Ensure stagger window doesn't exceed the interval
+        effective_stagger = min(effective_stagger, effective_interval - 10)
+        # At least 5 seconds of spread (if interval is large enough)
+        effective_stagger = max(effective_stagger, 5) if effective_interval > 15 else 0
+
         config = {
             "session_id": session_id,
             "zoom_meeting_id": zoom_meeting_id,
             "first_delay_seconds": first_delay_seconds or self.default_first_delay,
-            "interval_seconds": interval_seconds or self.default_interval,
+            "interval_seconds": effective_interval,
+            "stagger_window_seconds": effective_stagger,
             "max_questions": max_questions or self.default_max_questions,
             "started_at": datetime.utcnow().isoformat(),
             "questions_sent": 0,
@@ -88,13 +112,16 @@ class QuizScheduler:
         print(f"🤖 Quiz automation STARTED for session {session_id}")
         print(f"   First question in: {config['first_delay_seconds']} seconds")
         print(f"   Interval: {config['interval_seconds']} seconds")
+        print(f"   Stagger window: {config['stagger_window_seconds']} seconds "
+              f"(each student gets question at a random time within this window)")
         
         return {
             "success": True,
             "message": "Quiz automation started",
             "session_id": session_id,
             "first_trigger_in_seconds": config["first_delay_seconds"],
-            "interval_seconds": config["interval_seconds"]
+            "interval_seconds": config["interval_seconds"],
+            "stagger_window_seconds": config["stagger_window_seconds"]
         }
     
     async def stop_automation(self, session_id: str) -> dict:
@@ -135,6 +162,8 @@ class QuizScheduler:
         """
         Background task that runs the scheduled question delivery.
         First question after first_delay_seconds, then every interval_seconds.
+        Each question is delivered to students at staggered random times
+        within a configurable window (stagger_window_seconds).
         """
         session_id = config["session_id"]
         zoom_meeting_id = config.get("zoom_meeting_id")
@@ -162,17 +191,23 @@ class QuizScheduler:
                     print(f"🏁 Session {session_id}: Reached max questions ({max_questions})")
                     break
                 
-                # Re-read interval from config each time (e.g. 300s = 5 min)
+                # Re-read config values each iteration
                 interval = current_config.get("interval_seconds", 600)
+                stagger_window = current_config.get("stagger_window_seconds", interval // 3)
                 
-                print(f"📤 Session {session_id}: Triggering question #{questions_sent + 1}...")
-                result = await self._trigger_question(session_id, zoom_meeting_id)
+                print(f"📤 Session {session_id}: Triggering question #{questions_sent + 1} "
+                      f"(stagger window: {stagger_window}s)...")
+                result = await self._trigger_question_staggered(
+                    session_id, zoom_meeting_id, stagger_window
+                )
                 
                 if result.get("success"):
                     current_config["questions_sent"] = questions_sent + 1
-                    print(f"✅ Session {session_id}: Auto-triggered question #{questions_sent + 1} → {result.get('sentTo', 0)} students")
+                    print(f"✅ Session {session_id}: Auto-triggered question #{questions_sent + 1} → "
+                          f"{result.get('sentTo', 0)} students (staggered over {stagger_window}s)")
                 else:
-                    print(f"⚠️ Session {session_id}: Trigger failed - {result.get('message')} (will retry in {interval}s)")
+                    print(f"⚠️ Session {session_id}: Trigger failed - {result.get('message')} "
+                          f"(will retry in {interval}s)")
                 
                 print(f"⏰ Session {session_id}: Next question in {interval}s...")
                 await asyncio.sleep(interval)
@@ -185,41 +220,55 @@ class QuizScheduler:
             import traceback
             traceback.print_exc()
     
-    async def _trigger_question(self, session_id: str, zoom_meeting_id: Optional[str] = None) -> dict:
+    async def _trigger_question_staggered(
+        self,
+        session_id: str,
+        zoom_meeting_id: Optional[str] = None,
+        stagger_window: int = 0
+    ) -> dict:
         """
-        Trigger a random question to all students in the session.
-        Ensures no duplicate questions are sent.
-        Questions are filtered by sessionId first, then instructor's general questions.
+        Trigger a question and deliver it to each student at a DIFFERENT
+        random time within the stagger window.
+
+        Example: stagger_window=600 (10 min)
+          - Student A receives the question after 47 seconds
+          - Student B receives the question after 312 seconds
+          - Student C receives the question after 589 seconds
+          All within the 10-minute window, but NOT at the same time.
         """
-        # Import here to avoid circular imports
         from ..database.connection import db
         from .ws_manager import ws_manager
-        from bson import ObjectId
-        
+
         try:
-            # Find the session to get instructor info
+            # ── 1. Find session doc ─────────────────────────────────────
             session_doc = None
             try:
                 if len(session_id) == 24:
-                    session_doc = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
-            except:
+                    session_doc = await db.database.sessions.find_one(
+                        {"_id": ObjectId(session_id)}
+                    )
+            except Exception:
                 pass
-            
+
             if not session_doc and zoom_meeting_id:
                 try:
-                    session_doc = await db.database.sessions.find_one({"zoomMeetingId": int(zoom_meeting_id)})
-                except:
-                    session_doc = await db.database.sessions.find_one({"zoomMeetingId": zoom_meeting_id})
-            
-            # Get questions - first try session-specific, then instructor's general questions
+                    session_doc = await db.database.sessions.find_one(
+                        {"zoomMeetingId": int(zoom_meeting_id)}
+                    )
+                except Exception:
+                    session_doc = await db.database.sessions.find_one(
+                        {"zoomMeetingId": zoom_meeting_id}
+                    )
+
+            # ── 2. Find available questions ─────────────────────────────
             questions = []
-            
-            # Try to get questions specific to this session
+
             if session_id:
-                questions = await db.database.questions.find({"sessionId": session_id}).to_list(length=None)
+                questions = await db.database.questions.find(
+                    {"sessionId": session_id}
+                ).to_list(length=None)
                 print(f"📝 Auto-trigger: Found {len(questions)} questions for session {session_id}")
-            
-            # If no session-specific questions, get instructor's general questions
+
             if not questions and session_doc:
                 instructor_id = session_doc.get("instructorId")
                 if instructor_id:
@@ -228,41 +277,37 @@ class QuizScheduler:
                         "$or": [{"sessionId": None}, {"sessionId": {"$exists": False}}]
                     }).to_list(length=None)
                     print(f"📝 Auto-trigger: Found {len(questions)} general questions from instructor")
-            
-            # Final fallback: get all questions
+
             if not questions:
                 questions = await db.database.questions.find({}).to_list(length=None)
                 print(f"📝 Auto-trigger: Fallback - Found {len(questions)} total questions")
-            
+
             if not questions:
                 return {"success": False, "message": "No questions found for this session"}
-            
-            # Filter out already-sent questions for this session
+
+            # Filter out already-sent questions
             sent_ids = self.sent_questions.get(session_id, set())
             available_questions = [
-                q for q in questions 
-                if str(q["_id"]) not in sent_ids
+                q for q in questions if str(q["_id"]) not in sent_ids
             ]
-            
+
             if not available_questions:
-                # If all questions sent, reset and start over (optional behavior)
                 print(f"📚 Session {session_id}: All questions sent, resetting pool...")
                 self.sent_questions[session_id] = set()
                 available_questions = questions
-            
-            # Pick a random question
+
+            # Pick a random question (same question for all students)
             question = random.choice(available_questions)
             question_id = str(question["_id"])
-            
-            # Mark as sent
             self.sent_questions[session_id].add(question_id)
-            
-            # Build quiz message with JSON-safe types only (no BSON/ObjectId)
+
+            # ── 3. Build quiz message ───────────────────────────────────
             opts = question.get("options") or []
             if not isinstance(opts, list):
                 opts = list(opts) if opts else []
             opts = [str(o) for o in opts]
-            message = {
+
+            base_message = {
                 "type": "quiz",
                 "questionId": question_id,
                 "question_id": question_id,
@@ -273,30 +318,103 @@ class QuizScheduler:
                 "triggeredAt": datetime.utcnow().isoformat(),
                 "autoTriggered": True,
             }
-            
-            # Always broadcast to BOTH session_id and zoom_meeting_id so we never miss students.
+
+            # ── 4. Collect all joined students from both room IDs ───────
             ids_to_try = [str(session_id)]
             zoom_str = str(zoom_meeting_id).strip() if zoom_meeting_id else None
             if zoom_str and zoom_str not in ids_to_try:
                 ids_to_try.append(zoom_str)
-            
-            sent_count = 0
+
+            # Gather unique students: {student_id: room_id}
+            students_to_send: Dict[str, str] = {}
             for room_id in ids_to_try:
-                msg = {**message, "sessionId": room_id}
-                n = await ws_manager.broadcast_to_session(room_id, msg)
-                print(f"   📤 Auto-trigger broadcast room [{room_id}] → {n} students")
-                sent_count += n
-            
+                participants = ws_manager.get_session_participants(room_id)
+                for p in participants:
+                    sid = p["studentId"]
+                    if sid not in students_to_send:
+                        students_to_send[sid] = room_id
+
+            total_students = len(students_to_send)
+            if total_students == 0:
+                # Still store as last quiz so reconnecting students get it
+                for room_id in ids_to_try:
+                    msg = {**base_message, "sessionId": room_id}
+                    ws_manager.last_session_quiz[room_id] = {
+                        "message": msg, "sent_at": datetime.now()
+                    }
+                print(f"⚠️ No participants in session — stored quiz for reconnect catch-up")
+                return {
+                    "success": True,
+                    "message": "Question stored (no online students)",
+                    "sentTo": 0,
+                    "questionId": question_id,
+                }
+
+            # ── 5. Assign a random delay to each student ────────────────
+            # Spread students across the stagger window.
+            # Minimum gap = 0s, Maximum gap = stagger_window.
+            student_delays: Dict[str, float] = {}
+            for sid in students_to_send:
+                if stagger_window > 0:
+                    student_delays[sid] = random.uniform(0, stagger_window)
+                else:
+                    student_delays[sid] = 0.0
+
+            # Sort by delay so log output is in delivery order
+            sorted_students = sorted(student_delays.items(), key=lambda x: x[1])
+            print(f"🎯 Staggered delivery plan for {total_students} students "
+                  f"(window: {stagger_window}s):")
+            for sid, delay in sorted_students:
+                room_id = students_to_send[sid]
+                participants = ws_manager.get_session_participants(room_id)
+                name = next(
+                    (p.get("studentName", sid[:8]) for p in participants if p["studentId"] == sid),
+                    sid[:8]
+                )
+                print(f"   🕐 {name}: +{delay:.0f}s")
+
+            # ── 6. Create per-student delivery tasks ────────────────────
+            async def _deliver_to_student(sid: str, room_id: str, delay: float):
+                """Wait the random delay, then send the question to one student."""
+                if delay > 0:
+                    await asyncio.sleep(delay)
+                msg = {**base_message, "sessionId": room_id}
+                ok = await ws_manager.send_to_student_in_session(room_id, sid, msg)
+                return ok
+
+            tasks = []
+            for sid, delay in sorted_students:
+                room_id = students_to_send[sid]
+                tasks.append(
+                    asyncio.create_task(_deliver_to_student(sid, room_id, delay))
+                )
+
+            # Store last quiz for reconnect catch-up (stored immediately)
+            for room_id in ids_to_try:
+                msg = {**base_message, "sessionId": room_id}
+                ws_manager.last_session_quiz[room_id] = {
+                    "message": msg, "sent_at": datetime.now()
+                }
+                print(f"   📌 Stored last quiz for session {room_id} (reconnect catch-up)")
+
+            # Wait for all deliveries to complete
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            sent_count = sum(
+                1 for r in results if r is True
+            )
+
             return {
                 "success": True,
-                "message": f"Question sent to {sent_count} students",
+                "message": f"Question sent to {sent_count}/{total_students} students "
+                           f"(staggered over {stagger_window}s)",
                 "sentTo": sent_count,
+                "totalStudents": total_students,
                 "questionId": question_id,
                 "question": str(question.get("question", ""))[:50] + "..."
             }
-            
+
         except Exception as e:
-            print(f"❌ Error triggering question: {e}")
+            print(f"❌ Error triggering staggered question: {e}")
             import traceback
             traceback.print_exc()
             return {"success": False, "message": str(e)}
@@ -319,6 +437,7 @@ class QuizScheduler:
             "questions_sent": config.get("questions_sent", 0),
             "first_delay_seconds": config.get("first_delay_seconds"),
             "interval_seconds": config.get("interval_seconds"),
+            "stagger_window_seconds": config.get("stagger_window_seconds"),
             "max_questions": config.get("max_questions"),
             "sent_question_ids": list(self.sent_questions.get(session_id, set()))
         }
@@ -335,7 +454,8 @@ class QuizScheduler:
         session_id: str,
         interval_seconds: int = None,
         max_questions: int = None,
-        enabled: bool = None
+        enabled: bool = None,
+        stagger_window_seconds: int = None
     ) -> dict:
         """Update automation configuration for a running session."""
         if session_id not in self.active_schedules:
@@ -349,6 +469,8 @@ class QuizScheduler:
             config["max_questions"] = max_questions
         if enabled is not None:
             config["enabled"] = enabled
+        if stagger_window_seconds is not None:
+            config["stagger_window_seconds"] = stagger_window_seconds
         
         return {
             "success": True,

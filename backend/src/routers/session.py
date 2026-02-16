@@ -626,6 +626,8 @@ class StartSessionRequest(BaseModel):
     firstDelaySeconds: Optional[int] = 120   # Delay before first question (2 minutes)
     intervalSeconds: Optional[int] = 600     # Interval between questions (10 minutes)
     maxQuestions: Optional[int] = None       # Max questions to auto-trigger (None = unlimited)
+    staggerWindowSeconds: Optional[int] = None  # Stagger delivery window (default: 1/3 of interval).
+    # Each student receives the question at a different random time within this window.
 
 
 @router.post("/{session_id}/start")
@@ -643,6 +645,10 @@ async def start_session(
     - firstDelaySeconds: Seconds before first question (default: 120 = 2 minutes)
     - intervalSeconds: Seconds between questions (default: 600 = 10 minutes)
     - maxQuestions: Maximum questions to auto-trigger (default: None = unlimited)
+    - staggerWindowSeconds: Delivery window where each student gets the question
+      at a DIFFERENT random time (default: 1/3 of intervalSeconds).
+      E.g. intervalSeconds=1800 → staggerWindowSeconds=600 (10 min):
+      each student receives the question at a random time within those 10 minutes.
     """
     try:
         session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
@@ -671,7 +677,8 @@ async def start_session(
                     "automationConfig": {
                         "firstDelaySeconds": request.firstDelaySeconds,
                         "intervalSeconds": request.intervalSeconds,
-                        "maxQuestions": request.maxQuestions
+                        "maxQuestions": request.maxQuestions,
+                        "staggerWindowSeconds": request.staggerWindowSeconds
                     }
                 }
             }
@@ -707,7 +714,8 @@ async def start_session(
                 zoom_meeting_id=str(zoom_meeting_id) if zoom_meeting_id else None,
                 first_delay_seconds=request.firstDelaySeconds,
                 interval_seconds=request.intervalSeconds,
-                max_questions=request.maxQuestions
+                max_questions=request.maxQuestions,
+                stagger_window_seconds=request.staggerWindowSeconds
             )
             print(f"🤖 Quiz automation started: {automation_result}")
         
