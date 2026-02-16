@@ -7,7 +7,7 @@ import { Users, AlertCircle, Target, Radio, Download, FileText, Loader2 } from '
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { sessionService } from '../../services/sessionService';
-import { clusteringService, StudentCluster } from '../../services/clusteringService';
+import { clusteringService, StudentCluster, ClusterResponse } from '../../services/clusteringService';
 import { toast } from 'sonner';
 
 interface EngagementData {
@@ -99,27 +99,7 @@ export const InstructorAnalytics = () => {
     }
   }, [sessions, selectedSession]);
 
-  // Real-time polling: fetch participant count + question count from DB
-  useEffect(() => {
-    if (!selectedSession) {
-      setRealtimeStats(null);
-      setLiveParticipantCount(null);
-      return;
-    }
-    const poll = async () => {
-      const stats = await clusteringService.getRealtimeStats(selectedSession);
-      if (stats) {
-        setRealtimeStats(stats);
-        setLiveParticipantCount(stats.activeStudents);
-      }
-      setLastUpdate(new Date());
-    };
-    poll();
-    const interval = setInterval(poll, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [selectedSession]);
-
-  // Real-time engagement data from the database
+  // Real-time engagement data from the database (updated via cluster polling)
   const engagementMetrics: EngagementData = useMemo(() => {
     const totalStudents = realtimeStats?.totalStudents ?? liveParticipantCount ?? sessions.find(s => s.id === selectedSession)?.studentCount ?? 0;
     const activeNow = realtimeStats?.activeStudents ?? liveParticipantCount ?? 0;
@@ -161,13 +141,22 @@ export const InstructorAnalytics = () => {
     setDownloadingReportId(null);
   };
 
-  // ── Fetch real cluster data from KMeans API ──────────────────────
+  // ── Fetch real cluster data + realtime stats from KMeans API ─────
   const fetchClusters = useCallback(async (sessionId: string) => {
     setLoadingClusters(true);
     try {
-      const data = await clusteringService.getClusters(sessionId);
-      if (data && data.length > 0) {
-        setClusters(data.map((c: StudentCluster) => ({
+      const response = await clusteringService.getClusters(sessionId);
+      const clusterList = response.clusters;
+
+      // Update realtime stats from the same response
+      if (response.realtimeStats) {
+        setRealtimeStats(response.realtimeStats);
+        setLiveParticipantCount(response.realtimeStats.activeStudents);
+      }
+      setLastUpdate(new Date());
+
+      if (clusterList && clusterList.length > 0) {
+        setClusters(clusterList.map((c: StudentCluster) => ({
           id: c.id,
           name: c.name,
           description: c.description,
@@ -179,7 +168,6 @@ export const InstructorAnalytics = () => {
           studentNames: c.studentNames || {},
         })));
       } else {
-        // No cluster data yet — show empty defaults
         setClusters(clusteringService.getDefaultClusters().map(c => ({ ...c, students: [] })));
       }
     } catch (error) {

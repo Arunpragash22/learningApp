@@ -12,6 +12,18 @@ export interface StudentCluster {
   studentNames?: Record<string, string>; // studentId -> "firstName lastName"
 }
 
+export interface RealtimeStats {
+  totalStudents: number;
+  activeStudents: number;
+  totalQuestions: number;
+  totalAnswers: number;
+}
+
+export interface ClusterResponse {
+  clusters: StudentCluster[];
+  realtimeStats: RealtimeStats;
+}
+
 export interface ClusterUpdate {
   sessionId: string;
   quizPerformance?: {
@@ -70,11 +82,16 @@ export const clusteringService = {
     ];
   },
 
-  // Get current clusters
-  async getClusters(sessionId: string): Promise<StudentCluster[]> {
+  // Get current clusters + real-time stats (combined response)
+  async getClusters(sessionId: string): Promise<ClusterResponse> {
+    const defaultResponse: ClusterResponse = {
+      clusters: this.getDefaultClusters(),
+      realtimeStats: { totalStudents: 0, activeStudents: 0, totalQuestions: 0, totalAnswers: 0 },
+    };
+
     if (!sessionId) {
       console.warn('No sessionId provided, using default clusters');
-      return this.getDefaultClusters();
+      return defaultResponse;
     }
 
     try {
@@ -91,12 +108,19 @@ export const clusteringService = {
       }
 
       const data = await response.json();
-      return data;
+
+      // Handle both old format (array) and new format ({ clusters, realtimeStats })
+      if (Array.isArray(data)) {
+        return { clusters: data, realtimeStats: defaultResponse.realtimeStats };
+      }
+      return {
+        clusters: data.clusters || [],
+        realtimeStats: data.realtimeStats || defaultResponse.realtimeStats,
+      };
     } catch (error) {
       console.error('Error getting clusters:', error);
       console.warn('Using fallback mock data - backend may not be running');
-      // Return default clusters on error
-      return this.getDefaultClusters();
+      return defaultResponse;
     }
   },
 
@@ -125,6 +149,28 @@ export const clusteringService = {
         return this.getClusters(update.sessionId);
       }
       return this.getDefaultClusters();
+    }
+  },
+
+  // Get real-time session stats (participant count + question count)
+  async getRealtimeStats(sessionId: string): Promise<{
+    totalStudents: number;
+    activeStudents: number;
+    totalQuestions: number;
+    totalAnswers: number;
+  } | null> {
+    if (!sessionId) return null;
+    try {
+      const encodedSessionId = encodeURIComponent(sessionId);
+      const response = await fetch(`${API_BASE_URL}/api/clustering/session/${encodedSessionId}/realtime-stats`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting realtime stats:', error);
+      return null;
     }
   },
 

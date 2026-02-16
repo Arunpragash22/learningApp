@@ -53,7 +53,7 @@ async def get_clusters(
     request: Request,
     user: dict = Depends(get_current_user)
 ):
-    """Get clusters for a session"""
+    """Get clusters for a session, including real-time stats."""
     try:
         if not session_id:
             raise HTTPException(
@@ -81,7 +81,13 @@ async def get_clusters(
             }
             enriched.append(cluster_dict)
 
-        return enriched
+        # ── Also compute real-time stats (piggybacked on this response) ──
+        realtime_stats = await _compute_realtime_stats(session_id)
+
+        return {
+            "clusters": enriched,
+            "realtimeStats": realtime_stats,
+        }
     except Exception as e:
         print(f"Error getting clusters: {e}")
         raise HTTPException(
@@ -162,6 +168,56 @@ async def get_student_cluster(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )
+
+
+async def _compute_realtime_stats(session_id: str) -> dict:
+    """Compute real-time student count and question count for a session."""
+    db = get_database()
+    if db is None:
+        return {"totalStudents": 0, "activeStudents": 0, "totalQuestions": 0, "totalAnswers": 0}
+
+    try:
+        all_ids = await _resolve_session_ids(db, session_id)
+        id_filter = {"sessionId": {"$in": all_ids}}
+        print(f"📊 realtime-stats: session_id={session_id}, resolved IDs={all_ids}")
+
+        # ── Students from all sources ────────────────────────────────
+        participant_sids: set = set()
+        active_sids: set = set()
+        async for p in db.session_participants.find(id_filter, {"studentId": 1, "status": 1}):
+            sid = p.get("studentId")
+            if sid:
+                participant_sids.add(sid)
+                if p.get("status") == "active":
+                    active_sids.add(sid)
+
+        assignment_sids = set(await db.question_assignments.distinct("studentId", id_filter))
+        answer_sids = set(await db.quiz_answers.distinct("studentId", id_filter))
+
+        all_student_ids = participant_sids | assignment_sids | answer_sids
+        total_students = len(all_student_ids)
+        active_students = len(active_sids) if active_sids else total_students
+
+        # ── Questions SENT ───────────────────────────────────────────
+        questions_from_assignments = set(await db.question_assignments.distinct("questionId", id_filter))
+        questions_from_answers = set(await db.quiz_answers.distinct("questionId", id_filter))
+        total_questions = len(questions_from_assignments | questions_from_answers)
+
+        # Total answer submissions
+        total_answers = await db.quiz_answers.count_documents(id_filter)
+
+        print(f"📊 realtime-stats result: students={total_students} (active={active_students}), "
+              f"questions_sent={total_questions}, answers={total_answers}")
+
+        return {
+            "totalStudents": total_students,
+            "activeStudents": active_students,
+            "totalQuestions": total_questions,
+            "totalAnswers": total_answers,
+        }
+    except Exception as e:
+        print(f"⚠️ realtime-stats error: {e}")
+        return {"totalStudents": 0, "activeStudents": 0, "totalQuestions": 0, "totalAnswers": 0}
 
 
 async def _resolve_session_ids(db, session_id: str) -> List[str]:
