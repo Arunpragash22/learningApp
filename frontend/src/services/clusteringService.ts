@@ -22,6 +22,16 @@ export interface ClusterUpdate {
 // ✔ Correct API root — no slash, no /api suffix
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+const getAuthToken = (): string => {
+  const token = sessionStorage.getItem('access_token') || '';
+  return token;
+};
+
+const getAuthHeaders = () => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${getAuthToken()}`,
+});
+
 export const clusteringService = {
   // Get default clusters (fallback)
   getDefaultClusters(): StudentCluster[] {
@@ -70,10 +80,7 @@ export const clusteringService = {
       const encodedSessionId = encodeURIComponent(sessionId);
       const response = await fetch(`${API_BASE_URL}/api/clustering/session/${encodedSessionId}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer mock-token', // Mock auth for development
-        },
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -97,10 +104,7 @@ export const clusteringService = {
     try {
       const response = await fetch(`${API_BASE_URL}/api/clustering/update`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer mock-token', // Mock auth for development
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(update),
       });
 
@@ -128,10 +132,7 @@ export const clusteringService = {
     try {
       const response = await fetch(`${API_BASE_URL}/api/clustering/student/${studentId}?sessionId=${sessionId}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer mock-token', // Mock auth for development
-        },
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
