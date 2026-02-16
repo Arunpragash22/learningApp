@@ -4,6 +4,7 @@ from ..models.cluster_model import ClusterModel
 from ..models.latency_metrics import LatencyMetricsModel
 from ..models.preprocessing import PreprocessingService
 from ..ml_models.kmeans_predictor import KMeansPredictor
+from ..database.connection import get_database
 
 # ── Cluster metadata (label → display info) ─────────────────────
 CLUSTER_META = {
@@ -57,6 +58,18 @@ class ClusteringService:
         if len(cluster_docs) > 0:
             return [StudentCluster(**doc) for doc in cluster_docs]
 
+        # Not found with given ID → try resolving the alternative session ID.
+        # The frontend uses MongoDB _id but clusters may be stored under Zoom ID.
+        alt_id = await self._resolve_alt_session_id(session_id)
+        if alt_id:
+            print(f"🔗 get_clusters: trying alternative ID {alt_id} for session {session_id}")
+            alt_docs = await ClusterModel.find_by_session(alt_id)
+            if len(alt_docs) > 0:
+                clusters = [StudentCluster(**doc) for doc in alt_docs]
+                # Copy clusters under the requested ID for future lookups
+                await ClusterModel.update_clusters_for_session(session_id, clusters)
+                return clusters
+
         # No clusters saved yet → return defaults (will be replaced
         # once update_clusters / predict_clusters is called)
         default_clusters = self._build_default_clusters()
@@ -99,6 +112,13 @@ class ClusteringService:
         # 1. Fetch preprocessed engagement docs from MongoDB
         print(f"🔄 _predict_clusters: fetching preprocessed data for session {session_id}")
         preprocessed = await self._preprocessing.get_preprocessed(session_id)
+
+        # If not found, try the alternative session ID
+        if not preprocessed:
+            alt_id = await self._resolve_alt_session_id(session_id)
+            if alt_id:
+                print(f"🔗 _predict_clusters: trying alternative ID {alt_id}")
+                preprocessed = await self._preprocessing.get_preprocessed(alt_id)
 
         if not preprocessed:
             print(f"⚠️  No preprocessed data for session {session_id}. "
@@ -145,6 +165,54 @@ class ClusteringService:
             print(f"   {c.engagementLevel}: {c.studentCount} students {c.students}")
 
         return clusters
+
+    # ── Session ID resolution ────────────────────────────────────────
+    @staticmethod
+    async def _resolve_alt_session_id(session_id: str) -> Optional[str]:
+        """
+        Resolve the alternative session ID for a given session.
+
+        Sessions have TWO identifiers:
+          - MongoDB _id  (e.g. "698236d3a02b8cac27617bfe")  ← used by frontend
+          - zoomMeetingId (e.g. "82970220279")               ← used by students
+
+        Given one, this returns the other (or None if not found).
+        """
+        db = get_database()
+        if db is None:
+            return None
+
+        try:
+            from bson import ObjectId
+
+            # Case 1: session_id looks like a MongoDB ObjectId → find zoom ID
+            if len(session_id) == 24:
+                try:
+                    doc = await db.sessions.find_one(
+                        {"_id": ObjectId(session_id)},
+                        {"zoomMeetingId": 1}
+                    )
+                    if doc and doc.get("zoomMeetingId"):
+                        return str(doc["zoomMeetingId"])
+                except Exception:
+                    pass
+
+            # Case 2: session_id is a Zoom meeting ID → find MongoDB _id
+            doc = await db.sessions.find_one(
+                {"zoomMeetingId": session_id},
+                {"_id": 1}
+            )
+            if not doc and session_id.isdigit():
+                doc = await db.sessions.find_one(
+                    {"zoomMeetingId": int(session_id)},
+                    {"_id": 1}
+                )
+            if doc:
+                return str(doc["_id"])
+        except Exception as e:
+            print(f"⚠️  _resolve_alt_session_id error: {e}")
+
+        return None
 
     # ── Default clusters (before any data exists) ───────────────────
     @staticmethod
