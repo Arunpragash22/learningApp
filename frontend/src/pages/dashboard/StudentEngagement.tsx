@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSessionConnection } from '../../context/SessionConnectionContext';
@@ -8,6 +8,7 @@ import { PersonalizedFeedback } from '../../components/feedback/PersonalizedFeed
 import { Activity, Target, Download, FileText, Loader2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { sessionService } from '../../services/sessionService';
+import { clusteringService, StudentEngagementData } from '../../services/clusteringService';
 import { toast } from 'sonner';
 
 interface Session {
@@ -26,13 +27,7 @@ export const StudentEngagement = () => {
   const sessionIdFromStorage = typeof window !== 'undefined' ? localStorage.getItem('connectedSessionId') : null;
   const activeSessionId = connectedSessionId || sessionIdFromStorage;
 
-  const [liveReport, setLiveReport] = useState<{
-    questionsAnswered: number;
-    correctAnswers: number;
-    quizScore: number | null;
-    averageResponseTime: number | null;
-    sessionTitle?: string;
-  } | null>(null);
+  const [engagementData, setEngagementData] = useState<StudentEngagementData | null>(null);
   const [downloadingReport, setDownloadingReport] = useState(false);
   
   // Session reports section state
@@ -40,26 +35,20 @@ export const StudentEngagement = () => {
   const [selectedReportSession, setSelectedReportSession] = useState<string | null>(null);
   const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
 
-  // Real-time: poll session report when student is in a session
+  // Real-time: poll engagement data from the clustering API
   useEffect(() => {
     if (!activeSessionId || !user?.id) {
-      setLiveReport(null);
+      setEngagementData(null);
       return;
     }
-    const fetchReport = async () => {
-      const report = await sessionService.getSessionReport(activeSessionId);
-      if (!report?.students?.length) return;
-      const me = report.students[0];
-      setLiveReport({
-        questionsAnswered: me.totalQuestions ?? 0,
-        correctAnswers: me.correctAnswers ?? 0,
-        quizScore: me.quizScore ?? null,
-        averageResponseTime: me.averageResponseTime ?? null,
-        sessionTitle: report.sessionTitle
-      });
+    const fetchEngagement = async () => {
+      const data = await clusteringService.getStudentEngagement(user.id, activeSessionId);
+      if (data) {
+        setEngagementData(data);
+      }
     };
-    fetchReport();
-    const interval = setInterval(fetchReport, POLL_INTERVAL_MS);
+    fetchEngagement();
+    const interval = setInterval(fetchEngagement, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [activeSessionId, user?.id]);
 
@@ -89,7 +78,7 @@ export const StudentEngagement = () => {
     if (!activeSessionId) return;
     setDownloadingReport(true);
     try {
-      const filename = `report_${liveReport?.sessionTitle?.replace(/\s+/g, '_') || activeSessionId}.pdf`;
+      const filename = `report_${activeSessionId}.pdf`;
       const result = await sessionService.downloadReport(activeSessionId, filename);
       if (result.success) {
         toast.success(result.error || 'Report downloaded as PDF');
@@ -121,29 +110,27 @@ export const StudentEngagement = () => {
     setDownloadingReportId(null);
   };
 
-  // Merge live report with defaults for display
+  // Use real engagement data from the API, with sensible defaults before data loads
   const studentData = useMemo(() => {
-    const base = {
-      engagementLevel: 'high' as const,
-      engagementScore: 85,
-      cluster: 'Active Participants',
-      sessionEngagement: 78,
-      overallEngagement: 82,
-      questionsAnswered: 12,
-      correctAnswers: 10,
-      averageResponseTime: 8.5
-    };
-    if (liveReport) {
+    if (engagementData) {
       return {
-        ...base,
-        questionsAnswered: liveReport.questionsAnswered,
-        correctAnswers: liveReport.correctAnswers,
-        averageResponseTime: liveReport.averageResponseTime ?? base.averageResponseTime,
-        engagementScore: liveReport.quizScore ?? base.engagementScore
+        engagementLevel: engagementData.engagementLevel as 'high' | 'medium' | 'low',
+        engagementScore: engagementData.engagementScore,
+        cluster: engagementData.cluster,
+        questionsAnswered: engagementData.questionsAnswered,
+        correctAnswers: engagementData.correctAnswers,
+        averageResponseTime: engagementData.averageResponseTime,
       };
     }
-    return base;
-  }, [liveReport]);
+    return {
+      engagementLevel: 'medium' as const,
+      engagementScore: 0,
+      cluster: 'Not Assigned',
+      questionsAnswered: 0,
+      correctAnswers: 0,
+      averageResponseTime: 0,
+    };
+  }, [engagementData]);
 
   const feedback = [
     {

@@ -210,6 +210,85 @@ async def get_student_cluster(
         )
 
 
+@router.get("/student/{student_id}/engagement")
+async def get_student_engagement(
+    student_id: str,
+    session_id: str = Query(..., alias="sessionId"),
+    user: dict = Depends(get_current_user)
+):
+    """
+    Get real-time engagement data for a student in a session.
+    Used by the student's 'My Engagement Dashboard'.
+    Returns: engagement score, level, cluster name, quiz stats.
+    """
+    try:
+        db = get_database()
+        if db is None:
+            raise HTTPException(status_code=500, detail="Database not connected")
+
+        all_ids = await _resolve_session_ids(db, session_id)
+        id_filter = {"sessionId": {"$in": all_ids}, "studentId": student_id}
+
+        # ── 1. Cluster assignment ────────────────────────────────────
+        cluster_name = "Not Assigned"
+        engagement_level = "medium"
+
+        clusters = await clustering_service.get_clusters(session_id)
+        for c in clusters:
+            if student_id in c.students:
+                cluster_name = c.name
+                engagement_level = c.engagementLevel
+                break
+
+        # ── 2. Engagement score from preprocessed data ───────────────
+        engagement_score = 0.0
+        score_count = 0
+        async for doc in db.preprocessed_engagement.find(
+            {"sessionId": {"$in": all_ids}, "studentId": student_id},
+            {"engagement_score": 1}
+        ):
+            engagement_score += doc.get("engagement_score", 0)
+            score_count += 1
+
+        if score_count > 0:
+            engagement_score = round((engagement_score / score_count) * 100, 1)
+        else:
+            # Fallback: derive from cluster
+            engagement_score = {"high": 85, "medium": 55, "low": 25}.get(engagement_level, 50)
+
+        # ── 3. Quiz stats from quiz_answers ──────────────────────────
+        total_answers = 0
+        correct_answers = 0
+        total_time = 0.0
+
+        async for ans in db.quiz_answers.find(id_filter):
+            total_answers += 1
+            if ans.get("isCorrect"):
+                correct_answers += 1
+            total_time += float(ans.get("timeTaken", 0))
+
+        avg_response_time = round(total_time / total_answers, 1) if total_answers > 0 else 0.0
+
+        return {
+            "engagementScore": engagement_score,
+            "engagementLevel": engagement_level,
+            "cluster": cluster_name,
+            "questionsAnswered": total_answers,
+            "correctAnswers": correct_answers,
+            "averageResponseTime": avg_response_time,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting student engagement: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
 async def _compute_realtime_stats(session_id: str) -> dict:
     """Compute real-time student count and question count for a session.
     Uses WebSocket manager (in-memory) as the primary source for live

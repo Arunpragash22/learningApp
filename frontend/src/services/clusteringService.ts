@@ -24,6 +24,15 @@ export interface ClusterResponse {
   realtimeStats: RealtimeStats;
 }
 
+export interface StudentEngagementData {
+  engagementScore: number;
+  engagementLevel: 'high' | 'medium' | 'low';
+  cluster: string;
+  questionsAnswered: number;
+  correctAnswers: number;
+  averageResponseTime: number;
+}
+
 export interface ClusterUpdate {
   sessionId: string;
   quizPerformance?: {
@@ -190,6 +199,21 @@ export const clusteringService = {
       return data.clusterId;
     } catch (error) {
       console.error('Error getting student cluster:', error);
+      return null;
+    }
+  },
+
+  // Get student engagement data (score, cluster, quiz stats) for the student dashboard
+  async getStudentEngagement(studentId: string, sessionId: string): Promise<StudentEngagementData | null> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/clustering/student/${studentId}/engagement?sessionId=${sessionId}`,
+        { method: 'GET', headers: getAuthHeaders() }
+      );
+      if (!response.ok) return null;
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting student engagement:', error);
       return null;
     }
   },
