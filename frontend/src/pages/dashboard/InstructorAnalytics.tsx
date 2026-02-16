@@ -52,6 +52,12 @@ export const InstructorAnalytics = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [liveParticipantCount, setLiveParticipantCount] = useState<number | null>(null);
+  const [realtimeStats, setRealtimeStats] = useState<{
+    totalStudents: number;
+    activeStudents: number;
+    totalQuestions: number;
+    totalAnswers: number;
+  } | null>(null);
   const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
   const [clusters, setClusters] = useState<ClusterData[]>([]);
   const [loadingClusters, setLoadingClusters] = useState(false);
@@ -93,67 +99,43 @@ export const InstructorAnalytics = () => {
     }
   }, [sessions, selectedSession]);
 
-  // Real-time polling: live participant count when a live session is selected
+  // Real-time polling: fetch participant count + question count from DB
   useEffect(() => {
-    if (selectedTimeRange !== 'live' || !selectedSession) {
+    if (!selectedSession) {
+      setRealtimeStats(null);
       setLiveParticipantCount(null);
       return;
     }
     const poll = async () => {
-      const stats = await sessionService.getLiveSessionStats(selectedSession);
-      setLiveParticipantCount(stats?.participantCount ?? null);
+      const stats = await clusteringService.getRealtimeStats(selectedSession);
+      if (stats) {
+        setRealtimeStats(stats);
+        setLiveParticipantCount(stats.activeStudents);
+      }
       setLastUpdate(new Date());
     };
     poll();
     const interval = setInterval(poll, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [selectedTimeRange, selectedSession]);
+  }, [selectedSession]);
 
-  // Simulated refresh for session/week view (keep lastUpdate ticking)
-  useEffect(() => {
-    if (selectedTimeRange === 'session' || selectedTimeRange === 'week') {
-      const interval = setInterval(() => setLastUpdate(new Date()), 5000);
-      return () => clearInterval(interval);
-    }
-  }, [selectedTimeRange]);
+  // Real-time engagement data from the database
+  const engagementMetrics: EngagementData = useMemo(() => {
+    const totalStudents = realtimeStats?.totalStudents ?? liveParticipantCount ?? sessions.find(s => s.id === selectedSession)?.studentCount ?? 0;
+    const activeNow = realtimeStats?.activeStudents ?? liveParticipantCount ?? 0;
+    const totalQuestions = realtimeStats?.totalQuestions ?? 0;
+    const totalAnswers = realtimeStats?.totalAnswers ?? 0;
 
-  // Generate dynamic data based on time range (real-time count for live when available)
-  const getEngagementData = (): EngagementData => {
-    const liveTotal = liveParticipantCount ?? sessions.find(s => s.id === selectedSession)?.studentCount ?? 0;
-    const baseData = {
-      live: {
-        averageEngagement: 72 + Math.floor(Math.random() * 10),
-        totalStudents: liveTotal,
-        activeNow: liveTotal,
-        questionsAnswered: 45 + Math.floor(Math.random() * 10),
-        averageResponseTime: 12.5 + (Math.random() * 3 - 1.5)
-      },
-      session: selectedSession ? {
-        averageEngagement: sessions.find(s => s.id === selectedSession)?.averageEngagement || 75,
-        totalStudents: sessions.find(s => s.id === selectedSession)?.studentCount || 30,
-        activeNow: sessions.find(s => s.id === selectedSession)?.studentCount || 30,
-        questionsAnswered: 52,
-        averageResponseTime: 11.2
-      } : {
-        averageEngagement: 75,
-        totalStudents: 30,
-        activeNow: 30,
-        questionsAnswered: 52,
-        averageResponseTime: 11.2
-      },
-      week: {
-        averageEngagement: 74,
-        totalStudents: 125,
-        activeNow: 98,
-        questionsAnswered: 342,
-        averageResponseTime: 10.8
-      }
+    return {
+      averageEngagement: 0,
+      totalStudents,
+      activeNow,
+      questionsAnswered: totalQuestions,
+      averageResponseTime: totalStudents > 0 && totalAnswers > 0
+        ? +(totalAnswers / totalStudents).toFixed(1)
+        : 0,
     };
-
-    return baseData[selectedTimeRange];
-  };
-
-  const engagementMetrics = useMemo(() => getEngagementData(), [selectedTimeRange, selectedSession, lastUpdate, liveParticipantCount, sessions]);
+  }, [realtimeStats, liveParticipantCount, selectedSession, sessions]);
 
   const selectedSessionObj = selectedSession ? sessions.find(s => s.id === selectedSession) : null;
 
@@ -396,11 +378,11 @@ export const InstructorAnalytics = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Questions per Student (real-time)</p>
+              <p className="text-sm text-gray-600">Questions Sent (real-time)</p>
               <p className="text-2xl font-bold text-gray-900">{engagementMetrics.questionsAnswered}</p>
               <p className="text-xs text-purple-600 mt-1">
-                {engagementMetrics.totalStudents > 0
-                  ? `${Math.floor(engagementMetrics.questionsAnswered / engagementMetrics.totalStudents)} sent per student`
+                {engagementMetrics.totalStudents > 0 && engagementMetrics.questionsAnswered > 0
+                  ? `${(engagementMetrics.questionsAnswered / engagementMetrics.totalStudents).toFixed(1)} per student`
                   : '0 per student'}
               </p>
             </div>

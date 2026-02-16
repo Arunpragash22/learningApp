@@ -165,24 +165,37 @@ async def get_student_cluster(
 
 
 async def _resolve_session_ids(db, session_id: str) -> List[str]:
-    """Resolve all possible session IDs (MongoDB _id + zoomMeetingId)."""
+    """
+    Resolve all possible session IDs (MongoDB _id + zoomMeetingId).
+    Returns every string variant so queries against collections that
+    may store the session under either ID will match.
+    """
     ids = [session_id]
     try:
         if len(session_id) == 24:
+            try:
+                doc = await db.sessions.find_one(
+                    {"_id": ObjectId(session_id)}, {"zoomMeetingId": 1}
+                )
+                if doc and doc.get("zoomMeetingId"):
+                    zoom_id = str(doc["zoomMeetingId"])
+                    if zoom_id not in ids:
+                        ids.append(zoom_id)
+            except Exception:
+                pass
+
+        # Also try to look up by zoomMeetingId (string or int)
+        for variant in ([session_id] + ([int(session_id)] if session_id.isdigit() else [])):
             doc = await db.sessions.find_one(
-                {"_id": ObjectId(session_id)}, {"zoomMeetingId": 1}
+                {"zoomMeetingId": variant}, {"_id": 1, "zoomMeetingId": 1}
             )
-            if doc and doc.get("zoomMeetingId"):
-                zoom_id = str(doc["zoomMeetingId"])
-                if zoom_id not in ids:
-                    ids.append(zoom_id)
-        else:
-            query = {"zoomMeetingId": int(session_id)} if session_id.isdigit() else {"zoomMeetingId": session_id}
-            doc = await db.sessions.find_one(query, {"_id": 1})
             if doc:
                 mongo_id = str(doc["_id"])
                 if mongo_id not in ids:
                     ids.append(mongo_id)
+                zoom_val = doc.get("zoomMeetingId")
+                if zoom_val and str(zoom_val) not in ids:
+                    ids.append(str(zoom_val))
     except Exception:
         pass
     return ids
@@ -193,7 +206,16 @@ async def get_realtime_stats(
     session_id: str,
     user: dict = Depends(get_current_user)
 ):
-    """Get real-time session stats: participant count and question count from DB."""
+    """
+    Real-time session stats polled by the analytics dashboard.
+
+    Returns:
+      - totalStudents  : unique students across session_participants,
+                         question_assignments, and quiz_answers
+      - activeStudents : currently active (from session_participants)
+      - totalQuestions  : distinct questions SENT (assigned or answered)
+      - totalAnswers   : total quiz answer submissions
+    """
     try:
         db = get_database()
         if db is None:
@@ -201,37 +223,61 @@ async def get_realtime_stats(
 
         all_ids = await _resolve_session_ids(db, session_id)
         id_filter = {"sessionId": {"$in": all_ids}}
+        print(f"📊 realtime-stats: session_id={session_id}, resolved IDs={all_ids}")
 
         # ── Students ─────────────────────────────────────────────────
-        # Count from session_participants
-        active_from_participants = await db.session_participants.count_documents(
-            {**id_filter, "status": "active"}
-        )
-        total_from_participants = await db.session_participants.count_documents(id_filter)
-
-        # Also count distinct students from quiz_answers (some students
-        # answer quizzes but may not appear in session_participants)
-        students_from_answers = await db.quiz_answers.distinct("studentId", id_filter)
-
-        # Merge: get distinct student IDs from session_participants too
-        participant_student_ids: List[str] = []
-        async for p in db.session_participants.find(id_filter, {"studentId": 1}):
+        # 1. From session_participants (the primary source)
+        participant_sids: set = set()
+        active_sids: set = set()
+        async for p in db.session_participants.find(id_filter, {"studentId": 1, "status": 1}):
             sid = p.get("studentId")
-            if sid and sid not in participant_student_ids:
-                participant_student_ids.append(sid)
+            if sid:
+                participant_sids.add(sid)
+                if p.get("status") == "active":
+                    active_sids.add(sid)
 
-        # Union of both sources
-        all_student_ids = set(participant_student_ids) | set(students_from_answers)
+        # 2. From question_assignments (students who received a question)
+        assignment_sids = set(
+            await db.question_assignments.distinct("studentId", id_filter)
+        )
+
+        # 3. From quiz_answers (students who answered a question)
+        answer_sids = set(
+            await db.quiz_answers.distinct("studentId", id_filter)
+        )
+
+        # Union of ALL sources
+        all_student_ids = participant_sids | assignment_sids | answer_sids
         total_students = len(all_student_ids)
-        active_students = max(active_from_participants, len(students_from_answers)) if total_from_participants == 0 else active_from_participants
 
-        # ── Questions ────────────────────────────────────────────────
-        # Distinct questions triggered in this session
-        distinct_questions = await db.quiz_answers.distinct("questionId", id_filter)
-        total_questions = len(distinct_questions)
+        # Active = from session_participants; fall back to all known students
+        active_students = len(active_sids) if active_sids else total_students
 
-        # Total quiz answer submissions
+        # ── Questions SENT ───────────────────────────────────────────
+        # Distinct questionIds from question_assignments (questions pushed
+        # to students) — this increments the moment a question is sent,
+        # even before any student answers.
+        questions_from_assignments = set(
+            await db.question_assignments.distinct("questionId", id_filter)
+        )
+
+        # Also check quiz_answers in case some answers were recorded
+        # without an assignment entry.
+        questions_from_answers = set(
+            await db.quiz_answers.distinct("questionId", id_filter)
+        )
+
+        all_question_ids = questions_from_assignments | questions_from_answers
+        total_questions = len(all_question_ids)
+
+        # Total answer submissions
         total_answers = await db.quiz_answers.count_documents(id_filter)
+
+        print(
+            f"📊 realtime-stats result: students={total_students} "
+            f"(active={active_students}), questions_sent={total_questions}, "
+            f"answers={total_answers}"
+        )
 
         return {
             "totalStudents": total_students,
@@ -243,6 +289,8 @@ async def get_realtime_stats(
         raise
     except Exception as e:
         print(f"Error getting realtime stats: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
