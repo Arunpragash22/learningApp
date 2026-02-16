@@ -19,7 +19,7 @@ from typing import List, Dict, Optional, Tuple
 
 # ── Path to the saved model ────────────────────────────────────────
 _MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
-_DEFAULT_MODEL_PATH = os.path.join(_MODEL_DIR, "kmean_k3.pkl")
+_DEFAULT_MODEL_PATH = os.path.join(_MODEL_DIR, "kmeans_k3.pkl")
 
 # ── Features the model was trained on ──────────────────────────────
 # Update this list if your notebook used different / more features.
