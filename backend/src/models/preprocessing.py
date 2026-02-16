@@ -13,8 +13,6 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from typing import List, Dict, Optional
-from sklearn.preprocessing import StandardScaler
-
 from ..database.connection import get_database
 
 
@@ -26,6 +24,21 @@ class PreprocessingService:
     # ── thresholds (same as original notebook) ──────────────────────────
     POOR_RTT = 3000       # ms
     POOR_JITTER = 1500    # ms
+
+    # ── Fixed scaler parameters (estimated from training data) ────────
+    # The KMeans model was trained on StandardScaler-transformed data.
+    # We use fixed mean/std so scaling is consistent regardless of
+    # session size (1 student or 100 students).
+    #
+    # engagement_score range: 0.0 (no attempt / wrong) → ~1.0 (correct + fast)
+    # With these params, typical mappings are:
+    #   raw 0.0  → scaled -1.33 → "low"    (no attempt / wrong)
+    #   raw 0.28 → scaled -0.40 → boundary low/medium
+    #   raw 0.50 → scaled  0.33 → "medium" (correct, slower)
+    #   raw 0.62 → scaled  0.73 → boundary medium/high
+    #   raw 0.80 → scaled  1.33 → "high"   (correct + fast)
+    SCALER_MEAN = 0.40
+    SCALER_STD = 0.30
 
     # ── public API ──────────────────────────────────────────────────────
     async def run(self, session_id: str) -> List[dict]:
@@ -68,13 +81,13 @@ class PreprocessingService:
         df = self._compute_engagement(df)
 
         # ── 4. scale engagement score ───────────────────────────────────
-        if len(df) > 1:
-            scaler = StandardScaler()
-            df["engagement_score_scaled"] = scaler.fit_transform(
-                df[["engagement_score"]]
-            )
-        else:
-            df["engagement_score_scaled"] = 0.0
+        # Use FIXED scaler parameters matching the training data so that
+        # the KMeans model receives values in the expected range.
+        # (A fresh StandardScaler per-session produces inconsistent values
+        #  and always outputs 0.0 with a single student.)
+        df["engagement_score_scaled"] = (
+            (df["engagement_score"] - self.SCALER_MEAN) / self.SCALER_STD
+        )
 
         # ── 5. persist to MongoDB ───────────────────────────────────────
         docs = self._dataframe_to_docs(df, session_id)

@@ -121,11 +121,11 @@ class KMeansPredictor:
         agg_cols = {col: "mean" for col in MODEL_FEATURES if col in df.columns}
 
         # If engagement_score_scaled is not directly available, compute it
+        # using fixed scaler parameters (matching training data)
         if "engagement_score_scaled" not in df.columns and "engagement_score" in df.columns:
-            from sklearn.preprocessing import StandardScaler
-            scaler = StandardScaler()
-            df["engagement_score_scaled"] = scaler.fit_transform(
-                df[["engagement_score"]]
+            SCALER_MEAN, SCALER_STD = 0.40, 0.30
+            df["engagement_score_scaled"] = (
+                (df["engagement_score"] - SCALER_MEAN) / SCALER_STD
             )
             agg_cols["engagement_score_scaled"] = "mean"
 
