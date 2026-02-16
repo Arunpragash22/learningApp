@@ -12,11 +12,23 @@ router = APIRouter(prefix="/api/clustering", tags=["clustering"])
 clustering_service = ClusteringService()
 
 
+def _is_valid_object_id(sid: str) -> bool:
+    """Check if a string is a valid 24-char hex MongoDB ObjectId."""
+    if not sid or len(sid) != 24:
+        return False
+    try:
+        ObjectId(sid)
+        return True
+    except Exception:
+        return False
+
+
 async def _resolve_student_info(student_ids: List[str]) -> tuple:
     """Look up student names and roles from the users collection.
-    Returns (names_dict, instructor_ids_set):
+    Returns (names_dict, non_student_ids_set):
       - names_dict: studentId -> 'firstName lastName'
-      - instructor_ids_set: set of IDs that are NOT students (instructor/admin)
+      - non_student_ids_set: set of IDs that are NOT students
+        (instructors, admins, or non-ObjectId IDs like 'instructor_xxx')
     """
     names: Dict[str, str] = {}
     non_student_ids: set = set()
@@ -30,10 +42,11 @@ async def _resolve_student_info(student_ids: List[str]) -> tuple:
 
     object_ids = []
     for sid in student_ids:
-        try:
-            object_ids.append(ObjectId(sid))
-        except Exception:
-            pass
+        if not _is_valid_object_id(sid):
+            # IDs like "instructor_6..." are not real students
+            non_student_ids.add(sid)
+            continue
+        object_ids.append(ObjectId(sid))
 
     if object_ids:
         async for user in db.users.find(
@@ -229,15 +242,15 @@ async def _compute_realtime_stats(session_id: str) -> dict:
         # Union of ALL sources
         all_student_ids = ws_student_ids | db_student_ids | assignment_sids | answer_sids
 
-        # Filter out instructors/admins
+        # Filter out instructors/admins and non-ObjectId IDs (e.g. "instructor_xxx")
         if all_student_ids:
             non_student_ids = set()
             obj_ids = []
             for sid in all_student_ids:
-                try:
-                    obj_ids.append(ObjectId(sid))
-                except Exception:
-                    pass
+                if not _is_valid_object_id(sid):
+                    non_student_ids.add(sid)
+                    continue
+                obj_ids.append(ObjectId(sid))
             if obj_ids:
                 async for u in db.users.find(
                     {"_id": {"$in": obj_ids}, "role": {"$in": ["instructor", "admin"]}},
