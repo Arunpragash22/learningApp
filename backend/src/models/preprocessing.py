@@ -213,9 +213,10 @@ class PreprocessingService:
     def _compute_engagement(self, df: pd.DataFrame) -> pd.DataFrame:
         """Compute engagement_score following the original Colab logic."""
 
-        # net_retrieved: True if we have some network data
+        # net_retrieved: True if we have BOTH RTT and Jitter data
+        # (matches Colab training logic: ~RTT.isna() & ~Jitter.isna())
         df["net_retrieved"] = (
-            (df["rtt_ms"] != 0) | (df["jitter_ms"] != 0)
+            (df["rtt_ms"] != 0) & (df["jitter_ms"] != 0)
         ).astype(int)
 
         df["engagement_score"] = 0.0
