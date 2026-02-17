@@ -25,7 +25,10 @@ import {
   SignalHigh,
   Activity,
   LayoutGrid,
-  LayoutList
+  LayoutList,
+  ChevronDown,
+  ChevronUp,
+  X
 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -221,7 +224,8 @@ export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
   const [useDemoData, setUseDemoData] = useState(showDemoData);
   const [nextRefreshIn, setNextRefreshIn] = useState(refreshInterval / 1000);
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(autoRefresh);
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards'); // Default to cards for live progress bars
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table'); // Default to table view
+  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null); // Track expanded student row
 
   const fetchStudentLatency = useCallback(async () => {
     if (!sessionId) return;
@@ -478,7 +482,7 @@ export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
             {/* View mode toggle */}
             <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
               <button
-                onClick={() => setViewMode('cards')}
+                onClick={() => { setViewMode('cards'); setExpandedStudentId(null); }}
                 className={`px-2 py-1 text-xs flex items-center gap-1 transition-colors ${
                   viewMode === 'cards'
                     ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
@@ -490,7 +494,7 @@ export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
                 <span className="hidden sm:inline">Live</span>
               </button>
               <button
-                onClick={() => setViewMode('table')}
+                onClick={() => { setViewMode('table'); setExpandedStudentId(null); }}
                 className={`px-2 py-1 text-xs flex items-center gap-1 transition-colors ${
                   viewMode === 'table'
                     ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
@@ -651,7 +655,7 @@ export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
           </div>
         </div>
       ) : (
-        /* ======= TABLE VIEW (original) ======= */
+        /* ======= TABLE VIEW with expandable detail ======= */
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900">
@@ -678,71 +682,123 @@ export const StudentNetworkMonitor: React.FC<StudentNetworkMonitorProps> = ({
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {students.map((student) => (
-                <tr 
-                  key={student.student_id} 
-                  className={`${getQualityRowColor(student.quality)} hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}
-                >
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
-                        <span className="text-xs font-medium text-indigo-600 dark:text-indigo-300">
-                          {(student.student_name || student.student_id).slice(0, 2).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100" title={student.student_id}>
-                          {student.student_name || student.student_id.slice(0, 12) + '...'}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {student.samples_count} samples
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      {getQualityIcon(student.quality)}
-                      <Badge variant={getQualityBadgeVariant(student.quality)} size="sm">
-                        {student.quality.toUpperCase()}
-                      </Badge>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-gray-100">
-                      {Math.round(student.avg_rtt_ms)}ms
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {Math.round(student.min_rtt_ms)}-{Math.round(student.max_rtt_ms)}ms
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                    {student.jitter_ms.toFixed(1)}ms
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <ConnectionStabilityBar
-                      stabilityHistory={student.stability_history || []}
-                      stabilityScore={student.stability_score}
-                      quality={student.quality}
-                      size="sm"
-                      showLabel={false}
-                      showPercentage={true}
-                      isActive={true}
-                    />
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {student.needs_attention ? (
-                      <span className="inline-flex items-center text-xs text-red-600 dark:text-red-400">
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                        Needs attention
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center text-xs text-blue-600 dark:text-blue-400">
-                        <Activity className="h-3 w-3 mr-1" />
-                        Stable
-                      </span>
+                <React.Fragment key={student.student_id}>
+                  {/* Student Row - Clickable */}
+                  <tr 
+                    className={`${getQualityRowColor(student.quality)} hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer select-none ${
+                      expandedStudentId === student.student_id ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''
+                    }`}
+                    onClick={() => setExpandedStudentId(
+                      expandedStudentId === student.student_id ? null : student.student_id
                     )}
-                  </td>
-                </tr>
+                  >
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
+                          <span className="text-xs font-medium text-indigo-600 dark:text-indigo-300">
+                            {(student.student_name || student.student_id).slice(0, 2).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="ml-3">
+                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1.5" title={student.student_id}>
+                            {student.student_name || student.student_id.slice(0, 12) + '...'}
+                            {expandedStudentId === student.student_id ? (
+                              <ChevronUp className="h-3.5 w-3.5 text-indigo-500" />
+                            ) : (
+                              <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {student.samples_count} samples
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        {getQualityIcon(student.quality)}
+                        <Badge variant={getQualityBadgeVariant(student.quality)} size="sm">
+                          {student.quality.toUpperCase()}
+                        </Badge>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-gray-100">
+                        {Math.round(student.avg_rtt_ms)}ms
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {Math.round(student.min_rtt_ms)}-{Math.round(student.max_rtt_ms)}ms
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {student.jitter_ms.toFixed(1)}ms
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <ConnectionStabilityBar
+                        stabilityHistory={student.stability_history || []}
+                        stabilityScore={student.stability_score}
+                        quality={student.quality}
+                        size="sm"
+                        showLabel={false}
+                        showPercentage={true}
+                        isActive={true}
+                      />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {student.needs_attention ? (
+                        <span className="inline-flex items-center text-xs text-red-600 dark:text-red-400">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Needs attention
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center text-xs text-blue-600 dark:text-blue-400">
+                          <Activity className="h-3 w-3 mr-1" />
+                          Stable
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+
+                  {/* Expanded Detail Row - Shows LiveNetworkProgressBars card */}
+                  {expandedStudentId === student.student_id && (
+                    <tr>
+                      <td colSpan={6} className="p-0">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 border-b-2 border-indigo-200 dark:border-indigo-800">
+                          <div className="p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <span className="flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                </span>
+                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                  Detailed Network Metrics — {student.student_name || student.student_id}
+                                </span>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedStudentId(null);
+                                }}
+                                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                title="Close details"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                            <div className="max-w-lg">
+                              <LiveNetworkProgressBars
+                                student={student as LiveStudentNetworkData}
+                                isActive={isAutoRefreshing}
+                                showSparkline={true}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
