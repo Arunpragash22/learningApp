@@ -22,32 +22,44 @@ router = APIRouter(prefix="/api/live", tags=["Live Learning"])
 def _get_eligible_questions(
     all_questions: list,
     student_cluster: Optional[str],
+    has_clustering_data: bool = False,
 ) -> list:
     """
     Return the list of questions a student is eligible to receive.
     
-    Rules:
-    - Generic questions (questionType == 'generic' or missing) → eligible for ALL students
-    - Cluster questions (questionType == 'cluster') → eligible ONLY if student's cluster matches targetCluster
-    - If the student has no cluster yet, they only get generic questions
+    Two-phase delivery:
     
-    Returns the filtered list. Falls back to all generic questions if the filtered list is empty.
+    Phase 1 — BEFORE clustering (has_clustering_data=False or student has no cluster):
+      → Student receives ONLY generic questions (different random one per student)
+    
+    Phase 2 — AFTER clustering (has_clustering_data=True and student has a cluster):
+      → Student receives ONLY their cluster-specific questions
+        (passive→passive, moderate→moderate, active→active)
+      → Falls back to generic if no cluster questions exist for their cluster
+    
+    This ensures generic questions go out first, and once clustering runs,
+    each student only sees questions targeted at their engagement level.
     """
     generic = [
         q for q in all_questions
         if q.get("questionType", "generic") == "generic" or not q.get("questionType")
     ]
-    
-    if not student_cluster:
+
+    # Phase 1: No clustering yet, or student not assigned to any cluster
+    if not has_clustering_data or not student_cluster:
         return generic if generic else all_questions
 
+    # Phase 2: Clustering done — send ONLY cluster-specific questions
     cluster_matched = [
         q for q in all_questions
         if q.get("questionType") == "cluster" and q.get("targetCluster") == student_cluster
     ]
 
-    eligible = generic + cluster_matched
-    return eligible if eligible else generic if generic else all_questions
+    if cluster_matched:
+        return cluster_matched
+
+    # Fallback: no cluster questions exist for this cluster — use generic
+    return generic if generic else all_questions
 
 
 # ================================================================
@@ -218,10 +230,16 @@ async def trigger_question(meeting_id: str):
         except Exception as cluster_err:
             print(f"⚠️ Could not load cluster data (non-fatal): {cluster_err}")
 
+        has_clustering = bool(student_cluster_map)
+        if has_clustering:
+            print(f"📋 Phase 2: Clustering active → students get ONLY their cluster-specific questions")
+        else:
+            print(f"📋 Phase 1: No clustering yet → students get ONLY generic questions (random per student)")
+
         ws_sent_count = 0
         sent_questions = []
 
-        # Send individual random question to each student (cluster-aware)
+        # Send individual random question to each student (two-phase delivery)
         for participant in student_participants:
             student_id = participant.get("studentId")
             student_session_id = participant.get("sessionId", meeting_id)
@@ -229,8 +247,8 @@ async def trigger_question(meeting_id: str):
             # Look up student's cluster label
             student_cluster = student_cluster_map.get(student_id)
 
-            # Filter questions: generic + matching cluster
-            eligible = _get_eligible_questions(questions, student_cluster)
+            # Phase 1: generic only | Phase 2: cluster-specific only
+            eligible = _get_eligible_questions(questions, student_cluster, has_clustering)
 
             # Pick a random question from the eligible pool
             q = random.choice(eligible)
@@ -392,7 +410,7 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
                 "sentTo": 0,
             }
 
-        # Build student → cluster mapping for cluster-aware delivery
+        # Build student → cluster mapping for two-phase delivery
         student_cluster_map: Dict[str, str] = {}
         try:
             for sid in session_ids_to_check:
@@ -402,52 +420,64 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
             if student_cluster_map:
                 print(f"🎯 trigger-same: Cluster mapping loaded: {len(student_cluster_map)} students")
             else:
-                print(f"⚠️ trigger-same: No cluster data — all students get generic questions")
+                print(f"⚠️ trigger-same: No cluster data — Phase 1 (generic only)")
         except Exception as cluster_err:
             print(f"⚠️ trigger-same: Could not load clusters (non-fatal): {cluster_err}")
 
-        # Check if we have any cluster questions — if not, broadcast same generic to all
-        has_cluster_questions = any(
-            q.get("questionType") == "cluster" for q in questions
-        )
+        has_clustering = bool(student_cluster_map)
 
-        if not has_cluster_questions or not student_cluster_map:
-            # No cluster questions or no cluster data — broadcast same generic question to all
+        if not has_clustering:
+            # Phase 1: No clustering yet — send different random GENERIC question to each student
             generic_qs = [
                 q for q in questions
                 if q.get("questionType", "generic") == "generic" or not q.get("questionType")
             ]
             pool = generic_qs if generic_qs else questions
-            q = random.choice(pool)
-            message = {
-                "type": "quiz",
-                "questionId": str(q["_id"]),
-                "question_id": str(q["_id"]),
-                "question": q["question"],
-                "options": q.get("options", []),
-                "timeLimit": q.get("timeLimit", 30),
-                "sessionId": effective_meeting_id,
-                "triggeredAt": datetime.now().isoformat(),
-            }
 
-            sent_count = await ws_manager.broadcast_to_session(effective_meeting_id, message)
+            print(f"📋 trigger-same: Phase 1 — sending random generic questions ({len(pool)} available)")
+
+            ws_sent_count = 0
+            for participant in participants:
+                student_id = participant.get("studentId")
+                student_session_id = participant.get("sessionId", effective_meeting_id)
+                q = random.choice(pool)
+
+                message = {
+                    "type": "quiz",
+                    "questionId": str(q["_id"]),
+                    "question_id": str(q["_id"]),
+                    "question": q["question"],
+                    "options": q.get("options", []),
+                    "timeLimit": q.get("timeLimit", 30),
+                    "sessionId": student_session_id,
+                    "studentId": student_id,
+                    "triggeredAt": datetime.now().isoformat(),
+                }
+
+                sent = await ws_manager.send_to_student_in_session(student_session_id, student_id, message)
+                if not sent and student_session_id != effective_meeting_id:
+                    sent = await ws_manager.send_to_student_in_session(effective_meeting_id, student_id, message)
+                if sent:
+                    ws_sent_count += 1
+
             participants_list = ws_manager.get_session_participants(effective_meeting_id)
-
             return {
                 "success": True,
                 "sessionId": effective_meeting_id,
-                "sentTo": sent_count,
+                "sentTo": ws_sent_count,
                 "participants": participants_list,
-                "message": f"Generic question sent to {sent_count} student(s) in session",
+                "message": f"Phase 1: Generic questions sent to {ws_sent_count} student(s) (different random each)",
             }
         else:
-            # Cluster-aware delivery: each student gets a random question from their eligible pool
+            # Phase 2: Clustering done — send ONLY cluster-specific questions per student
+            print(f"📋 trigger-same: Phase 2 — sending cluster-specific questions")
+
             ws_sent_count = 0
             for participant in participants:
                 student_id = participant.get("studentId")
                 student_session_id = participant.get("sessionId", effective_meeting_id)
                 student_cluster = student_cluster_map.get(student_id)
-                eligible = _get_eligible_questions(questions, student_cluster)
+                eligible = _get_eligible_questions(questions, student_cluster, has_clustering)
                 q = random.choice(eligible)
 
                 message = {

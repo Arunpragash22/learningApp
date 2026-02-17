@@ -340,13 +340,17 @@ class QuizService:
         if not questions:
             raise ValueError("No questions available in the database")
 
-        # ── Cluster-aware filtering ──
-        # Look up student's cluster to filter eligible questions
+        # ── Two-phase cluster-aware filtering ──
+        # Phase 1 (no clustering): ONLY generic questions
+        # Phase 2 (clustering done): ONLY cluster-specific questions for this student
         from ..models.cluster_model import ClusterModel
         student_cluster = None
+        has_clustering = False
         try:
             cluster_map = await ClusterModel.get_student_cluster_map(session_id)
-            student_cluster = cluster_map.get(student_id)
+            if cluster_map:
+                has_clustering = True
+                student_cluster = cluster_map.get(student_id)
             if not student_cluster:
                 # Try with alternate session IDs
                 from ..database.connection import get_database
@@ -357,16 +361,20 @@ class QuizService:
                         session_doc = await alt_db.sessions.find_one({"zoomMeetingId": int(session_id)})
                     if session_doc:
                         alt_map = await ClusterModel.get_student_cluster_map(str(session_doc["_id"]))
-                        student_cluster = alt_map.get(student_id)
+                        if alt_map:
+                            has_clustering = True
+                            student_cluster = alt_map.get(student_id)
         except Exception as cluster_err:
             print(f"⚠️ Could not load cluster for student {student_id}: {cluster_err}")
 
-        # Filter: generic + matching cluster questions
         generic_qs = [q for q in questions if q.get("questionType", "generic") == "generic" or not q.get("questionType")]
-        if student_cluster:
+
+        if has_clustering and student_cluster:
+            # Phase 2: ONLY cluster-specific questions
             cluster_qs = [q for q in questions if q.get("questionType") == "cluster" and q.get("targetCluster") == student_cluster]
-            eligible_questions = generic_qs + cluster_qs
+            eligible_questions = cluster_qs if cluster_qs else generic_qs
         else:
+            # Phase 1: ONLY generic questions
             eligible_questions = generic_qs
 
         if not eligible_questions:
