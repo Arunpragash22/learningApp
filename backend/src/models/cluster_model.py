@@ -1,7 +1,15 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 from bson import ObjectId
 from ..database.connection import get_database
 from .cluster import StudentCluster
+
+# Mapping from cluster engagementLevel to question targetCluster label
+ENGAGEMENT_TO_TARGET: Dict[str, str] = {
+    "low": "passive",
+    "medium": "moderate",
+    "high": "active",
+}
+
 
 
 class ClusterModel:
@@ -62,4 +70,27 @@ class ClusterModel:
             if student_id in cluster.get("students", []):
                 return str(cluster["_id"])
         return None
+
+    @staticmethod
+    async def get_student_cluster_map(session_id: str) -> Dict[str, str]:
+        """
+        Build a mapping of student_id → targetCluster label for a session.
+        Returns e.g. {"student_abc": "passive", "student_xyz": "active", ...}
+        Tries both the provided session_id and any resolved MongoDB/Zoom IDs.
+        """
+        database = get_database()
+        if database is None:
+            return {}
+
+        student_map: Dict[str, str] = {}
+
+        async for cluster in database.clusters.find({"sessionId": session_id}):
+            engagement = cluster.get("engagementLevel", "")
+            target = ENGAGEMENT_TO_TARGET.get(engagement)
+            if not target:
+                continue
+            for sid in cluster.get("students", []):
+                student_map[sid] = target
+
+        return student_map
 

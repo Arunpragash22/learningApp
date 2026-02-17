@@ -5,17 +5,49 @@ Trigger questions → Sent ONLY to students who JOINED the session via WebSocket
 """
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from typing import Optional
+from typing import Dict, List, Optional
 from bson import ObjectId
 from src.services.ws_manager import ws_manager
 from src.services.push_service import push_service
 from src.services.quiz_scheduler import quiz_scheduler
 from src.database.connection import db
 from src.middleware.auth import get_current_user, require_instructor
+from src.models.cluster_model import ClusterModel
 import random
 from datetime import datetime
 
 router = APIRouter(prefix="/api/live", tags=["Live Learning"])
+
+
+def _get_eligible_questions(
+    all_questions: list,
+    student_cluster: Optional[str],
+) -> list:
+    """
+    Return the list of questions a student is eligible to receive.
+    
+    Rules:
+    - Generic questions (questionType == 'generic' or missing) → eligible for ALL students
+    - Cluster questions (questionType == 'cluster') → eligible ONLY if student's cluster matches targetCluster
+    - If the student has no cluster yet, they only get generic questions
+    
+    Returns the filtered list. Falls back to all generic questions if the filtered list is empty.
+    """
+    generic = [
+        q for q in all_questions
+        if q.get("questionType", "generic") == "generic" or not q.get("questionType")
+    ]
+    
+    if not student_cluster:
+        return generic if generic else all_questions
+
+    cluster_matched = [
+        q for q in all_questions
+        if q.get("questionType") == "cluster" and q.get("targetCluster") == student_cluster
+    ]
+
+    eligible = generic + cluster_matched
+    return eligible if eligible else generic if generic else all_questions
 
 
 # ================================================================
@@ -159,30 +191,51 @@ async def trigger_question(meeting_id: str):
         print(f"   Target session: {meeting_id}")
         print(f"   Participants: {len(participants)} students")
         
-        # 3) Send DIFFERENT random question to EACH student
-        # All connected participants are students if they're in the session room
-        # (Instructors don't connect to session rooms, they only trigger questions)
+        # 3) Build student → cluster mapping for cluster-aware question delivery
         student_participants = participants
-        
+
         print(f"📊 Found {len(student_participants)} participants to send questions to")
         for p in student_participants:
             print(f"   - {p.get('studentName')} (ID: {p.get('studentId')})")
-        
+
         if not student_participants:
             return {"success": False, "message": "No students found in session (only instructor connected)"}
-        
+
+        # Fetch cluster mapping: student_id → "passive"/"moderate"/"active"
+        student_cluster_map: Dict[str, str] = {}
+        try:
+            # Try both session IDs to find clusters
+            for sid in session_ids_to_check:
+                cluster_map = await ClusterModel.get_student_cluster_map(sid)
+                if cluster_map:
+                    student_cluster_map.update(cluster_map)
+            if student_cluster_map:
+                print(f"🎯 Cluster mapping loaded: {len(student_cluster_map)} students mapped")
+                for sid, cl in student_cluster_map.items():
+                    print(f"   {sid[:12]}... → {cl}")
+            else:
+                print(f"⚠️ No cluster data found — all students will receive generic questions only")
+        except Exception as cluster_err:
+            print(f"⚠️ Could not load cluster data (non-fatal): {cluster_err}")
+
         ws_sent_count = 0
         sent_questions = []
-        
-        # Send individual random question to each student
-        # Use the session_id that each student is actually connected with (from participant data)
+
+        # Send individual random question to each student (cluster-aware)
         for participant in student_participants:
             student_id = participant.get("studentId")
-            # Get the session_id this student is connected with (could be zoomMeetingId or MongoDB sessionId)
             student_session_id = participant.get("sessionId", meeting_id)
-            
-            # Pick a random question for this student
-            q = random.choice(questions)
+
+            # Look up student's cluster label
+            student_cluster = student_cluster_map.get(student_id)
+
+            # Filter questions: generic + matching cluster
+            eligible = _get_eligible_questions(questions, student_cluster)
+
+            # Pick a random question from the eligible pool
+            q = random.choice(eligible)
+            print(f"   🎲 {participant.get('studentName', student_id)} (cluster={student_cluster or 'none'}) → "
+                  f"[{q.get('questionType', 'generic')}] {q['question'][:50]}...")
             
             # Prepare individual message for this student
             message = {
@@ -339,28 +392,92 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
                 "sentTo": 0,
             }
 
-        q = random.choice(questions)
-        message = {
-            "type": "quiz",
-            "questionId": str(q["_id"]),
-            "question_id": str(q["_id"]),
-            "question": q["question"],
-            "options": q.get("options", []),
-            "timeLimit": q.get("timeLimit", 30),
-            "sessionId": effective_meeting_id,
-            "triggeredAt": datetime.now().isoformat(),
-        }
+        # Build student → cluster mapping for cluster-aware delivery
+        student_cluster_map: Dict[str, str] = {}
+        try:
+            for sid in session_ids_to_check:
+                cluster_map = await ClusterModel.get_student_cluster_map(sid)
+                if cluster_map:
+                    student_cluster_map.update(cluster_map)
+            if student_cluster_map:
+                print(f"🎯 trigger-same: Cluster mapping loaded: {len(student_cluster_map)} students")
+            else:
+                print(f"⚠️ trigger-same: No cluster data — all students get generic questions")
+        except Exception as cluster_err:
+            print(f"⚠️ trigger-same: Could not load clusters (non-fatal): {cluster_err}")
 
-        sent_count = await ws_manager.broadcast_to_session(effective_meeting_id, message)
-        participants_list = ws_manager.get_session_participants(effective_meeting_id)
+        # Check if we have any cluster questions — if not, broadcast same generic to all
+        has_cluster_questions = any(
+            q.get("questionType") == "cluster" for q in questions
+        )
 
-        return {
-            "success": True,
-            "sessionId": effective_meeting_id,
-            "sentTo": sent_count,
-            "participants": participants_list,
-            "message": f"Question sent to {sent_count} student(s) in session",
-        }
+        if not has_cluster_questions or not student_cluster_map:
+            # No cluster questions or no cluster data — broadcast same generic question to all
+            generic_qs = [
+                q for q in questions
+                if q.get("questionType", "generic") == "generic" or not q.get("questionType")
+            ]
+            pool = generic_qs if generic_qs else questions
+            q = random.choice(pool)
+            message = {
+                "type": "quiz",
+                "questionId": str(q["_id"]),
+                "question_id": str(q["_id"]),
+                "question": q["question"],
+                "options": q.get("options", []),
+                "timeLimit": q.get("timeLimit", 30),
+                "sessionId": effective_meeting_id,
+                "triggeredAt": datetime.now().isoformat(),
+            }
+
+            sent_count = await ws_manager.broadcast_to_session(effective_meeting_id, message)
+            participants_list = ws_manager.get_session_participants(effective_meeting_id)
+
+            return {
+                "success": True,
+                "sessionId": effective_meeting_id,
+                "sentTo": sent_count,
+                "participants": participants_list,
+                "message": f"Generic question sent to {sent_count} student(s) in session",
+            }
+        else:
+            # Cluster-aware delivery: each student gets a random question from their eligible pool
+            ws_sent_count = 0
+            for participant in participants:
+                student_id = participant.get("studentId")
+                student_session_id = participant.get("sessionId", effective_meeting_id)
+                student_cluster = student_cluster_map.get(student_id)
+                eligible = _get_eligible_questions(questions, student_cluster)
+                q = random.choice(eligible)
+
+                message = {
+                    "type": "quiz",
+                    "questionId": str(q["_id"]),
+                    "question_id": str(q["_id"]),
+                    "question": q["question"],
+                    "options": q.get("options", []),
+                    "timeLimit": q.get("timeLimit", 30),
+                    "sessionId": student_session_id,
+                    "studentId": student_id,
+                    "triggeredAt": datetime.now().isoformat(),
+                }
+
+                sent = await ws_manager.send_to_student_in_session(student_session_id, student_id, message)
+                if not sent and student_session_id != effective_meeting_id:
+                    sent = await ws_manager.send_to_student_in_session(effective_meeting_id, student_id, message)
+                if sent:
+                    ws_sent_count += 1
+                    print(f"   🎲 {participant.get('studentName', student_id)} "
+                          f"(cluster={student_cluster or 'none'}) → [{q.get('questionType', 'generic')}]")
+
+            participants_list = ws_manager.get_session_participants(effective_meeting_id)
+            return {
+                "success": True,
+                "sessionId": effective_meeting_id,
+                "sentTo": ws_sent_count,
+                "participants": participants_list,
+                "message": f"Cluster-aware questions sent to {ws_sent_count} student(s) in session",
+            }
     except Exception as e:
         print(f"❌ Error trigger-same: {e}")
         import traceback

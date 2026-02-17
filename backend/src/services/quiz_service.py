@@ -340,16 +340,49 @@ class QuizService:
         if not questions:
             raise ValueError("No questions available in the database")
 
+        # ── Cluster-aware filtering ──
+        # Look up student's cluster to filter eligible questions
+        from ..models.cluster_model import ClusterModel
+        student_cluster = None
+        try:
+            cluster_map = await ClusterModel.get_student_cluster_map(session_id)
+            student_cluster = cluster_map.get(student_id)
+            if not student_cluster:
+                # Try with alternate session IDs
+                from ..database.connection import get_database
+                alt_db = get_database()
+                if alt_db:
+                    session_doc = await alt_db.sessions.find_one({"zoomMeetingId": session_id})
+                    if not session_doc and session_id.isdigit():
+                        session_doc = await alt_db.sessions.find_one({"zoomMeetingId": int(session_id)})
+                    if session_doc:
+                        alt_map = await ClusterModel.get_student_cluster_map(str(session_doc["_id"]))
+                        student_cluster = alt_map.get(student_id)
+        except Exception as cluster_err:
+            print(f"⚠️ Could not load cluster for student {student_id}: {cluster_err}")
+
+        # Filter: generic + matching cluster questions
+        generic_qs = [q for q in questions if q.get("questionType", "generic") == "generic" or not q.get("questionType")]
+        if student_cluster:
+            cluster_qs = [q for q in questions if q.get("questionType") == "cluster" and q.get("targetCluster") == student_cluster]
+            eligible_questions = generic_qs + cluster_qs
+        else:
+            eligible_questions = generic_qs
+
+        if not eligible_questions:
+            eligible_questions = questions
+
         active_question_ids = await QuestionAssignmentModel.find_active_question_ids(session_id, activation_version)
         available_questions = [
-            q for q in questions
+            q for q in eligible_questions
             if str(q.get("id")) not in active_question_ids
         ]
 
         if not available_questions:
-            available_questions = questions
+            available_questions = eligible_questions
 
         question = random.choice(available_questions)
+        print(f"🎲 Assigned question to {student_id[:12]}... (cluster={student_cluster or 'none'}) → [{question.get('questionType', 'generic')}]")
         assignment = await QuestionAssignmentModel.create(session_id, student_id, question.get("id"), activation_version)
 
         return {
