@@ -30,7 +30,6 @@ const DEFAULT_SESSION_QUESTIONS: Question[] = [
       'To visualize the network structure'
     ],
     correctAnswer: 1,
-    difficulty: 'medium',
     category: 'Neural Networks',
     tags: ['backpropagation', 'training'],
     timeLimit: 30,
@@ -46,7 +45,6 @@ const DEFAULT_SESSION_QUESTIONS: Question[] = [
       'Step function'
     ],
     correctAnswer: 1,
-    difficulty: 'easy',
     category: 'Neural Networks',
     tags: ['activation', 'functions'],
     timeLimit: 25,
@@ -62,7 +60,6 @@ const DEFAULT_SESSION_QUESTIONS: Question[] = [
       'Improves accuracy on all datasets'
     ],
     correctAnswer: 1,
-    difficulty: 'hard',
     category: 'Neural Networks',
     tags: ['dropout', 'regularization'],
     timeLimit: 35,
@@ -119,8 +116,7 @@ export const LiveSession = () => {
       question: quiz.question,
       options: quiz.options,
       correctAnswer: (quiz as { correctAnswer?: number; correct_answer?: number }).correctAnswer ?? (quiz as { correct_answer?: number }).correct_answer ?? -1,
-      difficulty: 'medium',
-      category: 'Live Quiz',
+      category: (quiz as { category?: string }).category || 'Live Quiz',
       tags: [],
       timeLimit: quiz.timeLimit || quiz.time_limit || 30,
       createdAt: quiz.triggeredAt || quiz.triggered_at || new Date().toISOString()
@@ -714,8 +710,7 @@ export const LiveSession = () => {
                   id: activeQuestion.id,
                   question: activeQuestion.question,
                   options: activeQuestion.options,
-                  correctAnswer: activeQuestion.correctAnswer,
-                  difficulty: activeQuestion.difficulty
+                  correctAnswer: activeQuestion.correctAnswer
                 }}
                 onAnswer={handleQuestionAnswer}
                 timeLimit={activeQuestion.timeLimit}
@@ -764,8 +759,7 @@ export const LiveSession = () => {
             performance={quizPerformance}
             question={{
               id: activeQuestion.id,
-              question: activeQuestion.question,
-              difficulty: activeQuestion.difficulty
+              question: activeQuestion.question
             }}
             onClose={() => {
               setShowPerformance(false);
@@ -1299,8 +1293,8 @@ export const LiveSession = () => {
                         <span className="text-xs font-medium text-indigo-900 dark:text-indigo-200">
                           {question.category}
                         </span>
-                        <Badge variant={question.difficulty === 'easy' ? 'success' : question.difficulty === 'medium' ? 'warning' : 'danger'} size="sm">
-                          {question.difficulty}
+                        <Badge variant={question.questionType === 'cluster' ? 'warning' : 'info'} size="sm">
+                          {question.questionType === 'cluster' ? question.category : 'Generic'}
                         </Badge>
                       </div>
                       <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">

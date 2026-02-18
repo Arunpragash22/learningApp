@@ -144,7 +144,6 @@ export const QuestionManagement = () => {
         question: question.question,
         options: question.options,
         correctAnswer: question.correctAnswer,
-        difficulty: question.difficulty,
         category: question.category,
         tags: question.tags,
         timeLimit: question.timeLimit,

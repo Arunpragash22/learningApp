@@ -23,7 +23,6 @@ export class QuizService {
         'To visualize the network structure'
       ],
       correctAnswer: 1,
-      difficulty: 'medium',
       category: 'Neural Networks',
     });
 
@@ -37,7 +36,6 @@ export class QuizService {
         'Step function'
       ],
       correctAnswer: 1,
-      difficulty: 'easy',
       category: 'Neural Networks',
     });
 
@@ -51,7 +49,6 @@ export class QuizService {
         'Improves accuracy on all datasets'
       ],
       correctAnswer: 1,
-      difficulty: 'hard',
       category: 'Neural Networks',
     });
 

@@ -50,9 +50,11 @@ def _get_eligible_questions(
         return generic if generic else all_questions
 
     # Phase 2: Clustering done — send ONLY cluster-specific questions
+    # Match on category (Passive/Moderate/Active) case-insensitively
     cluster_matched = [
         q for q in all_questions
-        if q.get("questionType") == "cluster" and q.get("targetCluster") == student_cluster
+        if q.get("questionType") == "cluster"
+        and q.get("category", "").lower() == student_cluster
     ]
 
     if cluster_matched:
@@ -266,7 +268,6 @@ async def trigger_question(meeting_id: str):
                 "question": q["question"],
                 "options": q["options"],
                 "timeLimit": q.get("timeLimit", 30),
-                "difficulty": q.get("difficulty", "medium"),
                 "category": q.get("category", "General"),
                 "questionType": q.get("questionType", "generic"),
                 "sessionId": student_session_id,

@@ -27,7 +27,6 @@ interface QuizPerformanceProps {
   question: {
     id: string;
     question: string;
-    difficulty: 'easy' | 'medium' | 'hard';
   };
   onClose?: () => void;
 }

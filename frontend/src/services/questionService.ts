@@ -5,7 +5,6 @@ export interface Question {
   question: string;
   options: string[];
   correctAnswer: number;
-  difficulty: 'easy' | 'medium' | 'hard';
   category: string;
   tags: string[];
   timeLimit?: number;
@@ -21,7 +20,6 @@ export interface CreateQuestionData {
   question: string;
   options: string[];
   correctAnswer: number;
-  difficulty: 'easy' | 'medium' | 'hard';
   category: string;
   tags?: string[];
   timeLimit?: number;

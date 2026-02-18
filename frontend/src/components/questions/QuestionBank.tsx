@@ -9,13 +9,12 @@ export interface Question {
   question: string;
   options: string[];
   correctAnswer: number;
-  difficulty: 'easy' | 'medium' | 'hard';
   category: string;
   tags: string[];
   timeLimit?: number;
   createdAt: string;
-  questionType?: 'generic' | 'cluster';  // Generic = all students, Cluster = specific cluster
-  targetCluster?: 'passive' | 'moderate' | 'active';  // Only used when questionType is 'cluster'
+  questionType?: 'generic' | 'cluster';
+  targetCluster?: 'passive' | 'moderate' | 'active';
 }
 
 interface QuestionBankProps {
@@ -61,28 +60,6 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
     
     return matchesSearch && matchesType && matchesCluster;
   });
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy':
-        return 'success';
-      case 'medium':
-        return 'warning';
-      case 'hard':
-        return 'danger';
-      default:
-        return 'default';
-    }
-  };
-
-  const getDifficultyLabel = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return 'Passive';
-      case 'medium': return 'Moderate';
-      case 'hard': return 'Active';
-      default: return difficulty;
-    }
-  };
 
   return (
     <div className="space-y-4">

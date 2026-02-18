@@ -13,14 +13,13 @@ class QuestionOption(BaseModel):
     question: str
     options: List[str]
     correctAnswer: int
-    difficulty: str
     category: str
     tags: Optional[List[str]] = []
     timeLimit: Optional[int] = 30
-    courseId: Optional[str] = None  # Optional: which course this question belongs to
-    sessionId: Optional[str] = None  # Optional: which session this question belongs to
-    questionType: Optional[str] = "generic"  # 'generic' or 'cluster'
-    targetCluster: Optional[str] = None  # 'passive', 'moderate', 'active' (only when questionType is 'cluster')
+    courseId: Optional[str] = None
+    sessionId: Optional[str] = None
+    questionType: Optional[str] = "generic"
+    targetCluster: Optional[str] = None
 
 
 class QuestionResponse(BaseModel):
@@ -28,7 +27,6 @@ class QuestionResponse(BaseModel):
     question: str
     options: List[str]
     correctAnswer: int
-    difficulty: str
     category: str
     tags: List[str]
     timeLimit: Optional[int] = 30
@@ -36,8 +34,8 @@ class QuestionResponse(BaseModel):
     instructorId: Optional[str] = None
     courseId: Optional[str] = None
     sessionId: Optional[str] = None
-    questionType: Optional[str] = "generic"  # 'generic' or 'cluster'
-    targetCluster: Optional[str] = None  # 'passive', 'moderate', 'active'
+    questionType: Optional[str] = "generic"
+    targetCluster: Optional[str] = None
 
 
 @router.post("/", response_model=QuestionResponse)
@@ -68,7 +66,6 @@ async def create_question(
             question=created_question.get("question", ""),
             options=created_question.get("options", []),
             correctAnswer=created_question.get("correctAnswer", 0),
-            difficulty=created_question.get("difficulty", "medium"),
             category=created_question.get("category", ""),
             tags=created_question.get("tags", []),
             timeLimit=created_question.get("timeLimit", 30),
@@ -117,7 +114,6 @@ async def get_all_questions(
                 question=q.get("question", ""),
                 options=q.get("options", []),
                 correctAnswer=q.get("correctAnswer", 0),
-                difficulty=q.get("difficulty", "medium"),
                 category=q.get("category", ""),
                 tags=q.get("tags", []),
                 timeLimit=q.get("timeLimit", 30),
@@ -168,7 +164,6 @@ async def get_question_by_id(
             question=question.get("question", ""),
             options=question.get("options", []),
             correctAnswer=question.get("correctAnswer", 0),
-            difficulty=question.get("difficulty", "medium"),
             category=question.get("category", ""),
             tags=question.get("tags", []),
             timeLimit=question.get("timeLimit", 30),
@@ -218,7 +213,6 @@ async def update_question(
             question=updated_question.get("question", ""),
             options=updated_question.get("options", []),
             correctAnswer=updated_question.get("correctAnswer", 0),
-            difficulty=updated_question.get("difficulty", "medium"),
             category=updated_question.get("category", ""),
             tags=updated_question.get("tags", []),
             timeLimit=updated_question.get("timeLimit", 30),

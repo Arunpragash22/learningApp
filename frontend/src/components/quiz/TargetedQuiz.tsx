@@ -8,7 +8,6 @@ interface QuizQuestion {
   question: string;
   options: string[];
   correctAnswer: number;
-  difficulty: 'easy' | 'medium' | 'hard';
   clusterTarget?: string;
 }
 
@@ -48,17 +47,6 @@ export const TargetedQuiz: React.FC<TargetedQuizProps> = ({
     onAnswer(index);
   };
 
-  const getDifficultyColor = () => {
-    switch (question.difficulty) {
-      case 'easy':
-        return 'bg-blue-100 text-blue-800';
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'hard':
-        return 'bg-red-100 text-red-800';
-    }
-  };
-
   const isCorrect = selectedAnswer === question.correctAnswer;
 
   return (
@@ -77,9 +65,6 @@ export const TargetedQuiz: React.FC<TargetedQuizProps> = ({
                 For: {question.clusterTarget}
               </span>
             )}
-            <span className={`px-2 py-1 text-xs font-medium rounded ${getDifficultyColor()}`}>
-              {question.difficulty.toUpperCase()}
-            </span>
           </div>
           <div className="flex items-center space-x-2 text-gray-600">
             <Clock className="h-4 w-4" />

@@ -370,8 +370,12 @@ class QuizService:
         generic_qs = [q for q in questions if q.get("questionType", "generic") == "generic" or not q.get("questionType")]
 
         if has_clustering and student_cluster:
-            # Phase 2: ONLY cluster-specific questions
-            cluster_qs = [q for q in questions if q.get("questionType") == "cluster" and q.get("targetCluster") == student_cluster]
+            # Phase 2: ONLY cluster-specific questions matched by category
+            cluster_qs = [
+                q for q in questions
+                if q.get("questionType") == "cluster"
+                and q.get("category", "").lower() == student_cluster
+            ]
             eligible_questions = cluster_qs if cluster_qs else generic_qs
         else:
             # Phase 1: ONLY generic questions
