@@ -227,17 +227,13 @@ class QuizScheduler:
         stagger_window: int = 0
     ) -> dict:
         """
-        Trigger a question and deliver it to each student at a DIFFERENT
-        random time within the stagger window.
-
-        Example: stagger_window=600 (10 min)
-          - Student A receives the question after 47 seconds
-          - Student B receives the question after 312 seconds
-          - Student C receives the question after 589 seconds
-          All within the 10-minute window, but NOT at the same time.
+        Two-phase staggered delivery:
+        Phase 1 (no clustering): each student gets a random GENERIC question
+        Phase 2 (clustering done): each student gets a question matching their cluster category
         """
         from ..database.connection import db
         from .ws_manager import ws_manager
+        from ..models.cluster_model import ClusterModel
 
         try:
             # ── 1. Find session doc ─────────────────────────────────────
@@ -285,123 +281,169 @@ class QuizScheduler:
             if not questions:
                 return {"success": False, "message": "No questions found for this session"}
 
-            # Filter out already-sent questions
-            sent_ids = self.sent_questions.get(session_id, set())
-            available_questions = [
-                q for q in questions if str(q["_id"]) not in sent_ids
+            # ── 3. Build cluster map (two-phase check) ──────────────────
+            student_cluster_map: Dict[str, str] = {}
+            session_ids_to_check = [session_id]
+            if zoom_meeting_id and zoom_meeting_id not in session_ids_to_check:
+                session_ids_to_check.append(str(zoom_meeting_id))
+            if session_doc:
+                mongo_id = str(session_doc["_id"])
+                if mongo_id not in session_ids_to_check:
+                    session_ids_to_check.append(mongo_id)
+
+            try:
+                for sid in session_ids_to_check:
+                    cmap = await ClusterModel.get_student_cluster_map(sid)
+                    if cmap:
+                        student_cluster_map.update(cmap)
+            except Exception as e:
+                print(f"⚠️ Auto-trigger: cluster lookup error (non-fatal): {e}")
+
+            has_clustering = bool(student_cluster_map)
+
+            # Separate generic and cluster questions
+            generic_qs = [
+                q for q in questions
+                if q.get("questionType", "generic") == "generic" or not q.get("questionType")
             ]
 
-            if not available_questions:
-                print(f"📚 Session {session_id}: All questions sent, resetting pool...")
-                self.sent_questions[session_id] = set()
-                available_questions = questions
+            if has_clustering:
+                print(f"📋 Auto-trigger: Phase 2 — cluster-specific per student ({len(student_cluster_map)} mapped)")
+            else:
+                print(f"📋 Auto-trigger: Phase 1 — generic questions only ({len(generic_qs)} available)")
 
-            # Pick a random question (same question for all students)
-            question = random.choice(available_questions)
-            question_id = str(question["_id"])
-            self.sent_questions[session_id].add(question_id)
+            # ── 4. Collect all joined students ──────────────────────────
+            ids_to_try = [str(s) for s in session_ids_to_check]
 
-            # ── 3. Build quiz message ───────────────────────────────────
-            opts = question.get("options") or []
-            if not isinstance(opts, list):
-                opts = list(opts) if opts else []
-            opts = [str(o) for o in opts]
-
-            base_message = {
-                "type": "quiz",
-                "questionId": question_id,
-                "question_id": question_id,
-                "question": str(question.get("question", "")),
-                "options": opts,
-                "timeLimit": int(question.get("timeLimit", 30)),
-                "sessionId": session_id,
-                "triggeredAt": datetime.utcnow().isoformat(),
-                "autoTriggered": True,
-            }
-
-            # ── 4. Collect all joined students from both room IDs ───────
-            ids_to_try = [str(session_id)]
-            zoom_str = str(zoom_meeting_id).strip() if zoom_meeting_id else None
-            if zoom_str and zoom_str not in ids_to_try:
-                ids_to_try.append(zoom_str)
-
-            # Gather unique students: {student_id: room_id}
             students_to_send: Dict[str, str] = {}
             for room_id in ids_to_try:
                 participants = ws_manager.get_session_participants(room_id)
                 for p in participants:
-                    sid = p["studentId"]
-                    if sid not in students_to_send:
-                        students_to_send[sid] = room_id
+                    sid_val = p["studentId"]
+                    if sid_val not in students_to_send:
+                        students_to_send[sid_val] = room_id
 
             total_students = len(students_to_send)
             if total_students == 0:
-                # Still store as last quiz so reconnecting students get it
                 for room_id in ids_to_try:
-                    msg = {**base_message, "sessionId": room_id}
                     ws_manager.last_session_quiz[room_id] = {
-                        "message": msg, "sent_at": datetime.now()
+                        "message": {"type": "quiz", "sessionId": room_id},
+                        "sent_at": datetime.now()
                     }
                 print(f"⚠️ No participants in session — stored quiz for reconnect catch-up")
-                return {
-                    "success": True,
-                    "message": "Question stored (no online students)",
-                    "sentTo": 0,
-                    "questionId": question_id,
-                }
+                return {"success": True, "message": "Question stored (no online students)", "sentTo": 0}
 
-            # ── 5. Assign a random delay to each student ────────────────
-            # Spread students across the stagger window.
-            # Minimum gap = 0s, Maximum gap = stagger_window.
-            student_delays: Dict[str, float] = {}
-            for sid in students_to_send:
-                if stagger_window > 0:
-                    student_delays[sid] = random.uniform(0, stagger_window)
+            # ── 5. Pick a question PER student (two-phase) ──────────────
+            sent_ids = self.sent_questions.get(session_id, set())
+            student_questions: Dict[str, dict] = {}
+
+            for sid_val in students_to_send:
+                student_cluster = student_cluster_map.get(sid_val) if has_clustering else None
+
+                if has_clustering and student_cluster:
+                    # Phase 2: cluster-matched questions by category
+                    pool = [
+                        q for q in questions
+                        if q.get("questionType") == "cluster"
+                        and q.get("category", "").lower() == student_cluster
+                    ]
+                    if not pool:
+                        pool = generic_qs
                 else:
-                    student_delays[sid] = 0.0
+                    # Phase 1: generic only
+                    pool = generic_qs if generic_qs else questions
 
-            # Sort by delay so log output is in delivery order
+                # Filter out already-sent
+                unsent = [q for q in pool if str(q["_id"]) not in sent_ids]
+                if not unsent:
+                    unsent = pool
+
+                if unsent:
+                    q = random.choice(unsent)
+                    student_questions[sid_val] = q
+                    self.sent_questions.setdefault(session_id, set()).add(str(q["_id"]))
+
+            if not student_questions:
+                return {"success": False, "message": "No eligible questions for any student"}
+
+            # ── 6. Assign stagger delays ────────────────────────────────
+            student_delays: Dict[str, float] = {}
+            for sid_val in student_questions:
+                student_delays[sid_val] = random.uniform(0, stagger_window) if stagger_window > 0 else 0.0
+
             sorted_students = sorted(student_delays.items(), key=lambda x: x[1])
-            print(f"🎯 Staggered delivery plan for {total_students} students "
+            print(f"🎯 Staggered delivery plan for {len(sorted_students)} students "
                   f"(window: {stagger_window}s):")
-            for sid, delay in sorted_students:
-                room_id = students_to_send[sid]
+            for sid_val, delay in sorted_students:
+                room_id = students_to_send[sid_val]
                 participants = ws_manager.get_session_participants(room_id)
                 name = next(
-                    (p.get("studentName", sid[:8]) for p in participants if p["studentId"] == sid),
-                    sid[:8]
+                    (p.get("studentName", sid_val[:8]) for p in participants if p["studentId"] == sid_val),
+                    sid_val[:8]
                 )
-                print(f"   🕐 {name}: +{delay:.0f}s")
+                q = student_questions[sid_val]
+                print(f"   🕐 {name}: +{delay:.0f}s → [{q.get('questionType', 'generic')}] "
+                      f"{q.get('category', 'Generic')}")
 
-            # ── 6. Create per-student delivery tasks ────────────────────
-            async def _deliver_to_student(sid: str, room_id: str, delay: float):
-                """Wait the random delay, then send the question to one student."""
+            # ── 7. Deliver per-student ──────────────────────────────────
+            async def _deliver_to_student(sid_val: str, room_id: str, delay: float):
                 if delay > 0:
                     await asyncio.sleep(delay)
-                msg = {**base_message, "sessionId": room_id}
-                ok = await ws_manager.send_to_student_in_session(room_id, sid, msg)
+                q = student_questions[sid_val]
+                opts = q.get("options") or []
+                if not isinstance(opts, list):
+                    opts = list(opts) if opts else []
+                opts = [str(o) for o in opts]
+                msg = {
+                    "type": "quiz",
+                    "questionId": str(q["_id"]),
+                    "question_id": str(q["_id"]),
+                    "question": str(q.get("question", "")),
+                    "options": opts,
+                    "timeLimit": int(q.get("timeLimit", 30)),
+                    "category": q.get("category", "General"),
+                    "questionType": q.get("questionType", "generic"),
+                    "sessionId": room_id,
+                    "studentId": sid_val,
+                    "triggeredAt": datetime.utcnow().isoformat(),
+                    "autoTriggered": True,
+                }
+                ok = await ws_manager.send_to_student_in_session(room_id, sid_val, msg)
+                if ok:
+                    ws_manager.last_student_quiz.setdefault(room_id, {})[sid_val] = {
+                        "message": msg, "sent_at": datetime.now()
+                    }
+                    print(f"   ✅ Sent to {sid_val[:12]}...")
                 return ok
 
             tasks = []
-            for sid, delay in sorted_students:
-                room_id = students_to_send[sid]
-                tasks.append(
-                    asyncio.create_task(_deliver_to_student(sid, room_id, delay))
-                )
+            for sid_val, delay in sorted_students:
+                room_id = students_to_send[sid_val]
+                tasks.append(asyncio.create_task(_deliver_to_student(sid_val, room_id, delay)))
 
-            # Store last quiz for reconnect catch-up (stored immediately)
+            # Store last quiz for reconnect catch-up
             for room_id in ids_to_try:
-                msg = {**base_message, "sessionId": room_id}
+                first_q = next(iter(student_questions.values()))
+                opts = first_q.get("options") or []
+                if not isinstance(opts, list):
+                    opts = list(opts) if opts else []
                 ws_manager.last_session_quiz[room_id] = {
-                    "message": msg, "sent_at": datetime.now()
+                    "message": {
+                        "type": "quiz",
+                        "questionId": str(first_q["_id"]),
+                        "question": str(first_q.get("question", "")),
+                        "options": [str(o) for o in opts],
+                        "timeLimit": int(first_q.get("timeLimit", 30)),
+                        "sessionId": room_id,
+                        "triggeredAt": datetime.utcnow().isoformat(),
+                        "autoTriggered": True,
+                    },
+                    "sent_at": datetime.now()
                 }
                 print(f"   📌 Stored last quiz for session {room_id} (reconnect catch-up)")
 
-            # Wait for all deliveries to complete
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            sent_count = sum(
-                1 for r in results if r is True
-            )
+            sent_count = sum(1 for r in results if r is True)
 
             return {
                 "success": True,
@@ -409,8 +451,6 @@ class QuizScheduler:
                            f"(staggered over {stagger_window}s)",
                 "sentTo": sent_count,
                 "totalStudents": total_students,
-                "questionId": question_id,
-                "question": str(question.get("question", ""))[:50] + "..."
             }
 
         except Exception as e:
