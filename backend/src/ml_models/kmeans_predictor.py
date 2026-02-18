@@ -77,25 +77,24 @@ class KMeansPredictor:
     def get_label_mapping(self) -> Dict[int, str]:
         """
         Automatically map KMeans numeric labels (0, 1, 2) to
-        engagement levels ("high", "medium", "low") based on
+        cluster labels ("active", "moderate", "passive") based on
         cluster centers.
 
-        The cluster with the highest center → "high"
-        Middle center                      → "medium"
-        Lowest center                      → "low"
+        The cluster with the highest center → "active"
+        Middle center                      → "moderate"
+        Lowest center                      → "passive"
         """
         if not self.is_loaded:
             self.load()
 
         centers = self._model.cluster_centers_  # shape (3, n_features)
-        # Use the first feature (engagement_score_scaled) to rank
-        center_means = centers.mean(axis=1)     # one value per cluster
+        center_means = centers.mean(axis=1)
         sorted_indices = np.argsort(center_means)  # ascending order
 
         mapping = {
-            int(sorted_indices[0]): "low",
-            int(sorted_indices[1]): "medium",
-            int(sorted_indices[2]): "high",
+            int(sorted_indices[0]): "passive",
+            int(sorted_indices[1]): "moderate",
+            int(sorted_indices[2]): "active",
         }
         return mapping
 
@@ -107,12 +106,12 @@ class KMeansPredictor:
         Given preprocessed engagement docs (one per student×question),
         aggregate per student, predict cluster labels, and return:
 
-        1. student_labels : { studentId: "high" | "medium" | "low" }
-        2. cluster_students: { "high": [sid, ...], "medium": [...], "low": [...] }
+        1. student_labels : { studentId: "active" | "moderate" | "passive" }
+        2. cluster_students: { "active": [sid, ...], "moderate": [...], "passive": [...] }
         """
         if not preprocessed_docs:
             print("⚠️  predict_students: no preprocessed docs received")
-            return {}, {"high": [], "medium": [], "low": []}
+            return {}, {"active": [], "moderate": [], "passive": []}
 
         df = pd.DataFrame(preprocessed_docs)
         print(f"📊 predict_students: {len(df)} rows, columns: {list(df.columns)}")
@@ -132,14 +131,14 @@ class KMeansPredictor:
         if not agg_cols:
             print(f"❌ predict_students: MODEL_FEATURES {MODEL_FEATURES} "
                   f"not found in columns {list(df.columns)}")
-            return {}, {"high": [], "medium": [], "low": []}
+            return {}, {"active": [], "moderate": [], "passive": []}
 
         student_df = df.groupby("studentId").agg(agg_cols).reset_index()
         print(f"📊 predict_students: {len(student_df)} unique students")
         print(f"📊 Student engagement values: {student_df['engagement_score_scaled'].tolist()}")
 
         if student_df.empty:
-            return {}, {"high": [], "medium": [], "low": []}
+            return {}, {"active": [], "moderate": [], "passive": []}
 
         # ── Predict ────────────────────────────────────────────────────
         labels = self.predict(student_df)
@@ -149,7 +148,7 @@ class KMeansPredictor:
         # ── Build results ──────────────────────────────────────────────
         student_labels: Dict[str, str] = {}
         cluster_students: Dict[str, List[str]] = {
-            "high": [], "medium": [], "low": []
+            "active": [], "moderate": [], "passive": []
         }
 
         student_ids = student_df["studentId"].tolist()
@@ -160,8 +159,8 @@ class KMeansPredictor:
             cluster_students[level].append(sid)
 
         print(f"✅ predict_students result: "
-              f"high={len(cluster_students['high'])}, "
-              f"medium={len(cluster_students['medium'])}, "
-              f"low={len(cluster_students['low'])}")
+              f"active={len(cluster_students['active'])}, "
+              f"moderate={len(cluster_students['moderate'])}, "
+              f"passive={len(cluster_students['passive'])}")
 
         return student_labels, cluster_students

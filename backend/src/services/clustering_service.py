@@ -8,19 +8,19 @@ from ..database.connection import get_database
 
 # ── Cluster metadata (label → display info) ─────────────────────
 CLUSTER_META = {
-    "high": {
+    "active": {
         "name": "Active Participants",
         "description": "Highly engaged students",
         "color": "#10b981",
         "prediction": "stable",
     },
-    "medium": {
+    "moderate": {
         "name": "Moderate Participants",
         "description": "Moderately engaged students",
         "color": "#f59e0b",
         "prediction": "improving",
     },
-    "low": {
+    "passive": {
         "name": "At-Risk Students",
         "description": "Low engagement, need support",
         "color": "#ef4444",
@@ -144,7 +144,7 @@ class ClusteringService:
 
         # 3. Build StudentCluster objects
         clusters: List[StudentCluster] = []
-        for idx, level in enumerate(["high", "medium", "low"], start=1):
+        for idx, level in enumerate(["active", "moderate", "passive"], start=1):
             meta = CLUSTER_META[level]
             students = cluster_students.get(level, [])
             clusters.append(
@@ -223,7 +223,7 @@ class ClusteringService:
                 name="Active Participants",
                 description="Highly engaged students",
                 studentCount=0,
-                engagementLevel="high",
+                engagementLevel="active",
                 color="#10b981",
                 prediction="stable",
                 students=[],
@@ -233,7 +233,7 @@ class ClusteringService:
                 name="Moderate Participants",
                 description="Moderately engaged students",
                 studentCount=0,
-                engagementLevel="medium",
+                engagementLevel="moderate",
                 color="#f59e0b",
                 prediction="improving",
                 students=[],
@@ -243,7 +243,7 @@ class ClusteringService:
                 name="At-Risk Students",
                 description="Low engagement, need support",
                 studentCount=0,
-                engagementLevel="low",
+                engagementLevel="passive",
                 color="#ef4444",
                 prediction="declining",
                 students=[],

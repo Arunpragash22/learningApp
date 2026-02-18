@@ -251,8 +251,8 @@ export const LiveSession = () => {
         name: cluster.name,
         count: cluster.studentCount,
         percentage: (cluster.studentCount / clusters.reduce((sum, c) => sum + c.studentCount, 0)) * 100,
-        color: cluster.engagementLevel === 'high' ? 'bg-blue-500' :
-               cluster.engagementLevel === 'medium' ? 'bg-blue-400' : 'bg-red-500'
+        color: cluster.engagementLevel === 'active' ? 'bg-blue-500' :
+               cluster.engagementLevel === 'moderate' ? 'bg-blue-400' : 'bg-red-500'
       }))
     : [
         {

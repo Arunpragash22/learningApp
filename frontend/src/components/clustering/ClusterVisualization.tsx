@@ -7,7 +7,7 @@ interface Cluster {
   name: string;
   description: string;
   studentCount: number;
-  engagementLevel: 'high' | 'medium' | 'low';
+  engagementLevel: 'active' | 'moderate' | 'passive';
   color: string;
   prediction?: 'improving' | 'declining' | 'stable';
 }
@@ -87,8 +87,8 @@ export const ClusterVisualization: React.FC<ClusterVisualizationProps> = ({
                   </span>
                 </div>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  cluster.engagementLevel === 'high' ? 'bg-blue-100 text-blue-800' :
-                  cluster.engagementLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                  cluster.engagementLevel === 'active' ? 'bg-blue-100 text-blue-800' :
+                  cluster.engagementLevel === 'moderate' ? 'bg-yellow-100 text-yellow-800' :
                   'bg-red-100 text-red-800'
                 }`}>
                   {cluster.engagementLevel.toUpperCase()}

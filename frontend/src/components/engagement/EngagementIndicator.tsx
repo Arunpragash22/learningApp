@@ -3,7 +3,7 @@ import { Activity, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 
 interface EngagementIndicatorProps {
-  engagementLevel: 'high' | 'medium' | 'low';
+  engagementLevel: 'active' | 'moderate' | 'passive';
   engagementScore: number;
   cluster?: string;
   showCluster?: boolean;
@@ -17,11 +17,11 @@ export const EngagementIndicator: React.FC<EngagementIndicatorProps> = ({
 }) => {
   const getColor = () => {
     switch (engagementLevel) {
-      case 'high':
+      case 'active':
         return 'bg-blue-500';
-      case 'medium':
+      case 'moderate':
         return 'bg-yellow-500';
-      case 'low':
+      case 'passive':
         return 'bg-red-500';
       default:
         return 'bg-gray-500';
@@ -30,11 +30,11 @@ export const EngagementIndicator: React.FC<EngagementIndicatorProps> = ({
 
   const getIcon = () => {
     switch (engagementLevel) {
-      case 'high':
+      case 'active':
         return <TrendingUp className="h-4 w-4" />;
-      case 'medium':
+      case 'moderate':
         return <Minus className="h-4 w-4" />;
-      case 'low':
+      case 'passive':
         return <TrendingDown className="h-4 w-4" />;
       default:
         return <Activity className="h-4 w-4" />;
@@ -51,7 +51,7 @@ export const EngagementIndicator: React.FC<EngagementIndicatorProps> = ({
           <span className="text-sm font-medium text-gray-700">
             Engagement: {engagementScore}%
           </span>
-          <Badge variant={engagementLevel === 'high' ? 'success' : engagementLevel === 'medium' ? 'warning' : 'danger' as 'success' | 'warning' | 'danger'}>
+          <Badge variant={engagementLevel === 'active' ? 'success' : engagementLevel === 'moderate' ? 'warning' : 'danger' as 'success' | 'warning' | 'danger'}>
             {engagementLevel.toUpperCase()}
           </Badge>
         </div>
@@ -62,4 +62,3 @@ export const EngagementIndicator: React.FC<EngagementIndicatorProps> = ({
     </div>
   );
 };
-

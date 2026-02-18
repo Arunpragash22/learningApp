@@ -23,7 +23,7 @@ interface ClusterData {
   name: string;
   description: string;
   studentCount: number;
-  engagementLevel: 'high' | 'medium' | 'low';
+  engagementLevel: 'active' | 'moderate' | 'passive';
   color: string;
   prediction: 'stable' | 'improving' | 'declining';
   students: string[];  // Real student IDs from KMeans model
@@ -235,7 +235,7 @@ export const InstructorAnalytics = () => {
   // ── Build student lists from REAL cluster data ──────────────────
   // At-Risk students = students in the "low" engagement cluster
   const atRiskStudents = useMemo(() => {
-    const lowCluster = clusters.find(c => c.engagementLevel === 'low');
+    const lowCluster = clusters.find(c => c.engagementLevel === 'passive');
     if (!lowCluster || !lowCluster.students || lowCluster.students.length === 0) {
       return [];
     }
@@ -252,7 +252,7 @@ export const InstructorAnalytics = () => {
   const moderateActiveStudents = useMemo(() => {
     const result: { id: string; name: string; engagement: number; cluster: string; lastActive: string }[] = [];
 
-    const highCluster = clusters.find(c => c.engagementLevel === 'high');
+    const highCluster = clusters.find(c => c.engagementLevel === 'active');
     if (highCluster?.students) {
       highCluster.students.forEach(sid => {
         result.push({
@@ -265,7 +265,7 @@ export const InstructorAnalytics = () => {
       });
     }
 
-    const medCluster = clusters.find(c => c.engagementLevel === 'medium');
+    const medCluster = clusters.find(c => c.engagementLevel === 'moderate');
     if (medCluster?.students) {
       medCluster.students.forEach(sid => {
         result.push({
@@ -283,9 +283,9 @@ export const InstructorAnalytics = () => {
 
   // Active-only students (from high cluster)
   const activeStudents = useMemo(() => {
-    const highCluster = clusters.find(c => c.engagementLevel === 'high');
-    if (!highCluster?.students) return [];
-    return highCluster.students.map(sid => ({
+    const activeCluster = clusters.find(c => c.engagementLevel === 'active');
+    if (!activeCluster?.students) return [];
+    return activeCluster.students.map(sid => ({
       id: sid,
       name: getStudentName(sid),
       engagement: 0,
@@ -296,7 +296,7 @@ export const InstructorAnalytics = () => {
 
   // Moderate-only students (from medium cluster)
   const moderateStudents = useMemo(() => {
-    const medCluster = clusters.find(c => c.engagementLevel === 'medium');
+    const medCluster = clusters.find(c => c.engagementLevel === 'moderate');
     if (!medCluster?.students) return [];
     return medCluster.students.map(sid => ({
       id: sid,

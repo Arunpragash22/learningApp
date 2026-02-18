@@ -114,7 +114,7 @@ export const StudentEngagement = () => {
   const studentData = useMemo(() => {
     if (engagementData) {
       return {
-        engagementLevel: engagementData.engagementLevel as 'high' | 'medium' | 'low',
+        engagementLevel: engagementData.engagementLevel as 'active' | 'moderate' | 'passive',
         engagementScore: engagementData.engagementScore,
         cluster: engagementData.cluster,
         questionsAnswered: engagementData.questionsAnswered,
@@ -123,7 +123,7 @@ export const StudentEngagement = () => {
       };
     }
     return {
-      engagementLevel: 'medium' as const,
+      engagementLevel: 'moderate' as const,
       engagementScore: 0,
       cluster: 'Not Assigned',
       questionsAnswered: 0,
@@ -204,16 +204,16 @@ export const StudentEngagement = () => {
           </div>
           <div className="flex items-center space-x-3">
             <div className={`rounded-full p-2.5 text-white ${
-              studentData.engagementLevel === 'high' ? 'bg-green-500' :
-              studentData.engagementLevel === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
+              studentData.engagementLevel === 'active' ? 'bg-green-500' :
+              studentData.engagementLevel === 'moderate' ? 'bg-yellow-500' : 'bg-red-500'
             }`}>
               <Activity className="h-5 w-5" />
             </div>
             <div>
               <p className="text-lg font-semibold text-gray-900">{studentData.cluster}</p>
               <p className="text-sm text-gray-500">
-                {studentData.engagementLevel === 'high' ? 'Highly engaged' :
-                 studentData.engagementLevel === 'medium' ? 'Moderately engaged' : 'Needs improvement'}
+                {studentData.engagementLevel === 'active' ? 'Highly engaged' :
+                 studentData.engagementLevel === 'moderate' ? 'Moderately engaged' : 'Needs improvement'}
               </p>
             </div>
           </div>

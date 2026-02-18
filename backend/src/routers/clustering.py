@@ -231,7 +231,7 @@ async def get_student_engagement(
 
         # ── 1. Cluster assignment ────────────────────────────────────
         cluster_name = "Not Assigned"
-        engagement_level = "medium"
+        engagement_level = "moderate"
 
         clusters = await clustering_service.get_clusters(session_id)
         for c in clusters:
@@ -254,7 +254,7 @@ async def get_student_engagement(
             engagement_score = round((engagement_score / score_count) * 100, 1)
         else:
             # Fallback: derive from cluster
-            engagement_score = {"high": 85, "medium": 55, "low": 25}.get(engagement_level, 50)
+            engagement_score = {"active": 85, "moderate": 55, "passive": 25}.get(engagement_level, 50)
 
         # ── 3. Quiz stats from quiz_answers ──────────────────────────
         total_answers = 0

@@ -9,7 +9,7 @@ class StudentCluster(BaseModel):
     name: str
     description: str
     studentCount: int
-    engagementLevel: Literal["high", "medium", "low"]
+    engagementLevel: Literal["active", "moderate", "passive"]
     color: str
     prediction: Literal["stable", "improving", "declining"]
     students: List[str]  # Student IDs

@@ -3,12 +3,6 @@ from bson import ObjectId
 from ..database.connection import get_database
 from .cluster import StudentCluster
 
-# Mapping from cluster engagementLevel to question targetCluster label
-ENGAGEMENT_TO_TARGET: Dict[str, str] = {
-    "low": "passive",
-    "medium": "moderate",
-    "high": "active",
-}
 
 
 
@@ -74,10 +68,9 @@ class ClusterModel:
     @staticmethod
     async def get_student_cluster_map(session_id: str) -> Dict[str, str]:
         """
-        Build a mapping of student_id → targetCluster label for a session.
+        Build a mapping of student_id → cluster label for a session.
         Returns e.g. {"student_abc": "passive", "student_xyz": "active", ...}
-        Tries the provided session_id first. If no data, resolves the
-        alternate ID (MongoDB ↔ Zoom) to pick up clusters stored under either.
+        engagementLevel is now stored directly as active/moderate/passive.
         """
         database = get_database()
         if database is None:
@@ -86,12 +79,11 @@ class ClusterModel:
         student_map: Dict[str, str] = {}
 
         async for cluster in database.clusters.find({"sessionId": session_id}):
-            engagement = cluster.get("engagementLevel", "")
-            target = ENGAGEMENT_TO_TARGET.get(engagement)
-            if not target:
+            level = cluster.get("engagementLevel", "")
+            if level not in ("active", "moderate", "passive"):
                 continue
             for sid in cluster.get("students", []):
-                student_map[sid] = target
+                student_map[sid] = level
 
         if student_map:
             return student_map
@@ -100,12 +92,11 @@ class ClusterModel:
         alt_id = await ClusterModel._resolve_alt_session_id(session_id)
         if alt_id:
             async for cluster in database.clusters.find({"sessionId": alt_id}):
-                engagement = cluster.get("engagementLevel", "")
-                target = ENGAGEMENT_TO_TARGET.get(engagement)
-                if not target:
+                level = cluster.get("engagementLevel", "")
+                if level not in ("active", "moderate", "passive"):
                     continue
                 for sid in cluster.get("students", []):
-                    student_map[sid] = target
+                    student_map[sid] = level
 
         return student_map
 

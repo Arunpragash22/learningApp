@@ -5,7 +5,7 @@ export interface StudentCluster {
   name: string;
   description: string;
   studentCount: number;
-  engagementLevel: 'high' | 'medium' | 'low';
+  engagementLevel: 'active' | 'moderate' | 'passive';
   color: string;
   prediction: 'stable' | 'improving' | 'declining';
   students: string[]; // Student IDs
@@ -26,7 +26,7 @@ export interface ClusterResponse {
 
 export interface StudentEngagementData {
   engagementScore: number;
-  engagementLevel: 'high' | 'medium' | 'low';
+  engagementLevel: 'active' | 'moderate' | 'passive';
   cluster: string;
   questionsAnswered: number;
   correctAnswers: number;
@@ -63,7 +63,7 @@ export const clusteringService = {
         name: 'Active Participants',
         description: 'Highly engaged students',
         studentCount: 0,
-        engagementLevel: 'high',
+        engagementLevel: 'active',
         color: '#22c55e',
         prediction: 'stable',
         students: [],
@@ -73,7 +73,7 @@ export const clusteringService = {
         name: 'Moderate Participants',
         description: 'Moderately engaged students',
         studentCount: 0,
-        engagementLevel: 'medium',
+        engagementLevel: 'moderate',
         color: '#f59e0b',
         prediction: 'improving',
         students: [],
@@ -83,7 +83,7 @@ export const clusteringService = {
         name: 'At-Risk Students',
         description: 'Low engagement, need support',
         studentCount: 0,
-        engagementLevel: 'low',
+        engagementLevel: 'passive',
         color: '#ef4444',
         prediction: 'declining',
         students: [],
