@@ -15,6 +15,7 @@ if sys.platform == "win32":
         import codecs
         if hasattr(sys.stdout, 'detach'):
             sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+            
     except:
         pass
 

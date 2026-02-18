@@ -76,7 +76,8 @@ class ClusterModel:
         """
         Build a mapping of student_id → targetCluster label for a session.
         Returns e.g. {"student_abc": "passive", "student_xyz": "active", ...}
-        Tries both the provided session_id and any resolved MongoDB/Zoom IDs.
+        Tries the provided session_id first. If no data, resolves the
+        alternate ID (MongoDB ↔ Zoom) to pick up clusters stored under either.
         """
         database = get_database()
         if database is None:
@@ -92,5 +93,48 @@ class ClusterModel:
             for sid in cluster.get("students", []):
                 student_map[sid] = target
 
+        if student_map:
+            return student_map
+
+        # No clusters under primary ID — try the alternate session ID
+        alt_id = await ClusterModel._resolve_alt_session_id(session_id)
+        if alt_id:
+            async for cluster in database.clusters.find({"sessionId": alt_id}):
+                engagement = cluster.get("engagementLevel", "")
+                target = ENGAGEMENT_TO_TARGET.get(engagement)
+                if not target:
+                    continue
+                for sid in cluster.get("students", []):
+                    student_map[sid] = target
+
         return student_map
+
+    @staticmethod
+    async def _resolve_alt_session_id(session_id: str) -> Optional[str]:
+        """Given a MongoDB _id, return the Zoom meeting ID, or vice versa."""
+        database = get_database()
+        if database is None:
+            return None
+        try:
+            if len(session_id) == 24:
+                try:
+                    doc = await database.sessions.find_one(
+                        {"_id": ObjectId(session_id)}, {"zoomMeetingId": 1}
+                    )
+                    if doc and doc.get("zoomMeetingId"):
+                        return str(doc["zoomMeetingId"])
+                except Exception:
+                    pass
+            doc = await database.sessions.find_one(
+                {"zoomMeetingId": session_id}, {"_id": 1}
+            )
+            if not doc and session_id.isdigit():
+                doc = await database.sessions.find_one(
+                    {"zoomMeetingId": int(session_id)}, {"_id": 1}
+                )
+            if doc:
+                return str(doc["_id"])
+        except Exception:
+            pass
+        return None
 

@@ -213,16 +213,21 @@ async def trigger_question(meeting_id: str):
         if not student_participants:
             return {"success": False, "message": "No students found in session (only instructor connected)"}
 
-        # Fetch cluster mapping: student_id → "passive"/"moderate"/"active"
+        # Fetch FRESH cluster mapping: student_id → "passive"/"moderate"/"active"
+        # Queried from MongoDB every trigger so re-clustering results are used immediately.
         student_cluster_map: Dict[str, str] = {}
         try:
-            # Try both session IDs to find clusters
             for sid in session_ids_to_check:
                 cluster_map = await ClusterModel.get_student_cluster_map(sid)
                 if cluster_map:
                     student_cluster_map.update(cluster_map)
+            # Also try the MongoDB session ID if we resolved one
+            if session_mongo_id and session_mongo_id not in session_ids_to_check:
+                extra_map = await ClusterModel.get_student_cluster_map(session_mongo_id)
+                if extra_map:
+                    student_cluster_map.update(extra_map)
             if student_cluster_map:
-                print(f"🎯 Cluster mapping loaded: {len(student_cluster_map)} students mapped")
+                print(f"🎯 Cluster mapping loaded (fresh): {len(student_cluster_map)} students mapped")
                 for sid, cl in student_cluster_map.items():
                     print(f"   {sid[:12]}... → {cl}")
             else:
@@ -255,7 +260,6 @@ async def trigger_question(meeting_id: str):
             print(f"   🎲 {participant.get('studentName', student_id)} (cluster={student_cluster or 'none'}) → "
                   f"[{q.get('questionType', 'generic')}] {q['question'][:50]}...")
             
-            # Prepare individual message for this student
             message = {
                 "type": "quiz",
                 "questionId": str(q["_id"]),
@@ -264,8 +268,9 @@ async def trigger_question(meeting_id: str):
                 "timeLimit": q.get("timeLimit", 30),
                 "difficulty": q.get("difficulty", "medium"),
                 "category": q.get("category", "General"),
+                "questionType": q.get("questionType", "generic"),
                 "sessionId": student_session_id,
-                "studentId": student_id,  # Include student ID so they know it's for them
+                "studentId": student_id,
                 "timestamp": datetime.now().isoformat()
             }
             
@@ -410,15 +415,19 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
                 "sentTo": 0,
             }
 
-        # Build student → cluster mapping for two-phase delivery
+        # Build FRESH student → cluster mapping for two-phase delivery
         student_cluster_map: Dict[str, str] = {}
         try:
             for sid in session_ids_to_check:
                 cluster_map = await ClusterModel.get_student_cluster_map(sid)
                 if cluster_map:
                     student_cluster_map.update(cluster_map)
+            if session_mongo_id and session_mongo_id not in session_ids_to_check:
+                extra_map = await ClusterModel.get_student_cluster_map(session_mongo_id)
+                if extra_map:
+                    student_cluster_map.update(extra_map)
             if student_cluster_map:
-                print(f"🎯 trigger-same: Cluster mapping loaded: {len(student_cluster_map)} students")
+                print(f"🎯 trigger-same: Cluster mapping loaded (fresh): {len(student_cluster_map)} students")
             else:
                 print(f"⚠️ trigger-same: No cluster data — Phase 1 (generic only)")
         except Exception as cluster_err:
@@ -449,6 +458,7 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
                     "question": q["question"],
                     "options": q.get("options", []),
                     "timeLimit": q.get("timeLimit", 30),
+                    "questionType": "generic",
                     "sessionId": student_session_id,
                     "studentId": student_id,
                     "triggeredAt": datetime.now().isoformat(),
@@ -487,6 +497,7 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
                     "question": q["question"],
                     "options": q.get("options", []),
                     "timeLimit": q.get("timeLimit", 30),
+                    "questionType": q.get("questionType", "generic"),
                     "sessionId": student_session_id,
                     "studentId": student_id,
                     "triggeredAt": datetime.now().isoformat(),
