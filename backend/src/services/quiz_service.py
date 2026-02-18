@@ -103,14 +103,13 @@ class QuizService:
             activation_version=activation_version
         )
 
-        # ── Auto-trigger preprocessing (+ optional KMeans clustering) ──
-        # Generic answers: preprocess only (collect data, no clustering)
-        # Cluster answers: preprocess + re-cluster (update labels)
-        question_type = (question.get("questionType") or "generic") if question else "generic"
+        # ── Auto-trigger preprocessing + KMeans clustering ──
+        # Every answer (generic or cluster) triggers preprocessing AND clustering.
+        # Generic answers build the INITIAL clusters; cluster answers RE-cluster.
         asyncio.create_task(
             self._run_preprocessing_and_clustering(
                 answer.sessionId,
-                run_clustering=(question_type == "cluster"),
+                run_clustering=True,
             )
         )
 
@@ -123,10 +122,11 @@ class QuizService:
         self, session_id: str, run_clustering: bool = True
     ) -> None:
         """
-        Background task: preprocess engagement data and optionally run KMeans.
+        Background task: preprocess engagement data and run KMeans clustering.
 
-        - Generic answers  → run_clustering=False (preprocess only, collect data)
-        - Cluster answers  → run_clustering=True  (preprocess + KMeans re-cluster)
+        Every student answer triggers preprocessing + clustering so that:
+        - Generic answers build the INITIAL cluster assignments
+        - Cluster answers RE-cluster with updated engagement data
 
         Uses a per-session lock so that concurrent submissions don't
         create duplicate cluster documents (race condition).
@@ -167,12 +167,11 @@ class QuizService:
                     return
 
                 if not run_clustering:
-                    print(f"📋 [BG] Generic answer — preprocessing done, clustering skipped")
+                    print(f"📋 [BG] Preprocessing done, clustering skipped (flag=False)")
                     return
 
                 # Step 2: Run KMeans model and update clusters
-                # Only reached for cluster-type question answers
-                print(f"🔄 [BG] Step 2: Running KMeans re-clustering (cluster answer)...")
+                print(f"🔄 [BG] Step 2: Running KMeans clustering...")
                 clustering = ClusteringService()
 
                 clusters = await clustering.update_clusters(session_id)
