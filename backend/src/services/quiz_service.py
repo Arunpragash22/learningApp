@@ -370,7 +370,8 @@ class QuizService:
         generic_qs = [q for q in questions if q.get("questionType", "generic") == "generic" or not q.get("questionType")]
 
         if has_clustering and student_cluster:
-            # Phase 2: ONLY cluster-specific questions matched by category
+            # Phase 2: ONLY this student's cluster questions (matched by category)
+            # Falls back to generic — NEVER to other clusters' questions
             cluster_qs = [
                 q for q in questions
                 if q.get("questionType") == "cluster"
@@ -378,11 +379,8 @@ class QuizService:
             ]
             eligible_questions = cluster_qs if cluster_qs else generic_qs
         else:
-            # Phase 1: ONLY generic questions
-            eligible_questions = generic_qs
-
-        if not eligible_questions:
-            eligible_questions = questions
+            # Phase 1: ONLY generic questions (fall back to all only in Phase 1)
+            eligible_questions = generic_qs if generic_qs else questions
 
         active_question_ids = await QuestionAssignmentModel.find_active_question_ids(session_id, activation_version)
         available_questions = [

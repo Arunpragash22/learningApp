@@ -26,19 +26,14 @@ def _get_eligible_questions(
 ) -> list:
     """
     Return the list of questions a student is eligible to receive.
-    
-    Two-phase delivery:
-    
-    Phase 1 — BEFORE clustering (has_clustering_data=False or student has no cluster):
-      → Student receives ONLY generic questions (different random one per student)
-    
-    Phase 2 — AFTER clustering (has_clustering_data=True and student has a cluster):
-      → Student receives ONLY their cluster-specific questions
-        (passive→passive, moderate→moderate, active→active)
-      → Falls back to generic if no cluster questions exist for their cluster
-    
-    This ensures generic questions go out first, and once clustering runs,
-    each student only sees questions targeted at their engagement level.
+
+    Phase 1 — BEFORE clustering:
+      → ONLY generic questions
+
+    Phase 2 — AFTER clustering:
+      → ONLY questions whose category matches the student's cluster
+      → Falls back to generic if no matching cluster questions exist
+      → NEVER returns questions from a different cluster
     """
     generic = [
         q for q in all_questions
@@ -49,8 +44,7 @@ def _get_eligible_questions(
     if not has_clustering_data or not student_cluster:
         return generic if generic else all_questions
 
-    # Phase 2: Clustering done — send ONLY cluster-specific questions
-    # Match on category (Passive/Moderate/Active) case-insensitively
+    # Phase 2: Clustering done — send ONLY this student's cluster questions
     cluster_matched = [
         q for q in all_questions
         if q.get("questionType") == "cluster"
@@ -60,8 +54,9 @@ def _get_eligible_questions(
     if cluster_matched:
         return cluster_matched
 
-    # Fallback: no cluster questions exist for this cluster — use generic
-    return generic if generic else all_questions
+    # Fallback: no cluster questions for this cluster — use generic ONLY
+    # NEVER fall back to all_questions (would leak other clusters' questions)
+    return generic
 
 
 # ================================================================
@@ -257,7 +252,11 @@ async def trigger_question(meeting_id: str):
             # Phase 1: generic only | Phase 2: cluster-specific only
             eligible = _get_eligible_questions(questions, student_cluster, has_clustering)
 
-            # Pick a random question from the eligible pool
+            if not eligible:
+                print(f"   ⚠️ No questions available for {participant.get('studentName', student_id)} "
+                      f"(cluster={student_cluster or 'none'}) — skipping")
+                continue
+
             q = random.choice(eligible)
             print(f"   🎲 {participant.get('studentName', student_id)} (cluster={student_cluster or 'none'}) → "
                   f"[{q.get('questionType', 'generic')}] {q['question'][:50]}...")
@@ -489,6 +488,12 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
                 student_session_id = participant.get("sessionId", effective_meeting_id)
                 student_cluster = student_cluster_map.get(student_id)
                 eligible = _get_eligible_questions(questions, student_cluster, has_clustering)
+
+                if not eligible:
+                    print(f"   ⚠️ No questions for {participant.get('studentName', student_id)} "
+                          f"(cluster={student_cluster or 'none'}) — skipping")
+                    continue
+
                 q = random.choice(eligible)
 
                 message = {
