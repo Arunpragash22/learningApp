@@ -303,12 +303,12 @@ export const SessionReport = () => {
         
         <Card className="p-4 text-center">
           <div className="flex justify-center mb-2">
-            <CheckCircleIcon className="h-8 w-8 text-blue-500" />
+            <CheckCircleIcon className="h-8 w-8 text-green-500" />
           </div>
-          <p className="text-3xl font-bold text-blue-600">
+          <p className="text-3xl font-bold text-green-600">
             {report.engagementSummary?.highly_engaged || 0}
           </p>
-          <p className="text-sm text-gray-500">Highly Engaged</p>
+          <p className="text-sm text-gray-500">Active Students</p>
         </Card>
       </div>
 
@@ -322,23 +322,23 @@ export const SessionReport = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-4">
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
-                <p className="text-2xl font-bold text-blue-600">
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
+                <p className="text-2xl font-bold text-green-600">
                   {report.engagementSummary?.highly_engaged || 0}
                 </p>
-                <p className="text-sm text-blue-800 dark:text-blue-300">Highly Engaged</p>
+                <p className="text-sm text-green-800 dark:text-green-300">Active</p>
               </div>
               <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-center">
                 <p className="text-2xl font-bold text-yellow-600">
                   {report.engagementSummary?.moderately_engaged || 0}
                 </p>
-                <p className="text-sm text-yellow-800 dark:text-yellow-300">Moderately Engaged</p>
+                <p className="text-sm text-yellow-800 dark:text-yellow-300">Moderate</p>
               </div>
               <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-center">
                 <p className="text-2xl font-bold text-red-600">
                   {report.engagementSummary?.at_risk || 0}
                 </p>
-                <p className="text-sm text-red-800 dark:text-red-300">At Risk</p>
+                <p className="text-sm text-red-800 dark:text-red-300">Passive</p>
               </div>
             </div>
           </CardContent>
@@ -384,6 +384,9 @@ export const SessionReport = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
                       Connection
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      Engagement
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -428,6 +431,14 @@ export const SessionReport = () => {
                       </td>
                       <td className="px-4 py-4">
                         {getConnectionBadge(student.averageConnectionQuality)}
+                      </td>
+                      <td className="px-4 py-4">
+                        <Badge 
+                          variant={(student as any).engagementLevel === 'active' ? 'success' : (student as any).engagementLevel === 'moderate' ? 'warning' : 'danger'}
+                          size="sm"
+                        >
+                          {(student as any).engagementLevel === 'active' ? 'Active' : (student as any).engagementLevel === 'moderate' ? 'Moderate' : 'Passive'}
+                        </Badge>
                       </td>
                     </tr>
                   ))}

@@ -852,6 +852,7 @@ export const InstructorReports = () => {
                           <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Correct</th>
                           <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Score</th>
                           <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Connection</th>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Engagement</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -885,6 +886,14 @@ export const InstructorReports = () => {
                             </td>
                             <td className="px-3 py-2 text-xs">
                               {student.averageConnectionQuality || '-'}
+                            </td>
+                            <td className="px-3 py-2">
+                              <Badge 
+                                variant={(student as any).engagementLevel === 'active' ? 'success' : (student as any).engagementLevel === 'moderate' ? 'warning' : 'danger'}
+                                size="sm"
+                              >
+                                {(student as any).engagementLevel === 'active' ? 'Active' : (student as any).engagementLevel === 'moderate' ? 'Moderate' : 'Passive'}
+                              </Badge>
                             </td>
                           </tr>
                         ))}

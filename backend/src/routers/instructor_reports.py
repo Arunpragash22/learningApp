@@ -353,6 +353,17 @@ async def get_engagement_report(
             student_id = metric.get("student_id")
             connection_data[student_id] = metric.get("overall_quality", "unknown")
         
+        # Get real cluster assignments
+        cluster_labels = {}
+        zoom_meeting_id = session.get("zoomMeetingId")
+        for sid in [session_id] + ([str(zoom_meeting_id)] if zoom_meeting_id else []):
+            async for c in db.database.clusters.find({"sessionId": sid}):
+                level = c.get("engagementLevel", "")
+                if level in ("active", "moderate", "passive"):
+                    for s_id in c.get("students", []):
+                        if s_id not in cluster_labels:
+                            cluster_labels[s_id] = level
+        
         # Build engagement report
         engagement_list = []
         for student_id, info in participants.items():
@@ -365,13 +376,21 @@ async def get_engagement_report(
             if info.get("joinedAt") and info.get("leftAt"):
                 duration_minutes = int((info["leftAt"] - info["joinedAt"]).total_seconds() / 60)
             
-            # Determine engagement level based on quiz participation
-            if answered_count >= 3:
+            # Use real cluster data if available, fallback to quiz participation
+            engagement_level = cluster_labels.get(student_id, "")
+            if engagement_level == "active":
                 engagement_level = "High"
-            elif answered_count >= 1:
+            elif engagement_level == "moderate":
                 engagement_level = "Medium"
-            else:
+            elif engagement_level == "passive":
                 engagement_level = "Low"
+            else:
+                if answered_count >= 3:
+                    engagement_level = "High"
+                elif answered_count >= 1:
+                    engagement_level = "Medium"
+                else:
+                    engagement_level = "Low"
             
             engagement_list.append({
                 "studentId": student_id,

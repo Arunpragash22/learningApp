@@ -536,17 +536,17 @@ def _generate_report_html(report: dict, user_role: str) -> str:
                     <tr>
                         <td style="width: 33%; padding: 15px; text-align: center; background: #ecfdf5; border: 1px solid #d1fae5; border-radius: 8px;">
                             <p style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; color: #059669;">{report.get("engagementSummary", {}).get("highly_engaged", 0)}</p>
-                            <p style="margin: 0; font-size: 12px; color: #065f46;">Highly Engaged</p>
+                            <p style="margin: 0; font-size: 12px; color: #065f46;">Active</p>
                         </td>
                         <td style="width: 5px;"></td>
                         <td style="width: 33%; padding: 15px; text-align: center; background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px;">
                             <p style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; color: #d97706;">{report.get("engagementSummary", {}).get("moderately_engaged", 0)}</p>
-                            <p style="margin: 0; font-size: 12px; color: #92400e;">Moderately Engaged</p>
+                            <p style="margin: 0; font-size: 12px; color: #92400e;">Moderate</p>
                         </td>
                         <td style="width: 5px;"></td>
                         <td style="width: 33%; padding: 15px; text-align: center; background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px;">
                             <p style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; color: #dc2626;">{report.get("engagementSummary", {}).get("at_risk", 0)}</p>
-                            <p style="margin: 0; font-size: 12px; color: #991b1b;">At Risk</p>
+                            <p style="margin: 0; font-size: 12px; color: #991b1b;">Passive</p>
                         </td>
                     </tr>
                 </table>

@@ -244,16 +244,37 @@ class SessionReportModel:
         if scores:
             avg_quiz_score = sum(scores) / len(scores)
         
-        # Engagement summary (mock for now - can be enhanced with cluster data)
+        # Engagement summary from REAL cluster data
+        report_cluster_map = {}
+        try:
+            for sid in [session_id]:
+                async for c in database.clusters.find({"sessionId": sid}):
+                    level = c.get("engagementLevel", "")
+                    if level in ("active", "moderate", "passive"):
+                        for sid_s in c.get("students", []):
+                            report_cluster_map[sid_s] = level
+            # Also try zoom ID
+            zoom_id = session.get("zoomMeetingId")
+            if zoom_id:
+                async for c in database.clusters.find({"sessionId": str(zoom_id)}):
+                    level = c.get("engagementLevel", "")
+                    if level in ("active", "moderate", "passive"):
+                        for sid_s in c.get("students", []):
+                            if sid_s not in report_cluster_map:
+                                report_cluster_map[sid_s] = level
+        except Exception:
+            pass
+
         engagement_summary = {
             "highly_engaged": 0,
             "moderately_engaged": 0,
             "at_risk": 0
         }
         for s in student_reports:
-            if s.quizScore and s.quizScore >= 80:
+            level = report_cluster_map.get(s.studentId, "")
+            if level == "active":
                 engagement_summary["highly_engaged"] += 1
-            elif s.quizScore and s.quizScore >= 50:
+            elif level == "moderate":
                 engagement_summary["moderately_engaged"] += 1
             else:
                 engagement_summary["at_risk"] += 1
@@ -563,6 +584,17 @@ class SessionReportModel:
                     metric["id"] = str(metric.get("_id", ""))
                     latency_data[student_id] = metric
         
+        # Get REAL cluster assignments from MongoDB
+        cluster_map = {}  # student_id → "active" / "moderate" / "passive"
+        for sid in [session_id] + ([str(zoom_meeting_id)] if zoom_meeting_id else []):
+            async for c in database.clusters.find({"sessionId": sid}):
+                level = c.get("engagementLevel", "")
+                if level in ("active", "moderate", "passive"):
+                    for s in c.get("students", []):
+                        cluster_map[s] = level
+        
+        print(f"📊 Report: Loaded {len(cluster_map)} cluster assignments")
+        
         # Build complete student reports for ALL students
         student_reports = []
         for participant in participants:
@@ -623,6 +655,7 @@ class SessionReportModel:
                 "quizDetails": quiz_details,
                 "averageConnectionQuality": latency_info.get("overall_quality"),
                 "connectionIssuesDetected": latency_info.get("overall_quality") in ["poor", "critical"],
+                "engagementLevel": cluster_map.get(student_id, "moderate"),
                 "latencyMetrics": {
                     "avgLatency": latency_info.get("avg_latency"),
                     "minLatency": latency_info.get("min_latency"),
@@ -641,17 +674,17 @@ class SessionReportModel:
         if scores:
             avg_quiz_score = sum(scores) / len(scores)
         
-        # Engagement summary
+        # Engagement summary from REAL cluster data (not quiz score thresholds)
         engagement_summary = {
             "highly_engaged": 0,
             "moderately_engaged": 0,
             "at_risk": 0
         }
         for s in student_reports:
-            score = s.get("quizScore")
-            if score and score >= 80:
+            level = s.get("engagementLevel", "")
+            if level == "active":
                 engagement_summary["highly_engaged"] += 1
-            elif score and score >= 50:
+            elif level == "moderate":
                 engagement_summary["moderately_engaged"] += 1
             else:
                 engagement_summary["at_risk"] += 1
