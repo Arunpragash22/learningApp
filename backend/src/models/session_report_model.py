@@ -156,10 +156,18 @@ class SessionReportModel:
             del assignment["_id"]
             assignments.append(assignment)
         
-        # Get questions for details
-        question_ids = list(set([a.get("questionId") for a in assignments if a.get("questionId")]))
+        # Get questions for details (from both assignments and quiz_answers)
+        question_id_set = set()
+        for a in assignments:
+            qid = a.get("questionId")
+            if qid:
+                question_id_set.add(qid)
+        for a in quiz_answers:
+            qid = a.get("questionId")
+            if qid:
+                question_id_set.add(qid)
         questions = {}
-        for qid in question_ids:
+        for qid in question_id_set:
             try:
                 q = await database.questions.find_one({"_id": ObjectId(qid)})
                 if q:
@@ -179,13 +187,21 @@ class SessionReportModel:
         for participant in participants:
             student_id = participant.get("studentId")
             
-            # Get student's quiz answers
+            # Get student's quiz answers and assignments
             student_answers = [a for a in quiz_answers if a.get("studentId") == student_id]
             student_assignments = [a for a in assignments if a.get("studentId") == student_id]
             
-            # Calculate quiz stats
-            correct_count = sum(1 for a in student_assignments if a.get("isCorrect"))
-            total_questions = len(student_assignments)
+            # Use assignments if available, otherwise fallback to quiz_answers
+            if student_assignments:
+                correct_count = sum(1 for a in student_assignments if a.get("isCorrect"))
+                total_questions = len(student_assignments)
+            elif student_answers:
+                correct_count = sum(1 for a in student_answers if a.get("isCorrect"))
+                total_questions = len(student_answers)
+            else:
+                correct_count = 0
+                total_questions = 0
+
             avg_time = None
             if student_answers:
                 times = [a.get("timeTaken", 0) for a in student_answers if a.get("timeTaken")]
@@ -193,18 +209,19 @@ class SessionReportModel:
             
             quiz_score = (correct_count / total_questions * 100) if total_questions > 0 else None
             
-            # Build quiz details
+            # Build quiz details from assignments or quiz_answers
             quiz_details = []
-            for assignment in student_assignments:
-                qid = assignment.get("questionId")
+            source = student_assignments if student_assignments else student_answers
+            for item in source:
+                qid = item.get("questionId")
                 q = questions.get(qid, {})
                 quiz_details.append(QuizSummary(
                     questionId=qid or "",
                     question=q.get("question", "Unknown question"),
                     correctAnswer=q.get("correctAnswer", -1),
-                    studentAnswer=assignment.get("answerIndex"),
-                    isCorrect=assignment.get("isCorrect"),
-                    timeTaken=assignment.get("timeTaken")
+                    studentAnswer=item.get("answerIndex"),
+                    isCorrect=item.get("isCorrect"),
+                    timeTaken=item.get("timeTaken")
                 ))
             
             # Calculate attendance duration
@@ -237,7 +254,9 @@ class SessionReportModel:
         
         # Calculate overall stats
         total_participants = len(participants)
-        total_questions_asked = len(set([a.get("questionId") for a in assignments]))
+        all_q_ids = set([a.get("questionId") for a in assignments])
+        all_q_ids.update([a.get("questionId") for a in quiz_answers])
+        total_questions_asked = len(all_q_ids - {None})
         
         avg_quiz_score = None
         scores = [s.quizScore for s in student_reports if s.quizScore is not None]
@@ -556,10 +575,18 @@ class SessionReportModel:
         
         print(f"📊 Report: Found {len(assignments)} question assignments")
         
-        # Get questions for details
-        question_ids = list(set([a.get("questionId") for a in assignments if a.get("questionId")]))
+        # Get questions for details (from both assignments and quiz_answers)
+        question_id_set = set()
+        for a in assignments:
+            qid = a.get("questionId")
+            if qid:
+                question_id_set.add(qid)
+        for a in quiz_answers:
+            qid = a.get("questionId")
+            if qid:
+                question_id_set.add(qid)
         questions = {}
-        for qid in question_ids:
+        for qid in question_id_set:
             try:
                 q = await database.questions.find_one({"_id": ObjectId(qid)})
                 if q:
@@ -600,13 +627,21 @@ class SessionReportModel:
         for participant in participants:
             student_id = participant.get("studentId")
             
-            # Get student's quiz answers
+            # Get student's quiz answers and assignments
             student_answers = [a for a in quiz_answers if a.get("studentId") == student_id]
             student_assignments = [a for a in assignments if a.get("studentId") == student_id]
             
-            # Calculate quiz stats
-            correct_count = sum(1 for a in student_assignments if a.get("isCorrect"))
-            total_questions = len(student_assignments)
+            # Use assignments if available, otherwise fallback to quiz_answers
+            if student_assignments:
+                correct_count = sum(1 for a in student_assignments if a.get("isCorrect"))
+                total_questions = len(student_assignments)
+            elif student_answers:
+                correct_count = sum(1 for a in student_answers if a.get("isCorrect"))
+                total_questions = len(student_answers)
+            else:
+                correct_count = 0
+                total_questions = 0
+
             avg_time = None
             if student_answers:
                 times = [a.get("timeTaken", 0) for a in student_answers if a.get("timeTaken")]
@@ -614,20 +649,21 @@ class SessionReportModel:
             
             quiz_score = (correct_count / total_questions * 100) if total_questions > 0 else None
             
-            # Build quiz details with ALL question info
+            # Build quiz details from assignments or quiz_answers as fallback
             quiz_details = []
-            for assignment in student_assignments:
-                qid = assignment.get("questionId")
+            source = student_assignments if student_assignments else student_answers
+            for item in source:
+                qid = item.get("questionId")
                 q = questions.get(qid, {})
                 quiz_details.append({
                     "questionId": qid or "",
                     "question": q.get("question", "Unknown question"),
                     "options": q.get("options", []),
                     "correctAnswer": q.get("correctAnswer", -1),
-                    "studentAnswer": assignment.get("answerIndex"),
-                    "isCorrect": assignment.get("isCorrect"),
-                    "timeTaken": assignment.get("timeTaken"),
-                    "answeredAt": assignment.get("answeredAt")
+                    "studentAnswer": item.get("answerIndex"),
+                    "isCorrect": item.get("isCorrect"),
+                    "timeTaken": item.get("timeTaken"),
+                    "answeredAt": item.get("answeredAt", item.get("timestamp"))
                 })
             
             # Calculate attendance duration
@@ -667,7 +703,9 @@ class SessionReportModel:
         
         # Calculate overall stats
         total_participants = len(participants)
-        total_questions_asked = len(set([a.get("questionId") for a in assignments]))
+        all_q_ids = set([a.get("questionId") for a in assignments])
+        all_q_ids.update([a.get("questionId") for a in quiz_answers])
+        total_questions_asked = len(all_q_ids - {None})
         
         avg_quiz_score = None
         scores = [s["quizScore"] for s in student_reports if s.get("quizScore") is not None]

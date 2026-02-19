@@ -234,6 +234,7 @@ class QuizScheduler:
         from ..database.connection import db
         from .ws_manager import ws_manager
         from ..models.cluster_model import ClusterModel
+        from ..models.question_assignment_model import QuestionAssignmentModel
 
         try:
             # ── 1. Find session doc ─────────────────────────────────────
@@ -413,6 +414,10 @@ class QuizScheduler:
                     ws_manager.last_student_quiz.setdefault(room_id, {})[sid_val] = {
                         "message": msg, "sent_at": datetime.now()
                     }
+                    try:
+                        await QuestionAssignmentModel.create(room_id, sid_val, str(q["_id"]), 0)
+                    except Exception:
+                        pass
                     print(f"   ✅ Sent to {sid_val[:12]}...")
                 return ok
 

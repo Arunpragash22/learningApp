@@ -198,25 +198,44 @@ async def get_quiz_performance_report(
         if session.get("instructorId") != instructor_id:
             raise HTTPException(status_code=403, detail="You can only view reports for your own sessions")
         
-        # Get question assignments for this session
+        # Resolve all session IDs (MongoDB + Zoom)
+        zoom_meeting_id = session.get("zoomMeetingId")
+        session_ids = [session_id]
+        if zoom_meeting_id:
+            session_ids.append(str(zoom_meeting_id))
+
+        # Get question assignments for this session (check all IDs)
         assignments = []
-        async for assignment in db.database.question_assignments.find({"sessionId": session_id}):
-            assignments.append(assignment)
+        seen_assign = set()
+        for sid in session_ids:
+            async for assignment in db.database.question_assignments.find({"sessionId": sid}):
+                aid = str(assignment["_id"])
+                if aid not in seen_assign:
+                    seen_assign.add(aid)
+                    assignments.append(assignment)
         
-        # Get quiz answers for this session
+        # Get quiz answers for this session (check all IDs)
         quiz_answers = []
-        async for answer in db.database.quiz_answers.find({"sessionId": session_id}):
-            quiz_answers.append(answer)
+        seen_answers = set()
+        for sid in session_ids:
+            async for answer in db.database.quiz_answers.find({"sessionId": sid}):
+                aid = str(answer["_id"])
+                if aid not in seen_answers:
+                    seen_answers.add(aid)
+                    quiz_answers.append(answer)
         
-        # Get participants for this session
+        # Get participants for this session (check all IDs)
         participants = {}
-        async for p in db.database.session_participants.find({"sessionId": session_id}):
-            participants[p.get("studentId")] = {
-                "studentName": p.get("studentName", "Unknown"),
-                "studentEmail": p.get("studentEmail", "")
-            }
+        for sid in session_ids:
+            async for p in db.database.session_participants.find({"sessionId": sid}):
+                student_id = p.get("studentId")
+                if student_id and student_id not in participants:
+                    participants[student_id] = {
+                        "studentName": p.get("studentName", "Unknown"),
+                        "studentEmail": p.get("studentEmail", "")
+                    }
         
-        # Aggregate performance by student
+        # Aggregate performance by student - prefer assignments, fallback to quiz_answers
         student_performance = {}
         
         for assignment in assignments:
@@ -248,6 +267,33 @@ async def get_quiz_performance_report(
                     student_performance[student_id]["answeredCount"] += 1
             else:
                 student_performance[student_id]["unanswered"] += 1
+
+        # Fallback: for students with quiz_answers but no assignments
+        for answer in quiz_answers:
+            student_id = answer.get("studentId")
+            if student_id not in student_performance:
+                student_info = participants.get(student_id, {})
+                student_performance[student_id] = {
+                    "studentId": student_id,
+                    "studentName": student_info.get("studentName", "Unknown"),
+                    "studentEmail": student_info.get("studentEmail", ""),
+                    "totalQuestions": 0,
+                    "correctAnswers": 0,
+                    "incorrectAnswers": 0,
+                    "unanswered": 0,
+                    "totalResponseTime": 0,
+                    "answeredCount": 0,
+                    "_from_answers": True
+                }
+            if student_performance[student_id].get("_from_answers"):
+                student_performance[student_id]["totalQuestions"] += 1
+                if answer.get("isCorrect"):
+                    student_performance[student_id]["correctAnswers"] += 1
+                else:
+                    student_performance[student_id]["incorrectAnswers"] += 1
+                if answer.get("timeTaken"):
+                    student_performance[student_id]["totalResponseTime"] += answer.get("timeTaken")
+                    student_performance[student_id]["answeredCount"] += 1
         
         # Calculate scores and averages
         performance_list = []
@@ -264,7 +310,7 @@ async def get_quiz_performance_report(
                 "totalQuestions": total,
                 "correctAnswers": correct,
                 "incorrectAnswers": perf["incorrectAnswers"],
-                "unanswered": perf["unanswered"],
+                "unanswered": perf.get("unanswered", 0),
                 "score": round(score, 1),
                 "averageResponseTime": round(avg_time, 2) if avg_time else None
             })
@@ -276,11 +322,15 @@ async def get_quiz_performance_report(
         total_students = len(performance_list)
         avg_score = sum(p["score"] for p in performance_list) / total_students if total_students > 0 else 0
         
+        all_q_ids = set(a.get("questionId") for a in assignments)
+        all_q_ids.update(a.get("questionId") for a in quiz_answers)
+        all_q_ids.discard(None)
+
         return {
             "success": True,
             "sessionId": session_id,
             "sessionName": session.get("title", ""),
-            "totalQuestions": len(set(a.get("questionId") for a in assignments)),
+            "totalQuestions": len(all_q_ids),
             "totalParticipants": total_students,
             "classAverageScore": round(avg_score, 1),
             "studentPerformance": performance_list

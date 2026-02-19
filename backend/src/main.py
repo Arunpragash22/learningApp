@@ -361,6 +361,7 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
     from src.database.connection import get_database
     from bson import ObjectId
     from src.models.cluster_model import ClusterModel
+    from src.models.question_assignment_model import QuestionAssignmentModel
 
     try:
         body = await request.json()
@@ -431,11 +432,17 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
                 "triggeredAt": datetime.now().isoformat()
             }
             sent_count = 0
+            q_id = question_data.get("id", "")
             for student_id, data in all_participants.items():
                 msg = {**message, "sessionId": data["room_id"], "studentId": student_id}
                 ok = await ws_manager.send_to_student_in_session(data["room_id"], student_id, msg)
                 if ok:
                     sent_count += 1
+                    if q_id:
+                        try:
+                            await QuestionAssignmentModel.create(data["room_id"], student_id, q_id, 0)
+                        except Exception:
+                            pass
             print(f"✅ Phase 1: Sent generic question to {sent_count}/{len(all_participants)} students")
             return {"success": True, "sessionId": session_id, "sentTo": sent_count,
                     "message": f"Generic question sent to {sent_count} students"}
@@ -501,6 +508,10 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
             ok = await ws_manager.send_to_student_in_session(room_id, student_id, msg)
             if ok:
                 sent_count += 1
+                try:
+                    await QuestionAssignmentModel.create(room_id, student_id, str(q["_id"]), 0)
+                except Exception:
+                    pass
                 print(f"   ✅ {name} (cluster={student_cluster}) → [{q.get('questionType')}] {q.get('category', 'General')}")
 
         print(f"✅ Phase 2: Sent cluster-matched questions to {sent_count}/{len(all_participants)} students")
