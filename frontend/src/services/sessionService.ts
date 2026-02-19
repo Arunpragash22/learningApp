@@ -129,8 +129,6 @@ export const sessionService = {
 
       if (!res.ok) {
         const errorText = await res.text();
-        console.error("Failed to download report:", errorText);
-        // Try to parse error message from JSON response
         try {
           const errorJson = JSON.parse(errorText);
           return { success: false, error: errorJson.detail || 'Failed to download report' };
@@ -141,44 +139,34 @@ export const sessionService = {
 
       const htmlContent = await res.text();
       const pdfFilename = filename || `session_report_${sessionId}.pdf`;
-      
+
       try {
-        // Create an iframe to render and print the HTML
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = 'none';
-        document.body.appendChild(iframe);
-        
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (!iframeDoc) {
-          throw new Error('Could not access iframe document');
-        }
-        
-        // Write the HTML content to the iframe
-        iframeDoc.open();
-        iframeDoc.write(htmlContent);
-        iframeDoc.close();
-        
-        // Wait for content to fully render
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Trigger print dialog (user can save as PDF)
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-        
-        // Clean up after a delay
-        setTimeout(() => {
-          document.body.removeChild(iframe);
-        }, 1000);
-        
-        return { success: true, error: 'Use "Save as PDF" in the print dialog' };
+        const html2pdf = (await import('html2pdf.js')).default;
+
+        const container = document.createElement('div');
+        container.innerHTML = htmlContent;
+        container.style.position = 'fixed';
+        container.style.left = '-9999px';
+        container.style.top = '0';
+        container.style.width = '210mm';
+        document.body.appendChild(container);
+
+        await html2pdf()
+          .set({
+            margin: [10, 10, 10, 10],
+            filename: pdfFilename,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, logging: false },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+          })
+          .from(container)
+          .save();
+
+        document.body.removeChild(container);
+        return { success: true, error: 'Report downloaded as PDF' };
       } catch (pdfError) {
         console.error("PDF generation error:", pdfError);
-        // Fallback to HTML download if print fails
         const blob = new Blob([htmlContent], { type: 'text/html' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -188,7 +176,7 @@ export const sessionService = {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        return { success: true, error: 'Downloaded as HTML' };
+        return { success: true, error: 'Downloaded as HTML (PDF generation failed)' };
       }
     } catch (err) {
       console.error("Report download error:", err);

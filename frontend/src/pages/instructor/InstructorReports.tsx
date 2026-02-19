@@ -19,6 +19,7 @@ import {
 import { Card, CardHeader, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { sessionService } from '../../services/sessionService';
 import { toast } from 'sonner';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -532,6 +533,23 @@ export const InstructorReports = () => {
     setDownloading(false);
   };
 
+  const handleDownloadPdf = async (sessionId: string, sessionTitle: string) => {
+    setDownloading(true);
+    toast.info(`Generating PDF for ${sessionTitle}...`);
+    try {
+      const filename = `report_${sessionTitle.replace(/\s+/g, '_')}.pdf`;
+      const result = await sessionService.downloadReport(sessionId, filename);
+      if (result.success) {
+        toast.success('Report downloaded as PDF');
+      } else {
+        toast.error(result.error || 'Failed to download report');
+      }
+    } catch {
+      toast.error('Failed to download report');
+    }
+    setDownloading(false);
+  };
+
   // ============================================================
   // MYSQL SYNC FUNCTIONS
   // ============================================================
@@ -755,10 +773,10 @@ export const InstructorReports = () => {
                               variant="outline"
                               size="sm"
                               leftIcon={<DownloadIcon className="h-3 w-3" />}
-                              onClick={() => downloadFullSessionReport(report.sessionId, report.sessionTitle)}
+                              onClick={() => handleDownloadPdf(report.sessionId, report.sessionTitle)}
                               disabled={downloading}
                             >
-                              Download
+                              PDF
                             </Button>
                           </div>
                         </td>
@@ -938,13 +956,13 @@ export const InstructorReports = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            downloadFullSessionReport(session.sessionId, session.sessionName);
+                            handleDownloadPdf(session.sessionId, session.sessionName);
                           }}
                           className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-blue-600 hover:text-blue-700 py-1 border border-blue-200 dark:border-blue-800 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                           disabled={downloading}
                         >
                           <DownloadIcon className="h-3 w-3" />
-                          Download Report
+                          Download PDF
                         </button>
                       </div>
                     ))}
@@ -1003,10 +1021,10 @@ export const InstructorReports = () => {
                               variant="outline"
                               size="sm"
                               leftIcon={<DownloadIcon className="h-3 w-3" />}
-                              onClick={() => downloadFullSessionReport(session.sessionId, session.sessionName)}
+                              onClick={() => handleDownloadPdf(session.sessionId, session.sessionName)}
                               disabled={downloading}
                             >
-                              Download
+                              PDF
                             </Button>
                           </td>
                         </tr>
