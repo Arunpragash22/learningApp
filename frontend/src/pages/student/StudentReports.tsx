@@ -385,40 +385,6 @@ export const StudentReports = () => {
         </div>
       </div>
 
-      {/* Dashboard Stats */}
-      {dashboardStats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="p-4 text-center">
-            <CalendarIcon className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {dashboardStats.sessionsAttended}
-            </p>
-            <p className="text-sm text-gray-500">Sessions Attended</p>
-          </Card>
-          <Card className="p-4 text-center">
-            <FileTextIcon className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {dashboardStats.totalQuizQuestions}
-            </p>
-            <p className="text-sm text-gray-500">Quiz Questions</p>
-          </Card>
-          <Card className="p-4 text-center">
-            <AwardIcon className="h-8 w-8 text-purple-500 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {dashboardStats.overallQuizScore}%
-            </p>
-            <p className="text-sm text-gray-500">Overall Score</p>
-          </Card>
-          <Card className="p-4 text-center">
-            <TimerIcon className="h-8 w-8 text-orange-500 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {dashboardStats.totalAttendanceMinutes}
-            </p>
-            <p className="text-sm text-gray-500">Total Minutes</p>
-          </Card>
-        </div>
-      )}
-
       {/* Tabs */}
       <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
         {[
@@ -590,9 +556,6 @@ export const StudentReports = () => {
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Session</th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Course</th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Join Time</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Leave Time</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Duration</th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
                         </tr>
                       </thead>
@@ -607,15 +570,6 @@ export const StudentReports = () => {
                             </td>
                             <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                               {record.sessionDate}
-                            </td>
-                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                              {record.joinTime ? new Date(record.joinTime).toLocaleTimeString() : 'N/A'}
-                            </td>
-                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                              {record.leaveTime ? new Date(record.leaveTime).toLocaleTimeString() : '-'}
-                            </td>
-                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                              {record.durationMinutes !== null ? `${record.durationMinutes} min` : 'N/A'}
                             </td>
                             <td className="px-4 py-3">
                               {getStatusBadge(record.sessionStatus)}
