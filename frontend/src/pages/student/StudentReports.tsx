@@ -368,14 +368,6 @@ export const StudentReports = () => {
         </div>
         <div className="flex gap-2">
           <Button
-            variant="primary"
-            leftIcon={downloading ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <DownloadIcon className="h-4 w-4" />}
-            onClick={handleDownload}
-            disabled={downloading}
-          >
-            {downloading ? 'Downloading...' : 'Download CSV'}
-          </Button>
-          <Button
             variant="outline"
             leftIcon={<RefreshCwIcon className="h-4 w-4" />}
             onClick={refreshCurrentTab}
@@ -421,7 +413,7 @@ export const StudentReports = () => {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    📦 My Session Reports (Stored in MongoDB)
+                    My Session Reports
                   </h3>
                   <div className="flex items-center gap-2">
                     <Badge variant="success">{storedReports.length} Reports</Badge>

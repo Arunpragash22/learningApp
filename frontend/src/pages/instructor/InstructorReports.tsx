@@ -602,14 +602,6 @@ export const InstructorReports = () => {
         </div>
         <div className="flex gap-2">
           <Button
-            variant="primary"
-            leftIcon={downloading ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <DownloadIcon className="h-4 w-4" />}
-            onClick={handleDownload}
-            disabled={downloading}
-          >
-            {downloading ? 'Downloading...' : 'Download CSV'}
-          </Button>
-          <Button
             variant="outline"
             leftIcon={<RefreshCwIcon className="h-4 w-4" />}
             onClick={() => {
@@ -673,7 +665,7 @@ export const InstructorReports = () => {
           <CardHeader>
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                📦 Stored Reports (MongoDB)
+                Stored Reports
               </h3>
               <div className="flex items-center gap-2">
                 <Badge variant="success">{storedReports.length} Reports</Badge>
@@ -688,7 +680,7 @@ export const InstructorReports = () => {
               </div>
             </div>
             <p className="text-sm text-gray-500 mt-1">
-              These reports are automatically generated and stored in MongoDB when you end a session.
+              These reports are automatically generated when you end a session.
             </p>
           </CardHeader>
           <CardContent>
