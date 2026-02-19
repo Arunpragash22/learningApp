@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import {
   User, Mail, Calendar, Shield, Edit,
-  Save, X, Lock, Bell, Settings,
+  Save, X, Settings,
   GraduationCap, Award, TrendingUp, Activity,
   BookOpen, Users, HelpCircle, Clock, Loader2
 } from 'lucide-react';
@@ -340,18 +340,6 @@ export const UserProfile = () => {
                       </p>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center justify-between py-3">
-                  <div className="flex items-center">
-                    <Lock className="h-5 w-5 text-gray-400 mr-3" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Change Password</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Update your account password</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Change
-                  </Button>
                 </div>
               </div>
             </div>
