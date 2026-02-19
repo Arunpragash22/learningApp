@@ -824,21 +824,19 @@ class SessionReportModel:
         - Students: Get filtered report with only their own data
         
         For students, matches by studentId OR email (for Zoom webhook participants).
+        If a student's stored data shows 0 quiz questions but quiz_answers exist,
+        the data is enriched on-the-fly.
         """
         # First, try to get the stored master report
         master_report = await SessionReportModel.get_stored_master_report(session_id)
         
         if not master_report:
-            # No stored report - generate fresh one (fallback for older sessions)
             return await SessionReportModel.generate_report(session_id, user_id, user_role, user_email)
         
-        # Clone the report for filtering
         import copy
         report = copy.deepcopy(master_report)
         
         if user_role == "student":
-            # Filter to only show this student's data
-            # Match by studentId OR email (for Zoom webhook participants who may have different IDs)
             def matches_student(s):
                 if s.get("studentId") == user_id:
                     return True
@@ -848,12 +846,89 @@ class SessionReportModel:
             
             report["students"] = [s for s in report.get("students", []) if matches_student(s)]
             report["reportType"] = "student_personal"
-            # Remove raw data from student view
             report.pop("rawAssignments", None)
             report.pop("rawQuizAnswers", None)
             report.pop("allQuestions", None)
+            
+            # Enrich stale student data: if stored report shows 0 questions,
+            # check quiz_answers / question_assignments directly
+            if report["students"]:
+                student_data = report["students"][0]
+                if student_data.get("totalQuestions", 0) == 0:
+                    await SessionReportModel._enrich_student_quiz_data(
+                        session_id, student_data, user_id
+                    )
         else:
             report["reportType"] = "instructor_full"
         
         return report
+
+    @staticmethod
+    async def _enrich_student_quiz_data(session_id: str, student_data: Dict, student_id: str):
+        """
+        Fill in quiz performance for a student when the stored report has 0 questions.
+        Checks question_assignments first, then falls back to quiz_answers.
+        """
+        database = get_database()
+        if database is None:
+            return
+
+        session = await database.sessions.find_one({"_id": ObjectId(session_id)})
+        zoom_id = session.get("zoomMeetingId") if session else None
+        session_ids = [session_id] + ([str(zoom_id)] if zoom_id else [])
+
+        items = []
+        source_label = None
+
+        for sid in session_ids:
+            async for a in database.question_assignments.find({"sessionId": sid, "studentId": student_id}):
+                items.append(a)
+            if items:
+                source_label = "assignments"
+                break
+
+        if not items:
+            for sid in session_ids:
+                async for a in database.quiz_answers.find({"sessionId": sid, "studentId": student_id}):
+                    items.append(a)
+                if items:
+                    source_label = "quiz_answers"
+                    break
+
+        if not items:
+            return
+
+        correct = sum(1 for a in items if a.get("isCorrect"))
+        total = len(items)
+        times = [a.get("timeTaken") for a in items if a.get("timeTaken")]
+        avg_time = (sum(times) / len(times)) if times else None
+
+        student_data["totalQuestions"] = total
+        student_data["correctAnswers"] = correct
+        student_data["incorrectAnswers"] = total - correct
+        student_data["quizScore"] = round((correct / total * 100), 1) if total > 0 else None
+        if avg_time is not None:
+            student_data["averageResponseTime"] = round(avg_time, 2)
+
+        quiz_details = []
+        for item in items:
+            qid = item.get("questionId")
+            q = {}
+            try:
+                q_doc = await database.questions.find_one({"_id": ObjectId(qid)})
+                if q_doc:
+                    q = q_doc
+            except Exception:
+                pass
+            ts_field = "answeredAt" if source_label == "assignments" else "timestamp"
+            quiz_details.append({
+                "questionId": qid or "",
+                "question": q.get("question", "Unknown question"),
+                "correctAnswer": q.get("correctAnswer", -1),
+                "studentAnswer": item.get("answerIndex"),
+                "isCorrect": item.get("isCorrect"),
+                "timeTaken": item.get("timeTaken"),
+                "answeredAt": item.get(ts_field)
+            })
+        student_data["quizDetails"] = quiz_details
 

@@ -27,6 +27,36 @@ from src.models.session_report_model import SessionReportModel
 router = APIRouter(prefix="/api/student/reports", tags=["Student Reports"])
 
 
+async def _enrich_quiz_from_db(session_id: str, student_id: str) -> dict:
+    """Check question_assignments then quiz_answers for a student's quiz stats."""
+    session = None
+    try:
+        session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
+    except Exception:
+        pass
+    zoom_id = session.get("zoomMeetingId") if session else None
+    session_ids = [session_id] + ([str(zoom_id)] if zoom_id else [])
+
+    items = []
+    for sid in session_ids:
+        async for a in db.database.question_assignments.find({"sessionId": sid, "studentId": student_id}):
+            items.append(a)
+        if items:
+            break
+
+    if not items:
+        for sid in session_ids:
+            async for a in db.database.quiz_answers.find({"sessionId": sid, "studentId": student_id}):
+                items.append(a)
+            if items:
+                break
+
+    total = len(items)
+    correct = sum(1 for a in items if a.get("isCorrect"))
+    score = round((correct / total * 100), 1) if total > 0 else None
+    return {"total": total, "correct": correct, "score": score}
+
+
 def require_student(user: dict = Depends(get_current_user)):
     """Middleware to ensure user is a student"""
     if user.get("role") not in ["student"]:
@@ -572,6 +602,18 @@ async def get_all_my_stored_reports(user: dict = Depends(require_student)):
                     break
             
             if student_data:
+                my_total = student_data.get("totalQuestions", 0)
+                my_correct = student_data.get("correctAnswers", 0)
+                my_score = student_data.get("quizScore")
+
+                # Enrich from quiz_answers if stored data is stale (0 questions)
+                if my_total == 0:
+                    sid = report.get("sessionId")
+                    enrich = await _enrich_quiz_from_db(sid, student_id)
+                    my_total = enrich["total"]
+                    my_correct = enrich["correct"]
+                    my_score = enrich["score"]
+
                 reports.append({
                     "reportId": report_id,
                     "sessionId": report.get("sessionId"),
@@ -579,9 +621,9 @@ async def get_all_my_stored_reports(user: dict = Depends(require_student)):
                     "courseName": report.get("courseName"),
                     "sessionDate": report.get("sessionDate"),
                     "generatedAt": report.get("generatedAt"),
-                    "myTotalQuestions": student_data.get("totalQuestions", 0),
-                    "myCorrectAnswers": student_data.get("correctAnswers", 0),
-                    "myScore": student_data.get("quizScore"),
+                    "myTotalQuestions": my_total,
+                    "myCorrectAnswers": my_correct,
+                    "myScore": my_score,
                     "myAttendanceDuration": student_data.get("attendanceDuration")
                 })
         
@@ -625,6 +667,15 @@ async def get_all_my_stored_reports(user: dict = Depends(require_student)):
                         break
                 
                 if student_data:
+                    my_total = student_data.get("totalQuestions", 0)
+                    my_correct = student_data.get("correctAnswers", 0)
+                    my_score = student_data.get("quizScore")
+                    if my_total == 0:
+                        enrich = await _enrich_quiz_from_db(report.get("sessionId"), student_id)
+                        my_total = enrich["total"]
+                        my_correct = enrich["correct"]
+                        my_score = enrich["score"]
+
                     reports.append({
                         "reportId": report_id,
                         "sessionId": report.get("sessionId"),
@@ -632,9 +683,9 @@ async def get_all_my_stored_reports(user: dict = Depends(require_student)):
                         "courseName": report.get("courseName"),
                         "sessionDate": report.get("sessionDate"),
                         "generatedAt": report.get("generatedAt"),
-                        "myTotalQuestions": student_data.get("totalQuestions", 0),
-                        "myCorrectAnswers": student_data.get("correctAnswers", 0),
-                        "myScore": student_data.get("quizScore"),
+                        "myTotalQuestions": my_total,
+                        "myCorrectAnswers": my_correct,
+                        "myScore": my_score,
                         "myAttendanceDuration": student_data.get("attendanceDuration")
                     })
         
@@ -674,6 +725,7 @@ async def get_all_my_stored_reports(user: dict = Depends(require_student)):
                             elif joined_at:
                                 duration = int((datetime.utcnow() - joined_at).total_seconds() / 60)
                             
+                            enrich = await _enrich_quiz_from_db(session_id, student_id)
                             reports.append({
                                 "reportId": f"live_{session_id}",
                                 "sessionId": session_id,
@@ -681,9 +733,9 @@ async def get_all_my_stored_reports(user: dict = Depends(require_student)):
                                 "courseName": session.get("course", ""),
                                 "sessionDate": session.get("date", ""),
                                 "generatedAt": session.get("endedAt") or session.get("actualEndTime"),
-                                "myTotalQuestions": 0,
-                                "myCorrectAnswers": 0,
-                                "myScore": None,
+                                "myTotalQuestions": enrich["total"],
+                                "myCorrectAnswers": enrich["correct"],
+                                "myScore": enrich["score"],
                                 "myAttendanceDuration": duration,
                                 "source": "session_participants"
                             })
