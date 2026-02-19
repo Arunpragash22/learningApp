@@ -27,6 +27,25 @@ from src.models.session_report_model import SessionReportModel
 router = APIRouter(prefix="/api/student/reports", tags=["Student Reports"])
 
 
+async def _resolve_session_doc(sid: str):
+    """Resolve a session by MongoDB ObjectId or Zoom meeting ID."""
+    try:
+        s = await db.database.sessions.find_one({"_id": ObjectId(sid)})
+        if s:
+            return s
+    except Exception:
+        pass
+    s = await db.database.sessions.find_one({"zoomMeetingId": sid})
+    if not s:
+        try:
+            s = await db.database.sessions.find_one({"zoomMeetingId": int(sid)})
+        except (ValueError, TypeError):
+            pass
+    if not s:
+        s = await db.database.sessions.find_one({"zoomMeetingId": str(sid)})
+    return s
+
+
 async def _enrich_quiz_from_db(session_id: str, student_id: str) -> dict:
     """Check question_assignments then quiz_answers for a student's quiz stats."""
     session = None
@@ -91,11 +110,7 @@ async def get_my_attendance_report(user: dict = Depends(require_student)):
                 return
             seen_sessions.add(session_id)
             
-            # Get session details
-            try:
-                session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
-            except:
-                session = None
+            session = await _resolve_session_doc(session_id)
             
             if not session:
                 return
@@ -174,12 +189,7 @@ async def get_my_quiz_report(user: dict = Depends(require_student)):
         quiz_by_session = {}
         sessions_from_assignments = set()
 
-        # Helper to resolve session → session doc
-        async def _get_session(sid):
-            try:
-                return await db.database.sessions.find_one({"_id": ObjectId(sid)})
-            except Exception:
-                return None
+        _get_session = _resolve_session_doc
 
         # Helper to init session entry
         async def _ensure_session(sid):
@@ -336,11 +346,7 @@ async def get_my_session_history(user: dict = Depends(require_student)):
         async for participant in db.database.session_participants.find({"studentId": student_id}):
             session_id = participant.get("sessionId")
             
-            # Get session details
-            try:
-                session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
-            except:
-                session = None
+            session = await _resolve_session_doc(session_id)
             
             if not session:
                 continue
@@ -509,11 +515,7 @@ async def get_my_stored_session_report(
         if not participant:
             raise HTTPException(status_code=403, detail="You did not participate in this session")
         
-        # Get session info
-        try:
-            session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
-        except:
-            session = None
+        session = await _resolve_session_doc(session_id)
         
         # Get stored report from MongoDB
         stored_report = await SessionReportModel.get_stored_master_report(session_id)
@@ -705,7 +707,7 @@ async def get_all_my_stored_reports(user: dict = Depends(require_student)):
             # Get completed sessions from this list
             for session_id in participated_session_ids:
                 try:
-                    session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
+                    session = await _resolve_session_doc(session_id)
                     if session and session.get("status") == "completed":
                         # Get participant data for this student
                         participant = await db.database.session_participants.find_one({
