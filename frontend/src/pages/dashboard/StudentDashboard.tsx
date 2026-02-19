@@ -87,7 +87,7 @@ const showBrowserNotification = (title: string, body: string) => {
 // --------------------------------------
 export const StudentDashboard = () => {
   const { user } = useAuth();
-  const { connectedSessionId, incomingQuiz, receiveQuizFromPoll, sessionStatsInvalidated } = useSessionConnection();
+  const { connectedSessionId, incomingQuiz, receiveQuizFromPoll, sessionStatsInvalidated, leaveSession } = useSessionConnection();
   const [sessions, setSessions] = useState<Session[]>([]);
   const lastCountedQuestionIdRef = useRef<string | null>(null);
 
@@ -269,6 +269,7 @@ export const StudentDashboard = () => {
 
         if (data.type === "meeting_ended") {
           loadSessions();
+          leaveSession();
           toast.info("Meeting has ended");
         }
       } catch (e) {

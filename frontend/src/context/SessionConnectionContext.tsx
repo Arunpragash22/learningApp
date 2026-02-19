@@ -166,54 +166,83 @@ export function SessionConnectionProvider({ children }: { children: React.ReactN
     [user, closeWs, setConnectedSessionId, showQuizIfNew]
   );
 
-  /** Restore WebSocket when app loads with connectedSessionId in localStorage (e.g. after refresh). */
+  /** Restore WebSocket when app loads with connectedSessionId in localStorage (e.g. after refresh).
+   *  First checks if the session is still live; if not, clears the stored state. */
   useEffect(() => {
     const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
     if (!stored || !user?.id || user?.role === "instructor" || user?.role === "admin") return;
     if (wsRef.current && currentSessionKeyRef.current === stored) return;
 
+    const apiBase = import.meta.env.VITE_API_URL || "http://localhost:8000";
     const wsBase =
       import.meta.env.VITE_WS_URL ||
-      (import.meta.env.VITE_API_URL || "").replace("/api", "").replace("http", "ws") ||
+      apiBase.replace("/api", "").replace("http", "ws") ||
       "ws://localhost:8000";
     const studentName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email?.split("@")[0] || "Student";
-    const url = `${wsBase}/ws/session/${stored}/${user.id}?student_name=${encodeURIComponent(studentName)}&student_email=${encodeURIComponent(user.email || "")}`;
 
-    closeWs();
-    const ws = new WebSocket(url);
-    ws.onopen = () => {
-      setConnectedSessionId(stored);
-      currentSessionKeyRef.current = stored;
-      wsRef.current = ws;
-      const sendPing = () => {
-        if (ws.readyState === WebSocket.OPEN) ws.send("ping");
+    const reconnect = () => {
+      const url = `${wsBase}/ws/session/${stored}/${user.id}?student_name=${encodeURIComponent(studentName)}&student_email=${encodeURIComponent(user.email || "")}`;
+
+      closeWs();
+      const ws = new WebSocket(url);
+      ws.onopen = () => {
+        setConnectedSessionId(stored);
+        currentSessionKeyRef.current = stored;
+        wsRef.current = ws;
+        const sendPing = () => {
+          if (ws.readyState === WebSocket.OPEN) ws.send("ping");
+        };
+        sendPing();
+        pingIntervalRef.current = setInterval(sendPing, WS_PING_INTERVAL_MS);
       };
-      sendPing();
-      pingIntervalRef.current = setInterval(sendPing, WS_PING_INTERVAL_MS);
-    };
-    ws.onclose = () => {
-      if (wsRef.current === ws && currentSessionKeyRef.current === stored) {
-        setConnectedSessionId(null);
-      }
-      wsRef.current = null;
-      currentSessionKeyRef.current = null;
-      if (pingIntervalRef.current) {
-        clearInterval(pingIntervalRef.current);
-        pingIntervalRef.current = null;
-      }
-    };
-    ws.onmessage = (event) => {
-      if (event.data === "pong") return;
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === "quiz") showQuizIfNew(data);
-        else if (data.type === "meeting_ended") {
-          toast.info("Meeting has ended");
-          leaveSession();
+      ws.onclose = () => {
+        if (wsRef.current === ws && currentSessionKeyRef.current === stored) {
+          setConnectedSessionId(null);
         }
-      } catch (_) {}
+        wsRef.current = null;
+        currentSessionKeyRef.current = null;
+        if (pingIntervalRef.current) {
+          clearInterval(pingIntervalRef.current);
+          pingIntervalRef.current = null;
+        }
+      };
+      ws.onmessage = (event) => {
+        if (event.data === "pong") return;
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "quiz") showQuizIfNew(data);
+          else if (data.type === "meeting_ended") {
+            toast.info("Meeting has ended");
+            leaveSession();
+          }
+        } catch (_) {}
+      };
+      wsRef.current = ws;
     };
-    wsRef.current = ws;
+
+    // Check if the session is still live before reconnecting
+    (async () => {
+      try {
+        const token = sessionStorage.getItem("access_token") || "";
+        const res = await fetch(`${apiBase}/api/sessions/${stored}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const status = (data.status || data.session?.status || "").toLowerCase();
+          if (status === "completed" || status === "ended") {
+            console.log("Session already ended, clearing stored connection.");
+            localStorage.removeItem(STORAGE_KEY);
+            setConnectedSessionId(null);
+            return;
+          }
+        }
+      } catch (_) {
+        // If check fails, try reconnecting anyway
+      }
+      reconnect();
+    })();
+
     return () => {
       closeWs();
     };
