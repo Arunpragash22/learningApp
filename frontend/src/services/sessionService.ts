@@ -143,20 +143,38 @@ export const sessionService = {
       try {
         const html2pdf = (await import('html2pdf.js')).default;
 
+        // Parse the full HTML document and extract body + styles
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlContent, 'text/html');
+
         const container = document.createElement('div');
-        container.innerHTML = htmlContent;
-        container.style.position = 'fixed';
+
+        // Copy inline styles from the parsed document
+        const styles = doc.querySelectorAll('style');
+        styles.forEach((s) => {
+          const styleEl = document.createElement('style');
+          styleEl.textContent = s.textContent;
+          container.appendChild(styleEl);
+        });
+
+        // Copy the body content
+        container.innerHTML += doc.body.innerHTML;
+        container.style.position = 'absolute';
         container.style.left = '-9999px';
         container.style.top = '0';
-        container.style.width = '210mm';
+        container.style.width = '800px';
+        container.style.background = '#ffffff';
         document.body.appendChild(container);
+
+        // Wait for rendering
+        await new Promise(resolve => setTimeout(resolve, 300));
 
         await html2pdf()
           .set({
-            margin: [10, 10, 10, 10],
+            margin: [5, 5, 5, 5],
             filename: pdfFilename,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, logging: false },
+            html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
             pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
           })
