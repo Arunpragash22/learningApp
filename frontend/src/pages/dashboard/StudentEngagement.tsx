@@ -9,6 +9,7 @@ import { Activity, Target, Download, FileText, Loader2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { sessionService } from '../../services/sessionService';
 import { clusteringService, StudentEngagementData } from '../../services/clusteringService';
+import { feedbackService, StudentFeedback } from '../../services/feedbackService';
 import { toast } from 'sonner';
 
 interface Session {
@@ -29,6 +30,8 @@ export const StudentEngagement = () => {
 
   const [engagementData, setEngagementData] = useState<StudentEngagementData | null>(null);
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const [downloadingFeedback, setDownloadingFeedback] = useState(false);
+  const [realFeedback, setRealFeedback] = useState<StudentFeedback | null>(null);
   
   // Session reports section state
   const [completedSessions, setCompletedSessions] = useState<Session[]>([]);
@@ -51,6 +54,34 @@ export const StudentEngagement = () => {
     const interval = setInterval(fetchEngagement, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [activeSessionId, user?.id]);
+
+  // Fetch personalized feedback from the API (Model-2)
+  useEffect(() => {
+    if (!activeSessionId || !user?.id) {
+      setRealFeedback(null);
+      return;
+    }
+    const fetchFeedback = async () => {
+      const fb = await feedbackService.getStudentFeedback(user.id, activeSessionId);
+      if (fb) setRealFeedback(fb);
+    };
+    fetchFeedback();
+    const interval = setInterval(fetchFeedback, POLL_INTERVAL_MS * 2);
+    return () => clearInterval(interval);
+  }, [activeSessionId, user?.id]);
+
+  const handleDownloadFeedbackCsv = async () => {
+    if (!activeSessionId) return;
+    setDownloadingFeedback(true);
+    try {
+      const ok = await feedbackService.downloadFeedbackCsv(activeSessionId);
+      if (ok) toast.success('Feedback CSV downloaded');
+      else toast.error('No feedback data available yet');
+    } catch {
+      toast.error('Failed to download feedback');
+    }
+    setDownloadingFeedback(false);
+  };
 
   // Fetch sessions the student participated in (from reports API)
   useEffect(() => {
@@ -132,36 +163,18 @@ export const StudentEngagement = () => {
     };
   }, [engagementData]);
 
-  const feedback = [
-    {
-      id: '1',
-      type: 'achievement' as const,
-      message: 'Great job! You\'ve maintained high engagement throughout this session. Keep up the excellent participation!',
-      clusterContext: 'Active Participants',
-      suggestions: [
-        'Continue asking questions during discussions',
-        'Help other students when possible'
-      ],
-      timestamp: '2 minutes ago'
-    },
-    {
-      id: '2',
-      type: 'encouragement' as const,
-      message: 'Your response time has improved significantly. You\'re responding 20% faster than last week!',
-      clusterContext: 'Active Participants',
-      timestamp: '5 minutes ago'
-    },
-    {
-      id: '3',
-      type: 'improvement' as const,
-      message: 'Consider participating more in group discussions. Your input would be valuable to the class.',
-      suggestions: [
-        'Raise your hand when you have questions',
-        'Share your thoughts in the chat more often'
-      ],
-      timestamp: '10 minutes ago'
-    }
-  ];
+  const feedback = realFeedback
+    ? [
+        {
+          id: '1',
+          type: realFeedback.type,
+          message: realFeedback.message,
+          clusterContext: realFeedback.clusterContext,
+          suggestions: realFeedback.suggestions,
+          timestamp: 'Just now',
+        },
+      ]
+    : [];
 
   return (
     <div className="py-6">
@@ -181,6 +194,15 @@ export const StudentEngagement = () => {
               onClick={() => navigate(`/dashboard/sessions/${activeSessionId}/report`)}
             >
               View report
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={downloadingFeedback ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              onClick={handleDownloadFeedbackCsv}
+              disabled={downloadingFeedback}
+            >
+              {downloadingFeedback ? 'Downloading...' : 'Feedback CSV'}
             </Button>
             <Button
               variant="primary"
