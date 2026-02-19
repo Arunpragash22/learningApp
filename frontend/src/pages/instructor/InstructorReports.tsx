@@ -1056,9 +1056,6 @@ export const InstructorReports = () => {
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Student</th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Email</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Join Time</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Leave Time</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Duration</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -1070,15 +1067,6 @@ export const InstructorReports = () => {
                             </td>
                             <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                               {record.studentEmail || 'N/A'}
-                            </td>
-                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                              {record.joinTime ? new Date(record.joinTime).toLocaleTimeString() : 'N/A'}
-                            </td>
-                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                              {record.leaveTime ? new Date(record.leaveTime).toLocaleTimeString() : 'Still in session'}
-                            </td>
-                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                              {record.durationMinutes !== null ? `${record.durationMinutes} min` : 'N/A'}
                             </td>
                           </tr>
                         ))}
