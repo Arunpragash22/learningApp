@@ -20,6 +20,43 @@ from src.services.email_service import email_service
 router = APIRouter(prefix="/api/sessions", tags=["Session Reports"])
 
 
+async def _resolve_session(session_id: str):
+    """Resolve a session_id that may be a MongoDB ObjectId or a Zoom meeting ID."""
+    # Try MongoDB ObjectId first
+    try:
+        session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
+        if session:
+            return session, str(session["_id"])
+    except Exception:
+        pass
+
+    # Fallback: lookup by zoomMeetingId (stored as int or string)
+    session = await db.database.sessions.find_one({"zoomMeetingId": session_id})
+    if not session:
+        try:
+            session = await db.database.sessions.find_one({"zoomMeetingId": int(session_id)})
+        except (ValueError, TypeError):
+            pass
+    if not session:
+        session = await db.database.sessions.find_one({"zoomMeetingId": str(session_id)})
+
+    if session:
+        return session, str(session["_id"])
+    return None, None
+
+
+@router.get("/resolve/{session_id}")
+async def resolve_session_id(
+    session_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Resolve a Zoom meeting ID or MongoDB ObjectId to the canonical MongoDB session ID."""
+    session, resolved_id = await _resolve_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"sessionId": resolved_id, "title": session.get("title", "")}
+
+
 # New endpoint to get all reports for a user
 reports_router = APIRouter(prefix="/api/reports", tags=["Reports"])
 
@@ -138,15 +175,13 @@ async def get_session_report(
 ):
     """
     Generate and return session report.
-    - Instructors: full report with all student details.
-    - Students: personal report with only their own data (if they participated).
-    - For sessions not yet ended, generates live/preview report.
+    Accepts MongoDB ObjectId or Zoom meeting ID.
     """
     try:
-        # Verify session exists
-        session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
+        session, resolved_id = await _resolve_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
+        session_id = resolved_id
         
         user_role = user.get("role", "student")
         user_id = user.get("id")
@@ -217,17 +252,17 @@ async def download_session_report(
 ):
     """
     Generate and return downloadable HTML report.
-    - Instructors: full session report.
-    - Students: personal report (only their data) for sessions they participated in.
+    Accepts MongoDB ObjectId or Zoom meeting ID.
     """
     try:
         user_role = user.get("role", "student")
         user_id = user.get("id")
         user_email = user.get("email", "")
         
-        session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
+        session, resolved_id = await _resolve_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
+        session_id = resolved_id
         
         if user_role == "instructor":
             if session.get("instructorId") != user_id:
@@ -286,9 +321,10 @@ async def send_report_email(
         raise HTTPException(status_code=403, detail="Only instructors can send report emails")
     
     try:
-        session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
+        session, resolved_id = await _resolve_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
+        session_id = resolved_id
         
         if user_role == "instructor" and session.get("instructorId") != user_id:
             raise HTTPException(

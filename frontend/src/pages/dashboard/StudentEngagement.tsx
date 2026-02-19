@@ -20,6 +20,7 @@ interface Session {
 }
 
 const POLL_INTERVAL_MS = 8000;
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 export const StudentEngagement = () => {
   const { user } = useAuth();
@@ -32,11 +33,36 @@ export const StudentEngagement = () => {
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [downloadingFeedback, setDownloadingFeedback] = useState(false);
   const [realFeedback, setRealFeedback] = useState<StudentFeedback | null>(null);
+  const [resolvedSessionId, setResolvedSessionId] = useState<string | null>(null);
   
   // Session reports section state
   const [completedSessions, setCompletedSessions] = useState<Session[]>([]);
   const [selectedReportSession, setSelectedReportSession] = useState<string | null>(null);
   const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
+
+  // Resolve Zoom meeting ID → MongoDB session ID for report operations
+  useEffect(() => {
+    if (!activeSessionId) {
+      setResolvedSessionId(null);
+      return;
+    }
+    const resolve = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/sessions/resolve/${activeSessionId}`, {
+          headers: { Authorization: `Bearer ${sessionStorage.getItem('access_token') || ''}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setResolvedSessionId(data.sessionId);
+        } else {
+          setResolvedSessionId(activeSessionId);
+        }
+      } catch {
+        setResolvedSessionId(activeSessionId);
+      }
+    };
+    resolve();
+  }, [activeSessionId]);
 
   // Real-time: poll engagement data from the clustering API
   useEffect(() => {
@@ -105,12 +131,14 @@ export const StudentEngagement = () => {
     fetchParticipatedSessions();
   }, []);
 
+  const reportSessionId = resolvedSessionId || activeSessionId;
+
   const handleDownloadReport = async () => {
-    if (!activeSessionId) return;
+    if (!reportSessionId) return;
     setDownloadingReport(true);
     try {
-      const filename = `report_${activeSessionId}.pdf`;
-      const result = await sessionService.downloadReport(activeSessionId, filename);
+      const filename = `report_${reportSessionId}.pdf`;
+      const result = await sessionService.downloadReport(reportSessionId, filename);
       if (result.success) {
         toast.success(result.error || 'Report downloaded as PDF');
       } else {
@@ -191,7 +219,7 @@ export const StudentEngagement = () => {
               variant="outline"
               size="sm"
               leftIcon={<FileText className="h-4 w-4" />}
-              onClick={() => navigate(`/dashboard/sessions/${activeSessionId}/report`)}
+              onClick={() => navigate(`/dashboard/sessions/${reportSessionId}/report`)}
             >
               View report
             </Button>
@@ -209,7 +237,7 @@ export const StudentEngagement = () => {
               size="sm"
               leftIcon={downloadingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               onClick={handleDownloadReport}
-              disabled={downloadingReport}
+              disabled={!reportSessionId || downloadingReport}
             >
               {downloadingReport ? 'Downloading...' : 'Download report'}
             </Button>
