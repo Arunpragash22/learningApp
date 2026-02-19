@@ -624,7 +624,7 @@ export const InstructorReports = () => {
 
       {/* Dashboard Stats */}
       {dashboardStats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <Card className="p-4 text-center">
             <CalendarIcon className="h-8 w-8 text-blue-500 mx-auto mb-2" />
             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -638,20 +638,6 @@ export const InstructorReports = () => {
               {dashboardStats.totalParticipants}
             </p>
             <p className="text-sm text-gray-500">Total Participants</p>
-          </Card>
-          <Card className="p-4 text-center">
-            <FileTextIcon className="h-8 w-8 text-purple-500 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {dashboardStats.totalQuestionsAsked}
-            </p>
-            <p className="text-sm text-gray-500">Questions Asked</p>
-          </Card>
-          <Card className="p-4 text-center">
-            <TrendingUpIcon className="h-8 w-8 text-orange-500 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {dashboardStats.averageQuizScore}%
-            </p>
-            <p className="text-sm text-gray-500">Avg. Quiz Score</p>
           </Card>
         </div>
       )}
