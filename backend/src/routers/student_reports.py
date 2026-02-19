@@ -136,73 +136,112 @@ async def get_my_quiz_report(user: dict = Depends(require_student)):
     """
     Get student's quiz performance across all sessions.
     Shows: Quizzes attempted, correct/incorrect answers, scores.
-    Student can ONLY see their own quiz data.
+    Uses question_assignments when available, falls back to quiz_answers.
     """
     try:
         student_id = user.get("id")
         
-        # Get all quiz assignments for this student
         quiz_by_session = {}
-        
+        sessions_from_assignments = set()
+
+        # Helper to resolve session → session doc
+        async def _get_session(sid):
+            try:
+                return await db.database.sessions.find_one({"_id": ObjectId(sid)})
+            except Exception:
+                return None
+
+        # Helper to init session entry
+        async def _ensure_session(sid):
+            if sid in quiz_by_session:
+                return
+            session = await _get_session(sid)
+            quiz_by_session[sid] = {
+                "sessionId": sid,
+                "sessionName": session.get("title", "Unknown") if session else "Unknown",
+                "courseName": session.get("course", "") if session else "",
+                "sessionDate": session.get("date", "") if session else "",
+                "totalQuestions": 0,
+                "correctAnswers": 0,
+                "incorrectAnswers": 0,
+                "unanswered": 0,
+                "totalResponseTime": 0,
+                "answeredCount": 0,
+                "questions": []
+            }
+
+        # 1) Gather from question_assignments
         async for assignment in db.database.question_assignments.find({"studentId": student_id}):
             session_id = assignment.get("sessionId")
-            
-            if session_id not in quiz_by_session:
-                # Get session info
-                try:
-                    session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
-                except:
-                    session = None
-                
-                quiz_by_session[session_id] = {
-                    "sessionId": session_id,
-                    "sessionName": session.get("title", "Unknown") if session else "Unknown",
-                    "courseName": session.get("course", "") if session else "",
-                    "sessionDate": session.get("date", "") if session else "",
-                    "totalQuestions": 0,
-                    "correctAnswers": 0,
-                    "incorrectAnswers": 0,
-                    "unanswered": 0,
-                    "totalResponseTime": 0,
-                    "answeredCount": 0,
-                    "questions": []
-                }
-            
+            await _ensure_session(session_id)
+            sessions_from_assignments.add(session_id)
+
             quiz_by_session[session_id]["totalQuestions"] += 1
-            
-            # Get question details
+
             question_id = assignment.get("questionId")
             question_text = "Unknown Question"
             try:
-                question = await db.database.questions.find_one({"_id": ObjectId(question_id)})
-                if question:
-                    question_text = question.get("question", "Unknown Question")
-            except:
+                q = await db.database.questions.find_one({"_id": ObjectId(question_id)})
+                if q:
+                    question_text = q.get("question", "Unknown Question")
+            except Exception:
                 pass
-            
-            question_detail = {
+
+            quiz_by_session[session_id]["questions"].append({
                 "questionId": question_id,
                 "question": question_text,
                 "yourAnswer": assignment.get("answerIndex"),
                 "isCorrect": assignment.get("isCorrect"),
                 "timeTaken": assignment.get("timeTaken"),
                 "answeredAt": assignment.get("answeredAt").isoformat() if assignment.get("answeredAt") else None
-            }
-            
-            quiz_by_session[session_id]["questions"].append(question_detail)
-            
+            })
+
             if assignment.get("answerIndex") is not None:
                 if assignment.get("isCorrect"):
                     quiz_by_session[session_id]["correctAnswers"] += 1
                 else:
                     quiz_by_session[session_id]["incorrectAnswers"] += 1
-                
                 if assignment.get("timeTaken"):
                     quiz_by_session[session_id]["totalResponseTime"] += assignment.get("timeTaken")
                     quiz_by_session[session_id]["answeredCount"] += 1
             else:
                 quiz_by_session[session_id]["unanswered"] += 1
-        
+
+        # 2) Fallback: gather from quiz_answers for sessions NOT covered by assignments
+        async for answer in db.database.quiz_answers.find({"studentId": student_id}):
+            session_id = answer.get("sessionId")
+            if session_id in sessions_from_assignments:
+                continue
+            await _ensure_session(session_id)
+
+            quiz_by_session[session_id]["totalQuestions"] += 1
+
+            question_id = answer.get("questionId")
+            question_text = "Unknown Question"
+            try:
+                q = await db.database.questions.find_one({"_id": ObjectId(question_id)})
+                if q:
+                    question_text = q.get("question", "Unknown Question")
+            except Exception:
+                pass
+
+            quiz_by_session[session_id]["questions"].append({
+                "questionId": question_id,
+                "question": question_text,
+                "yourAnswer": answer.get("answerIndex"),
+                "isCorrect": answer.get("isCorrect"),
+                "timeTaken": answer.get("timeTaken"),
+                "answeredAt": answer.get("timestamp").isoformat() if answer.get("timestamp") else None
+            })
+
+            if answer.get("isCorrect"):
+                quiz_by_session[session_id]["correctAnswers"] += 1
+            else:
+                quiz_by_session[session_id]["incorrectAnswers"] += 1
+            if answer.get("timeTaken"):
+                quiz_by_session[session_id]["totalResponseTime"] += answer.get("timeTaken")
+                quiz_by_session[session_id]["answeredCount"] += 1
+
         # Calculate scores for each session
         session_quizzes = []
         for session_id, data in quiz_by_session.items():
@@ -219,16 +258,14 @@ async def get_my_quiz_report(user: dict = Depends(require_student)):
                 "totalQuestions": total,
                 "correctAnswers": correct,
                 "incorrectAnswers": data["incorrectAnswers"],
-                "unanswered": data["unanswered"],
+                "unanswered": data.get("unanswered", 0),
                 "score": round(score, 1),
                 "averageResponseTime": round(avg_time, 2) if avg_time else None,
                 "questionDetails": data["questions"]
             })
         
-        # Sort by date (most recent first)
         session_quizzes.sort(key=lambda x: x["sessionDate"] or "", reverse=True)
         
-        # Calculate overall stats
         total_questions = sum(q["totalQuestions"] for q in session_quizzes)
         total_correct = sum(q["correctAnswers"] for q in session_quizzes)
         overall_score = (total_correct / total_questions * 100) if total_questions > 0 else 0
@@ -278,23 +315,34 @@ async def get_my_session_history(user: dict = Depends(require_student)):
             if not session:
                 continue
             
-            # Check quiz participation
+            # Check quiz participation from assignments first, fallback to quiz_answers
             quiz_count = await db.database.question_assignments.count_documents({
                 "sessionId": session_id,
                 "studentId": student_id
             })
             
-            quiz_answered = await db.database.question_assignments.count_documents({
-                "sessionId": session_id,
-                "studentId": student_id,
-                "answerIndex": {"$ne": None}
-            })
-            
-            quiz_correct = await db.database.question_assignments.count_documents({
-                "sessionId": session_id,
-                "studentId": student_id,
-                "isCorrect": True
-            })
+            if quiz_count > 0:
+                quiz_answered = await db.database.question_assignments.count_documents({
+                    "sessionId": session_id,
+                    "studentId": student_id,
+                    "answerIndex": {"$ne": None}
+                })
+                quiz_correct = await db.database.question_assignments.count_documents({
+                    "sessionId": session_id,
+                    "studentId": student_id,
+                    "isCorrect": True
+                })
+            else:
+                quiz_count = await db.database.quiz_answers.count_documents({
+                    "sessionId": session_id,
+                    "studentId": student_id
+                })
+                quiz_answered = quiz_count
+                quiz_correct = await db.database.quiz_answers.count_documents({
+                    "sessionId": session_id,
+                    "studentId": student_id,
+                    "isCorrect": True
+                })
             
             joined_at = participant.get("joinedAt")
             left_at = participant.get("leftAt")
@@ -355,17 +403,25 @@ async def get_my_dashboard_stats(user: dict = Depends(require_student)):
             "studentId": student_id
         })
         
-        # Get quiz stats
+        # Get quiz stats from assignments, fallback to quiz_answers
         total_questions = await db.database.question_assignments.count_documents({
             "studentId": student_id
         })
         
-        correct_answers = await db.database.question_assignments.count_documents({
-            "studentId": student_id,
-            "isCorrect": True
-        })
+        if total_questions > 0:
+            correct_answers = await db.database.question_assignments.count_documents({
+                "studentId": student_id,
+                "isCorrect": True
+            })
+        else:
+            total_questions = await db.database.quiz_answers.count_documents({
+                "studentId": student_id
+            })
+            correct_answers = await db.database.quiz_answers.count_documents({
+                "studentId": student_id,
+                "isCorrect": True
+            })
         
-        # Calculate overall score
         overall_score = (correct_answers / total_questions * 100) if total_questions > 0 else 0
         
         # Calculate total attendance time
