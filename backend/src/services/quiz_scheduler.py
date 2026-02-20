@@ -227,14 +227,15 @@ class QuizScheduler:
         stagger_window: int = 0
     ) -> dict:
         """
-        Two-phase staggered delivery:
-        Phase 1 (no clustering): each student gets a random GENERIC question
-        Phase 2 (clustering done): each student gets a question matching their cluster category
+        Staggered delivery with fallback + ordering:
+          - Fallback: current session → previous session → general questions
+          - Ordering: generic questions first, then cluster-specific
         """
         from ..database.connection import db
         from .ws_manager import ws_manager
         from ..models.cluster_model import ClusterModel
         from ..models.question_assignment_model import QuestionAssignmentModel
+        from ..models.question import Question
 
         try:
             # ── 1. Find session doc ─────────────────────────────────────
@@ -257,32 +258,22 @@ class QuizScheduler:
                         {"zoomMeetingId": zoom_meeting_id}
                     )
 
-            # ── 2. Find available questions ─────────────────────────────
-            questions = []
+            # ── 2. Find questions with fallback ─────────────────────────
+            instructor_id = session_doc.get("instructorId") if session_doc else None
+            course_id = session_doc.get("courseId") if session_doc else None
 
-            if session_id:
-                questions = await db.database.questions.find(
-                    {"sessionId": session_id}
-                ).to_list(length=None)
-                print(f"📝 Auto-trigger: Found {len(questions)} questions for session {session_id}")
-
-            if not questions and session_doc:
-                instructor_id = session_doc.get("instructorId")
-                if instructor_id:
-                    questions = await db.database.questions.find({
-                        "instructorId": instructor_id,
-                        "$or": [{"sessionId": None}, {"sessionId": {"$exists": False}}]
-                    }).to_list(length=None)
-                    print(f"📝 Auto-trigger: Found {len(questions)} general questions from instructor")
-
-            if not questions:
-                questions = await db.database.questions.find({}).to_list(length=None)
-                print(f"📝 Auto-trigger: Fallback - Found {len(questions)} total questions")
+            questions, q_source = await Question.find_for_session_with_fallback(
+                session_id, instructor_id, course_id
+            )
+            print(f"📝 Auto-trigger: {len(questions)} questions (source: {q_source})")
 
             if not questions:
                 return {"success": False, "message": "No questions found for this session"}
 
-            # ── 3. Build cluster map (two-phase check) ──────────────────
+            generic_qs, cluster_qs_all = Question.split_generic_and_cluster(questions)
+            print(f"   Generic: {len(generic_qs)} | Cluster-specific: {len(cluster_qs_all)}")
+
+            # ── 3. Build cluster map ────────────────────────────────────
             student_cluster_map: Dict[str, str] = {}
             session_ids_to_check = [session_id]
             if zoom_meeting_id and zoom_meeting_id not in session_ids_to_check:
@@ -302,16 +293,10 @@ class QuizScheduler:
 
             has_clustering = bool(student_cluster_map)
 
-            # Separate generic and cluster questions
-            generic_qs = [
-                q for q in questions
-                if q.get("questionType", "generic") == "generic" or not q.get("questionType")
-            ]
-
             if has_clustering:
-                print(f"📋 Auto-trigger: Phase 2 — cluster-specific per student ({len(student_cluster_map)} mapped)")
+                print(f"📋 Auto-trigger: Clustering active ({len(student_cluster_map)} mapped) — generic first, then cluster")
             else:
-                print(f"📋 Auto-trigger: Phase 1 — generic questions only ({len(generic_qs)} available)")
+                print(f"📋 Auto-trigger: No clustering — generic questions only ({len(generic_qs)} available)")
 
             # ── 4. Collect all joined students ──────────────────────────
             ids_to_try = [str(s) for s in session_ids_to_check]
@@ -334,7 +319,7 @@ class QuizScheduler:
                 print(f"⚠️ No participants in session — stored quiz for reconnect catch-up")
                 return {"success": True, "message": "Question stored (no online students)", "sentTo": 0}
 
-            # ── 5. Pick a question PER student (two-phase) ──────────────
+            # ── 5. Pick a question PER student: generic first, then cluster ──
             sent_ids = self.sent_questions.get(session_id, set())
             student_questions: Dict[str, dict] = {}
 
@@ -342,25 +327,29 @@ class QuizScheduler:
                 student_cluster = student_cluster_map.get(sid_val) if has_clustering else None
 
                 if has_clustering and student_cluster:
-                    # Phase 2: cluster-matched questions by category
-                    pool = [
-                        q for q in questions
-                        if q.get("questionType") == "cluster"
-                        and q.get("category", "").lower() == student_cluster
+                    student_cluster_qs = [
+                        q for q in cluster_qs_all
+                        if q.get("category", "").lower() == student_cluster
                     ]
-                    if not pool:
-                        pool = generic_qs
                 else:
-                    # Phase 1: generic only
-                    pool = generic_qs if generic_qs else questions
+                    student_cluster_qs = []
 
-                # Filter out already-sent
-                unsent = [q for q in pool if str(q["_id"]) not in sent_ids]
-                if not unsent:
-                    unsent = pool
+                # Generic first, then cluster-specific
+                unsent_generic = [q for q in generic_qs if str(q["_id"]) not in sent_ids]
+                if unsent_generic:
+                    q = random.choice(unsent_generic)
+                else:
+                    unsent_cluster = [q for q in student_cluster_qs if str(q["_id"]) not in sent_ids]
+                    if unsent_cluster:
+                        q = random.choice(unsent_cluster)
+                    else:
+                        # All sent — recycle from available pool
+                        pool = generic_qs + student_cluster_qs
+                        if not pool:
+                            pool = generic_qs if generic_qs else questions
+                        q = random.choice(pool) if pool else None
 
-                if unsent:
-                    q = random.choice(unsent)
+                if q:
                     student_questions[sid_val] = q
                     self.sent_questions.setdefault(session_id, set()).add(str(q["_id"]))
 
@@ -406,6 +395,7 @@ class QuizScheduler:
                     "questionType": q.get("questionType", "generic"),
                     "sessionId": room_id,
                     "studentId": sid_val,
+                    "questionSource": q_source,
                     "triggeredAt": datetime.utcnow().isoformat(),
                     "autoTriggered": True,
                 }
@@ -453,9 +443,10 @@ class QuizScheduler:
             return {
                 "success": True,
                 "message": f"Question sent to {sent_count}/{total_students} students "
-                           f"(staggered over {stagger_window}s)",
+                           f"(staggered over {stagger_window}s, source: {q_source})",
                 "sentTo": sent_count,
                 "totalStudents": total_students,
+                "questionSource": q_source,
             }
 
         except Exception as e:

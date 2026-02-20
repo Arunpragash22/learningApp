@@ -349,40 +349,40 @@ async def get_ws_stats():
 
 # --------------------------------------------------------
 # 🎯 TRIGGER QUIZ TO SESSION (API endpoint)
-# Two-phase cluster-aware delivery:
-#   Phase 1 (no clusters): send instructor's chosen question to all
-#   Phase 2 (clusters exist): per-student cluster-matched questions
+# Fallback: current session → previous session → general questions
+# Ordering: generic questions first, then cluster-specific
 # --------------------------------------------------------
 @app.post("/ws/trigger-session/{session_id}")
 async def trigger_quiz_to_session(session_id: str, request: Request):
     """
     Trigger quiz to ONLY students who have joined the session room.
-    Phase 1 (before clustering): sends the instructor's selected question to all.
-    Phase 2 (after clustering): picks a cluster-matched question per student.
+    Questions are fetched with fallback (current → previous session → general).
+    Delivery: generic questions first, then cluster-specific.
     """
     import random
     from src.database.connection import get_database
     from bson import ObjectId
     from src.models.cluster_model import ClusterModel
     from src.models.question_assignment_model import QuestionAssignmentModel
+    from src.models.question import Question
 
     try:
         body = await request.json()
         question_data = body.get("question", {})
-        db = get_database()
+        db_conn = get_database()
 
         # ── 1. Resolve session IDs ──────────────────────────────────
         session_ids = [session_id]
         session_doc = None
-        if db:
+        if db_conn:
             try:
                 if session_id.isdigit():
-                    session_doc = await db.sessions.find_one({"zoomMeetingId": int(session_id)})
+                    session_doc = await db_conn.sessions.find_one({"zoomMeetingId": int(session_id)})
                 if not session_doc:
-                    session_doc = await db.sessions.find_one({"zoomMeetingId": session_id})
+                    session_doc = await db_conn.sessions.find_one({"zoomMeetingId": session_id})
                 if not session_doc and len(session_id) == 24:
                     try:
-                        session_doc = await db.sessions.find_one({"_id": ObjectId(session_id)})
+                        session_doc = await db_conn.sessions.find_one({"_id": ObjectId(session_id)})
                     except Exception:
                         pass
                 if session_doc:
@@ -396,7 +396,7 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
                 print(f"⚠️ Trigger: could not resolve session id: {resolve_err}")
 
         # ── 2. Find participants across all room IDs ────────────────
-        all_participants = {}  # student_id → {participant_info, room_id}
+        all_participants = {}
         for sid in session_ids:
             for p in ws_manager.get_session_participants(sid):
                 student_id = p.get("studentId")
@@ -404,7 +404,6 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
                     all_participants[student_id] = {"info": p, "room_id": sid}
 
         if not all_participants:
-            print(f"⚠️ Trigger: no participants in rooms {session_ids}")
             return {"success": False, "sentTo": 0, "message": "No students connected to this session."}
 
         # ── 3. Check for cluster data ───────────────────────────────
@@ -446,50 +445,67 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
                             await QuestionAssignmentModel.create(data["room_id"], student_id, q_id, 0)
                         except Exception:
                             pass
-            print(f"✅ Phase 1: Sent generic question to {sent_count}/{len(all_participants)} students")
             return {"success": True, "sessionId": session_id, "sentTo": sent_count,
                     "message": f"Generic question sent to {sent_count} students"}
 
-        # ── 4b. Phase 2: Clustering exists → per-student question ───
+        # ── 4b. Phase 2: Clustering → fallback questions, generic first then cluster ──
         print(f"📋 Trigger Phase 2: Clusters exist → per-student delivery ({len(student_cluster_map)} mapped)")
 
-        # Fetch all questions for this session
-        all_questions = []
-        for sid in session_ids:
-            qs = await db.questions.find({"sessionId": sid}).to_list(length=None) if db else []
-            all_questions.extend(qs)
-        # Deduplicate by _id
-        seen_ids = set()
-        questions = []
-        for q in all_questions:
-            qid = str(q["_id"])
-            if qid not in seen_ids:
-                seen_ids.add(qid)
-                questions.append(q)
+        # Fetch questions with fallback (current session → previous session → general)
+        session_mongo_id = str(session_doc["_id"]) if session_doc else session_id
+        instructor_id = session_doc.get("instructorId") if session_doc else None
+        course_id = session_doc.get("courseId") if session_doc else None
 
-        generic_qs = [q for q in questions if q.get("questionType", "generic") == "generic" or not q.get("questionType")]
+        questions, q_source = await Question.find_for_session_with_fallback(
+            session_mongo_id, instructor_id, course_id
+        )
+        print(f"📝 Trigger Phase 2: {len(questions)} questions (source: {q_source})")
+
+        if not questions:
+            return {"success": False, "sentTo": 0, "message": "No questions found"}
+
+        generic_qs, cluster_qs_all = Question.split_generic_and_cluster(questions)
+        print(f"   Generic: {len(generic_qs)} | Cluster-specific: {len(cluster_qs_all)}")
 
         sent_count = 0
+        sent_generic_ids: set = set()
+        sent_cluster_ids: set = set()
+
         for student_id, data in all_participants.items():
             student_cluster = student_cluster_map.get(student_id)
             room_id = data["room_id"]
             name = data["info"].get("studentName", student_id[:12])
 
             if student_cluster:
-                cluster_qs = [
-                    q for q in questions
-                    if q.get("questionType") == "cluster"
-                    and q.get("category", "").lower() == student_cluster
+                student_cluster_qs = [
+                    q for q in cluster_qs_all
+                    if q.get("category", "").lower() == student_cluster
                 ]
-                eligible = cluster_qs if cluster_qs else generic_qs
             else:
-                eligible = generic_qs if generic_qs else questions
+                student_cluster_qs = []
 
-            if not eligible:
-                print(f"   ⚠️ No questions for {name} (cluster={student_cluster or 'none'}) — skipping")
+            # Generic first, then cluster-specific
+            unsent_generic = [q for q in generic_qs if str(q["_id"]) not in sent_generic_ids]
+            if unsent_generic:
+                q = random.choice(unsent_generic)
+            else:
+                unsent_cluster = [q for q in student_cluster_qs if str(q["_id"]) not in sent_cluster_ids]
+                if unsent_cluster:
+                    q = random.choice(unsent_cluster)
+                else:
+                    combined = generic_qs + student_cluster_qs
+                    q = random.choice(combined) if combined else None
+
+            if not q:
+                print(f"   ⚠️ No questions for {name} — skipping")
                 continue
 
-            q = random.choice(eligible)
+            qid = str(q["_id"])
+            if q.get("questionType") == "cluster":
+                sent_cluster_ids.add(qid)
+            else:
+                sent_generic_ids.add(qid)
+
             opts = q.get("options") or []
             if not isinstance(opts, list):
                 opts = list(opts) if opts else []
@@ -497,8 +513,8 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
 
             msg = {
                 "type": "quiz",
-                "questionId": str(q["_id"]),
-                "question_id": str(q["_id"]),
+                "questionId": qid,
+                "question_id": qid,
                 "question": str(q.get("question", "")),
                 "options": opts,
                 "timeLimit": int(q.get("timeLimit", 30)),
@@ -506,20 +522,21 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
                 "questionType": q.get("questionType", "generic"),
                 "sessionId": room_id,
                 "studentId": student_id,
+                "questionSource": q_source,
                 "triggeredAt": datetime.now().isoformat()
             }
             ok = await ws_manager.send_to_student_in_session(room_id, student_id, msg)
             if ok:
                 sent_count += 1
                 try:
-                    await QuestionAssignmentModel.create(room_id, student_id, str(q["_id"]), 0)
+                    await QuestionAssignmentModel.create(room_id, student_id, qid, 0)
                 except Exception:
                     pass
-                print(f"   ✅ {name} (cluster={student_cluster}) → [{q.get('questionType')}] {q.get('category', 'General')}")
+                print(f"   ✅ {name} (cluster={student_cluster}) → [{q.get('questionType')}]")
 
-        print(f"✅ Phase 2: Sent cluster-matched questions to {sent_count}/{len(all_participants)} students")
         return {"success": True, "sessionId": session_id, "sentTo": sent_count,
-                "message": f"Cluster questions sent to {sent_count} students"}
+                "questionSource": q_source,
+                "message": f"Questions sent to {sent_count} students (source: {q_source}, generic first)"}
 
     except Exception as e:
         print(f"❌ Error triggering quiz to session: {e}")
