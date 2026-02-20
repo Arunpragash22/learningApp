@@ -143,32 +143,28 @@ export const sessionService = {
       try {
         const html2pdf = (await import('html2pdf.js')).default;
 
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(htmlContent, 'text/html');
+        // Create a temporary iframe so html2canvas has a fully rendered DOM
+        // This avoids all offscreen/opacity issues that cause blank PDFs
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.left = '0';
+        iframe.style.top = '0';
+        iframe.style.width = '820px';
+        iframe.style.height = '100vh';
+        iframe.style.border = 'none';
+        iframe.style.zIndex = '99999';
+        iframe.style.background = '#ffffff';
+        document.body.appendChild(iframe);
 
-        const container = document.createElement('div');
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!iframeDoc) throw new Error('Could not access iframe document');
+        iframeDoc.open();
+        iframeDoc.write(htmlContent);
+        iframeDoc.close();
 
-        const styles = doc.querySelectorAll('style');
-        styles.forEach((s) => {
-          const styleEl = document.createElement('style');
-          styleEl.textContent = s.textContent;
-          container.appendChild(styleEl);
-        });
+        await new Promise(resolve => setTimeout(resolve, 600));
 
-        container.innerHTML += doc.body.innerHTML;
-
-        // Position in viewport so html2canvas can capture it, but visually hidden
-        container.style.position = 'fixed';
-        container.style.left = '0';
-        container.style.top = '0';
-        container.style.width = '800px';
-        container.style.background = '#ffffff';
-        container.style.zIndex = '-1';
-        container.style.opacity = '0.01';
-        container.style.pointerEvents = 'none';
-        document.body.appendChild(container);
-
-        await new Promise(resolve => setTimeout(resolve, 500));
+        const content = iframeDoc.body;
 
         await html2pdf()
           .set({
@@ -181,21 +177,14 @@ export const sessionService = {
               logging: false,
               backgroundColor: '#ffffff',
               windowWidth: 800,
-              onclone: (clonedDoc: Document) => {
-                const el = clonedDoc.querySelector('div');
-                if (el) {
-                  el.style.opacity = '1';
-                  el.style.position = 'static';
-                }
-              },
             },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
             pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
           })
-          .from(container)
+          .from(content)
           .save();
 
-        document.body.removeChild(container);
+        document.body.removeChild(iframe);
         return { success: true, error: 'Report downloaded as PDF' };
       } catch (pdfError) {
         console.error("PDF generation error:", pdfError);
@@ -552,10 +541,16 @@ export interface QuizSummary {
   question: string;
   options?: string[];
   correctAnswer: number;
+  correctAnswerText?: string;
   studentAnswer?: number;
+  studentAnswerText?: string;
   isCorrect?: boolean;
   timeTaken?: number;
   answeredAt?: string;
+  runningAccuracy?: number;
+  runningCorrect?: number;
+  runningTotal?: number;
+  clusterAtAnswer?: string;
 }
 
 export interface SessionReport {

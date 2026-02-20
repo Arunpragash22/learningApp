@@ -649,21 +649,43 @@ class SessionReportModel:
             
             quiz_score = (correct_count / total_questions * 100) if total_questions > 0 else None
             
-            # Build quiz details from assignments or quiz_answers as fallback
+            # Build quiz details with enriched data:
+            # option texts, running accuracy, cluster progression
             quiz_details = []
             source = student_assignments if student_assignments else student_answers
+            running_correct = 0
+            running_total = 0
             for item in source:
                 qid = item.get("questionId")
                 q = questions.get(qid, {})
+                options = q.get("options", [])
+                correct_idx = q.get("correctAnswer", -1)
+                student_idx = item.get("answerIndex")
+                is_correct = item.get("isCorrect", False)
+
+                running_total += 1
+                if is_correct:
+                    running_correct += 1
+                running_accuracy = round((running_correct / running_total) * 100, 1)
+
+                # Determine cluster at time of this answer (use session cluster data)
+                cluster_at_answer = cluster_map.get(student_id, "moderate")
+
                 quiz_details.append({
                     "questionId": qid or "",
                     "question": q.get("question", "Unknown question"),
-                    "options": q.get("options", []),
-                    "correctAnswer": q.get("correctAnswer", -1),
-                    "studentAnswer": item.get("answerIndex"),
-                    "isCorrect": item.get("isCorrect"),
+                    "options": options,
+                    "correctAnswer": correct_idx,
+                    "correctAnswerText": options[correct_idx] if 0 <= correct_idx < len(options) else "N/A",
+                    "studentAnswer": student_idx,
+                    "studentAnswerText": options[student_idx] if student_idx is not None and 0 <= student_idx < len(options) else "No answer",
+                    "isCorrect": is_correct,
                     "timeTaken": item.get("timeTaken"),
-                    "answeredAt": item.get("answeredAt", item.get("timestamp"))
+                    "answeredAt": item.get("answeredAt", item.get("timestamp")),
+                    "runningAccuracy": running_accuracy,
+                    "runningCorrect": running_correct,
+                    "runningTotal": running_total,
+                    "clusterAtAnswer": cluster_at_answer,
                 })
             
             # Calculate attendance duration
@@ -911,6 +933,8 @@ class SessionReportModel:
             student_data["averageResponseTime"] = round(avg_time, 2)
 
         quiz_details = []
+        running_correct = 0
+        running_total = 0
         for item in items:
             qid = item.get("questionId")
             q = {}
@@ -921,14 +945,30 @@ class SessionReportModel:
             except Exception:
                 pass
             ts_field = "answeredAt" if source_label == "assignments" else "timestamp"
+            options = q.get("options", [])
+            correct_idx = q.get("correctAnswer", -1)
+            student_idx = item.get("answerIndex")
+            is_correct = item.get("isCorrect", False)
+
+            running_total += 1
+            if is_correct:
+                running_correct += 1
+            running_accuracy = round((running_correct / running_total) * 100, 1)
+
             quiz_details.append({
                 "questionId": qid or "",
                 "question": q.get("question", "Unknown question"),
-                "correctAnswer": q.get("correctAnswer", -1),
-                "studentAnswer": item.get("answerIndex"),
-                "isCorrect": item.get("isCorrect"),
+                "options": options,
+                "correctAnswer": correct_idx,
+                "correctAnswerText": options[correct_idx] if 0 <= correct_idx < len(options) else "N/A",
+                "studentAnswer": student_idx,
+                "studentAnswerText": options[student_idx] if student_idx is not None and 0 <= student_idx < len(options) else "No answer",
+                "isCorrect": is_correct,
                 "timeTaken": item.get("timeTaken"),
-                "answeredAt": item.get(ts_field)
+                "answeredAt": item.get(ts_field),
+                "runningAccuracy": running_accuracy,
+                "runningCorrect": running_correct,
+                "runningTotal": running_total,
             })
         student_data["quizDetails"] = quiz_details
 

@@ -531,22 +531,22 @@ export const SessionReport = () => {
                 <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3">
                   Question-by-Question Results
                 </h4>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {studentData.quizDetails.length > 0 ? (
                     studentData.quizDetails.map((quiz, idx) => (
                       <div 
                         key={quiz.questionId || idx}
                         className={`p-4 rounded-lg border-l-4 ${
                           quiz.isCorrect 
-                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500' 
+                            ? 'bg-green-50 dark:bg-green-900/20 border-green-500' 
                             : 'bg-red-50 dark:bg-red-900/20 border-red-500'
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start justify-between gap-4 mb-3">
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="font-medium text-gray-900 dark:text-gray-100">
-                                Question {idx + 1}
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold text-gray-900 dark:text-gray-100">
+                                Q{idx + 1}.
                               </span>
                               {quiz.isCorrect ? (
                                 <Badge variant="success" size="sm">
@@ -560,16 +560,69 @@ export const SessionReport = () => {
                                 </Badge>
                               )}
                             </div>
-                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                            <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
                               {quiz.question}
                             </p>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right shrink-0">
                             <div className="flex items-center gap-1 text-gray-500 text-sm">
                               <ClockIcon className="h-4 w-4" />
                               {quiz.timeTaken ? `${quiz.timeTaken.toFixed(1)}s` : 'N/A'}
                             </div>
                           </div>
+                        </div>
+
+                        {/* Options with correct/selected highlighting */}
+                        {quiz.options && quiz.options.length > 0 && (
+                          <div className="space-y-1.5 mb-3">
+                            {quiz.options.map((opt, oi) => {
+                              const isStudentPick = quiz.studentAnswer !== undefined && quiz.studentAnswer !== null && oi === quiz.studentAnswer;
+                              const isCorrectOpt = oi === quiz.correctAnswer;
+                              let optClass = 'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700';
+                              if (isStudentPick && isCorrectOpt) {
+                                optClass = 'bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700';
+                              } else if (isStudentPick) {
+                                optClass = 'bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700';
+                              } else if (isCorrectOpt) {
+                                optClass = 'bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700';
+                              }
+                              const label = String.fromCharCode(65 + oi);
+                              return (
+                                <div key={oi} className={`px-3 py-2 rounded-md text-sm flex items-center justify-between ${optClass}`}>
+                                  <span>
+                                    <span className="font-semibold text-gray-700 dark:text-gray-300 mr-1">{label}.</span>
+                                    <span className="text-gray-700 dark:text-gray-300">{opt}</span>
+                                  </span>
+                                  <span className="text-xs font-semibold shrink-0 ml-2">
+                                    {isStudentPick && isCorrectOpt && <span className="text-green-600">Your Answer (Correct!)</span>}
+                                    {isStudentPick && !isCorrectOpt && <span className="text-red-600">Your Answer</span>}
+                                    {!isStudentPick && isCorrectOpt && <span className="text-green-600">Correct Answer</span>}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Running accuracy + cluster */}
+                        <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-200 dark:border-gray-700">
+                          <span>
+                            Accuracy after Q{idx + 1}:{' '}
+                            <span className={`font-bold ${quiz.runningAccuracy !== undefined && quiz.runningAccuracy >= 60 ? 'text-green-600' : 'text-red-600'}`}>
+                              {quiz.runningAccuracy !== undefined ? `${quiz.runningAccuracy}%` : 'N/A'}
+                            </span>
+                            <span className="text-gray-400 ml-1">
+                              ({quiz.runningCorrect ?? 0}/{quiz.runningTotal ?? 0})
+                            </span>
+                          </span>
+                          {quiz.clusterAtAnswer && (
+                            <Badge 
+                              variant={quiz.clusterAtAnswer === 'active' ? 'success' : quiz.clusterAtAnswer === 'moderate' ? 'warning' : 'danger'}
+                              size="sm"
+                            >
+                              {quiz.clusterAtAnswer.charAt(0).toUpperCase() + quiz.clusterAtAnswer.slice(1)}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     ))

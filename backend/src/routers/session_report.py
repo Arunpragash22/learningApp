@@ -416,7 +416,7 @@ def _generate_report_html(report: dict, user_role: str) -> str:
             </tr>
             """
 
-    # ── Student view: personal summary + quiz details ──
+    # ── Student view: personal summary + enriched quiz details ──
     student_personal_section = ""
     if not is_instructor and students:
         s = students[0]
@@ -430,23 +430,20 @@ def _generate_report_html(report: dict, user_role: str) -> str:
         <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
             <h3 style="margin: 0 0 15px 0; font-size: 16px; font-weight: bold; color: #111827;">Your Performance Summary</h3>
             <p style="margin: 0 0 12px 0; font-size: 14px; color: #374151;"><strong>{s.get("studentName", "Student")}</strong> &mdash; {s.get("studentEmail") or ""}</p>
-            <table style="width: 100%; border-collapse: collapse;">
+            <table style="width: 100%; border-collapse: separate; border-spacing: 6px 0;">
                 <tr>
                     <td style="width: 25%; padding: 12px; text-align: center; background: #ecfdf5; border: 1px solid #d1fae5; border-radius: 8px;">
                         <p style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; color: {score_color};">{score_display}</p>
                         <p style="margin: 0; font-size: 11px; color: #065f46;">Quiz Score</p>
                     </td>
-                    <td style="width: 4%;"></td>
                     <td style="width: 25%; padding: 12px; text-align: center; background: #eff6ff; border: 1px solid #dbeafe; border-radius: 8px;">
                         <p style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; color: #2563eb;">{s.get("correctAnswers", 0)}</p>
                         <p style="margin: 0; font-size: 11px; color: #1e40af;">Correct</p>
                     </td>
-                    <td style="width: 4%;"></td>
                     <td style="width: 25%; padding: 12px; text-align: center; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;">
                         <p style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; color: #dc2626;">{s.get("incorrectAnswers", 0)}</p>
                         <p style="margin: 0; font-size: 11px; color: #991b1b;">Incorrect</p>
                     </td>
-                    <td style="width: 4%;"></td>
                     <td style="width: 25%; padding: 12px; text-align: center; background: #f5f3ff; border: 1px solid #ede9fe; border-radius: 8px;">
                         <p style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; color: #7c3aed;">{avg_time_display}</p>
                         <p style="margin: 0; font-size: 11px; color: #5b21b6;">Avg. Time</p>
@@ -467,24 +464,73 @@ def _generate_report_html(report: dict, user_role: str) -> str:
             """
             for idx, q in enumerate(quiz_details, 1):
                 is_correct = q.get("isCorrect", False)
-                result_icon = "&#10004;" if is_correct else "&#10008;"
                 result_color = "#059669" if is_correct else "#dc2626"
                 bg = "#f0fdf4" if is_correct else "#fef2f2"
                 border_color = "#22c55e" if is_correct else "#ef4444"
                 time_taken = q.get("timeTaken")
                 time_display = f"{time_taken:.1f}s" if time_taken else "N/A"
+                running_acc = q.get("runningAccuracy", "N/A")
+                running_acc_display = f"{running_acc}%" if isinstance(running_acc, (int, float)) else "N/A"
+                cluster_at = q.get("clusterAtAnswer", "")
+                cluster_bg = "#dcfce7" if cluster_at == "active" else "#fef3c7" if cluster_at == "moderate" else "#fee2e2" if cluster_at == "passive" else "#f3f4f6"
+                cluster_color = "#166534" if cluster_at == "active" else "#92400e" if cluster_at == "moderate" else "#991b1b" if cluster_at == "passive" else "#6b7280"
+
+                # Build options display
+                options = q.get("options", [])
+                correct_idx = q.get("correctAnswer", -1)
+                student_idx = q.get("studentAnswer")
+                options_html = ""
+                for oi, opt in enumerate(options):
+                    is_student_pick = (student_idx is not None and oi == student_idx)
+                    is_correct_opt = (oi == correct_idx)
+                    opt_bg = ""
+                    opt_border = ""
+                    opt_icon = ""
+                    if is_student_pick and is_correct_opt:
+                        opt_bg = "background: #dcfce7;"
+                        opt_border = "border: 1px solid #86efac;"
+                        opt_icon = "&#10004; "
+                    elif is_student_pick:
+                        opt_bg = "background: #fee2e2;"
+                        opt_border = "border: 1px solid #fca5a5;"
+                        opt_icon = "&#10008; "
+                    elif is_correct_opt:
+                        opt_bg = "background: #dcfce7;"
+                        opt_border = "border: 1px solid #86efac;"
+                        opt_icon = "&#10004; "
+                    else:
+                        opt_bg = "background: #f9fafb;"
+                        opt_border = "border: 1px solid #e5e7eb;"
+
+                    label = chr(65 + oi)  # A, B, C, D
+                    options_html += f"""
+                        <div style="padding: 6px 10px; margin-bottom: 4px; border-radius: 6px; font-size: 12px; {opt_bg} {opt_border}">
+                            <span style="font-weight: 600; color: #374151;">{label}.</span>
+                            <span style="color: #374151;">{opt_icon}{opt}</span>
+                            {"<span style='float:right; font-size:11px; color:#059669; font-weight:600;'>Correct Answer</span>" if is_correct_opt and not is_student_pick else ""}
+                            {"<span style='float:right; font-size:11px; color:#059669; font-weight:600;'>Your Answer (Correct!)</span>" if is_student_pick and is_correct_opt else ""}
+                            {"<span style='float:right; font-size:11px; color:#dc2626; font-weight:600;'>Your Answer</span>" if is_student_pick and not is_correct_opt else ""}
+                        </div>
+                    """
 
                 student_personal_section += f"""
-                    <div style="padding: 14px; background: {bg}; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid {border_color};">
-                        <table style="width: 100%; border-collapse: collapse;">
+                    <div style="padding: 14px; background: {bg}; border-radius: 8px; margin-bottom: 14px; border-left: 4px solid {border_color};">
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
                             <tr>
-                                <td style="width: 70%; vertical-align: top;">
-                                    <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: 600; color: #374151;">Q{idx}. {q.get("question", "")}</p>
+                                <td style="vertical-align: top;">
+                                    <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #111827;">Q{idx}. {q.get("question", "")}</p>
                                 </td>
-                                <td style="width: 30%; text-align: right; vertical-align: top;">
-                                    <span style="color: {result_color}; font-weight: bold; font-size: 14px;">{result_icon} {"Correct" if is_correct else "Incorrect"}</span>
-                                    <br><span style="color: #6b7280; font-size: 12px;">{time_display}</span>
+                                <td style="width: 100px; text-align: right; vertical-align: top;">
+                                    <span style="color: {result_color}; font-weight: bold; font-size: 13px;">{"Correct" if is_correct else "Incorrect"}</span>
                                 </td>
+                            </tr>
+                        </table>
+                        {options_html}
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+                            <tr>
+                                <td style="font-size: 11px; color: #6b7280;">Time: <strong>{time_display}</strong></td>
+                                <td style="font-size: 11px; color: #6b7280; text-align: center;">Accuracy after Q{idx}: <strong style="color: {"#059669" if isinstance(running_acc, (int, float)) and running_acc >= 60 else "#dc2626"}">{running_acc_display}</strong></td>
+                                <td style="font-size: 11px; text-align: right;">{"<span style=" + repr("padding:2px 8px;border-radius:9999px;font-size:10px;background:" + cluster_bg + ";color:" + cluster_color + ";") + ">" + cluster_at.title() + "</span>" if cluster_at else ""}</td>
                             </tr>
                         </table>
                     </div>
