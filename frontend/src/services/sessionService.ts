@@ -143,13 +143,11 @@ export const sessionService = {
       try {
         const html2pdf = (await import('html2pdf.js')).default;
 
-        // Parse the full HTML document and extract body + styles
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlContent, 'text/html');
 
         const container = document.createElement('div');
 
-        // Copy inline styles from the parsed document
         const styles = doc.querySelectorAll('style');
         styles.forEach((s) => {
           const styleEl = document.createElement('style');
@@ -157,24 +155,40 @@ export const sessionService = {
           container.appendChild(styleEl);
         });
 
-        // Copy the body content
         container.innerHTML += doc.body.innerHTML;
-        container.style.position = 'absolute';
-        container.style.left = '-9999px';
+
+        // Position in viewport so html2canvas can capture it, but visually hidden
+        container.style.position = 'fixed';
+        container.style.left = '0';
         container.style.top = '0';
         container.style.width = '800px';
         container.style.background = '#ffffff';
+        container.style.zIndex = '-1';
+        container.style.opacity = '0.01';
+        container.style.pointerEvents = 'none';
         document.body.appendChild(container);
 
-        // Wait for rendering
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         await html2pdf()
           .set({
             margin: [5, 5, 5, 5],
             filename: pdfFilename,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+            html2canvas: {
+              scale: 2,
+              useCORS: true,
+              logging: false,
+              backgroundColor: '#ffffff',
+              windowWidth: 800,
+              onclone: (clonedDoc: Document) => {
+                const el = clonedDoc.querySelector('div');
+                if (el) {
+                  el.style.opacity = '1';
+                  el.style.position = 'static';
+                }
+              },
+            },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
             pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
           })
