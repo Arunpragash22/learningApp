@@ -184,19 +184,18 @@ class Question:
         course_id: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], str]:
         """
-        Find questions for a session with intelligent fallback:
+        Find questions for a session with fallback to ALL instructor questions:
           1. Current session's questions
-          2. Most recent previous session's questions (same course/instructor)
-          3. Instructor's general questions (no sessionId)
+          2. ALL questions the instructor ever created (across every session + general)
 
         Returns (questions_list, source_label) where source_label is one of:
-          "current_session", "previous_session", "general", "all_fallback"
+          "current_session", "all_instructor_questions", "all_fallback"
         """
         database = get_database()
         if database is None:
             return [], "none"
 
-        # --- 1. Current session ---
+        # --- 1. Current session's own questions ---
         questions: List[Dict[str, Any]] = []
         async for q in database.questions.find({"sessionId": session_id}):
             q["id"] = str(q["_id"])
@@ -217,97 +216,32 @@ class Question:
             if not course_id:
                 course_id = session_doc.get("courseId")
 
-        # --- 2. Previous session's questions ---
+        # --- 2. ALL questions created by this instructor (every session + general) ---
         if instructor_id:
-            prev_session = await Question._find_previous_session(
-                database, session_id, instructor_id, course_id
-            )
-            if prev_session:
-                prev_sid = str(prev_session["_id"])
-                async for q in database.questions.find({"sessionId": prev_sid}):
-                    q["id"] = str(q["_id"])
-                    questions.append(q)
-                if questions:
-                    print(f"📝 Fallback: Found {len(questions)} questions from previous session {prev_sid}")
-                    return questions, "previous_session"
-
-        # --- 3. Instructor's general questions (no sessionId) ---
-        if instructor_id:
-            query = {
-                "$and": [
-                    {"$or": [{"instructorId": instructor_id}, {"createdBy": instructor_id}]},
-                    {"$or": [{"sessionId": None}, {"sessionId": {"$exists": False}}]}
-                ]
-            }
+            seen_ids: set = set()
+            query = {"$or": [{"instructorId": instructor_id}, {"createdBy": instructor_id}]}
             async for q in database.questions.find(query):
-                q["id"] = str(q["_id"])
-                questions.append(q)
+                qid = str(q["_id"])
+                if qid not in seen_ids:
+                    q["id"] = qid
+                    seen_ids.add(qid)
+                    questions.append(q)
             if questions:
-                print(f"📝 Fallback: Found {len(questions)} general questions from instructor")
-                return questions, "general"
+                generic_count = sum(
+                    1 for q in questions
+                    if q.get("questionType", "generic") != "cluster"
+                )
+                cluster_count = len(questions) - generic_count
+                print(f"📝 Fallback: Found {len(questions)} total instructor questions "
+                      f"(generic: {generic_count}, cluster: {cluster_count}) across all sessions")
+                return questions, "all_instructor_questions"
 
-        # --- 4. Ultimate fallback: all questions in DB ---
+        # --- 3. Ultimate fallback: all questions in DB ---
         async for q in database.questions.find({}):
             q["id"] = str(q["_id"])
             questions.append(q)
         print(f"📝 Fallback: Using all {len(questions)} questions in database")
         return questions, "all_fallback"
-
-    @staticmethod
-    async def _find_previous_session(
-        database, current_session_id: str, instructor_id: str, course_id: Optional[str]
-    ) -> Optional[Dict]:
-        """
-        Find the most recent completed/live session BEFORE the current one
-        for the same instructor (and preferably same course).
-        """
-        current_session = None
-        try:
-            current_session = await database.sessions.find_one({"_id": ObjectId(current_session_id)})
-        except Exception:
-            pass
-
-        current_date = None
-        if current_session:
-            current_date = current_session.get("createdAt") or current_session.get("date")
-
-        # Build query: same instructor, different session, has questions
-        base_query = {
-            "instructorId": instructor_id,
-            "_id": {"$ne": ObjectId(current_session_id)},
-            "status": {"$in": ["completed", "live", "upcoming"]},
-        }
-        if course_id:
-            base_query["courseId"] = course_id
-
-        sort_field = "createdAt"
-        sort_order = -1  # newest first
-
-        prev_session = await database.sessions.find_one(base_query, sort=[(sort_field, sort_order)])
-
-        if not prev_session and course_id:
-            # Retry without course filter (any session from this instructor)
-            del base_query["courseId"]
-            prev_session = await database.sessions.find_one(base_query, sort=[(sort_field, sort_order)])
-
-        if prev_session:
-            prev_sid = str(prev_session["_id"])
-            has_questions = await database.questions.count_documents({"sessionId": prev_sid})
-            if has_questions > 0:
-                print(f"📝 Found previous session {prev_sid} with {has_questions} questions")
-                return prev_session
-            # If the most recent one has no questions, search further back
-            base_query["_id"] = {"$ne": ObjectId(current_session_id), "$lt": prev_session["_id"]}
-            if course_id:
-                base_query["courseId"] = course_id
-            async for s in database.sessions.find(base_query).sort(sort_field, sort_order).limit(5):
-                s_id = str(s["_id"])
-                count = await database.questions.count_documents({"sessionId": s_id})
-                if count > 0:
-                    print(f"📝 Found earlier session {s_id} with {count} questions")
-                    return s
-
-        return None
 
     @staticmethod
     def split_generic_and_cluster(questions: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
