@@ -14,6 +14,32 @@ import { toast } from "sonner";
 const STORAGE_KEY = "connectedSessionId";
 const WS_PING_INTERVAL_MS = 15000;
 
+export interface FeedbackHistoryEntry {
+  questionNumber: number;
+  accuracy: number;
+  responseTime: number;
+  cluster: string;
+  isCorrect: boolean;
+}
+
+export interface RealTimeFeedback {
+  feedback: {
+    type: "achievement" | "encouragement" | "improvement" | "warning";
+    message: string;
+    clusterContext: string;
+    suggestions: string[];
+    cluster_label: string;
+  };
+  stats: {
+    accuracy: number | null;
+    totalAttempts: number;
+    correctAnswers: number;
+    responseTime: number | null;
+    cluster: string;
+    history: FeedbackHistoryEntry[];
+  };
+}
+
 interface SessionConnectionContextType {
   connectedSessionId: string | null;
   incomingQuiz: any | null;
@@ -26,6 +52,8 @@ interface SessionConnectionContextType {
   markQuestionAnswered: (questionId: string) => void;
   /** Increments when an answer is submitted; use as dependency to refetch session stats. */
   sessionStatsInvalidated: number;
+  /** Real-time feedback pushed via WebSocket after each quiz answer */
+  latestFeedback: RealTimeFeedback | null;
 }
 
 const SessionConnectionContext = createContext<SessionConnectionContextType | undefined>(undefined);
@@ -36,6 +64,7 @@ export function SessionConnectionProvider({ children }: { children: React.ReactN
     typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null
   );
   const [incomingQuiz, setIncomingQuizState] = useState<any | null>(null);
+  const [latestFeedback, setLatestFeedback] = useState<RealTimeFeedback | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastShownQuestionIdRef = useRef<string | null>(null);
@@ -77,6 +106,7 @@ export function SessionConnectionProvider({ children }: { children: React.ReactN
     closeWs();
     setConnectedSessionId(null);
     setIncomingQuizState(null);
+    setLatestFeedback(null);
     answeredQuestionIdsRef.current.clear();
     toast.info("Disconnected from session");
   }, [closeWs, setConnectedSessionId]);
@@ -154,6 +184,8 @@ export function SessionConnectionProvider({ children }: { children: React.ReactN
               position: "top-center",
             });
             showQuizIfNew(data);
+          } else if (data.type === "feedback_update") {
+            setLatestFeedback(data as RealTimeFeedback);
           } else if (data.type === "meeting_ended") {
             toast.info("Meeting has ended");
             leaveSession();
@@ -211,7 +243,9 @@ export function SessionConnectionProvider({ children }: { children: React.ReactN
         try {
           const data = JSON.parse(event.data);
           if (data.type === "quiz") showQuizIfNew(data);
-          else if (data.type === "meeting_ended") {
+          else if (data.type === "feedback_update") {
+            setLatestFeedback(data as RealTimeFeedback);
+          } else if (data.type === "meeting_ended") {
             toast.info("Meeting has ended");
             leaveSession();
           }
@@ -264,6 +298,7 @@ export function SessionConnectionProvider({ children }: { children: React.ReactN
     receiveQuizFromPoll,
     markQuestionAnswered,
     sessionStatsInvalidated,
+    latestFeedback,
   };
 
   return (

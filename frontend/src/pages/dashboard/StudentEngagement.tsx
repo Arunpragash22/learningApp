@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSessionConnection } from '../../context/SessionConnectionContext';
 import { Card } from '../../components/ui/Card';
-import { EngagementIndicator } from '../../components/engagement/EngagementIndicator';
 import { PersonalizedFeedback } from '../../components/feedback/PersonalizedFeedback';
+import { FeedbackGraphs } from '../../components/feedback/FeedbackGraphs';
 import { Activity, Target, Download, FileText, Loader2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { sessionService } from '../../services/sessionService';
@@ -25,7 +25,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL;
 export const StudentEngagement = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { connectedSessionId } = useSessionConnection();
+  const { connectedSessionId, latestFeedback } = useSessionConnection();
   const sessionIdFromStorage = typeof window !== 'undefined' ? localStorage.getItem('connectedSessionId') : null;
   const activeSessionId = connectedSessionId || sessionIdFromStorage;
 
@@ -169,8 +169,20 @@ export const StudentEngagement = () => {
     setDownloadingReportId(null);
   };
 
-  // Use real engagement data from the API, with sensible defaults before data loads
+  // Prefer WebSocket real-time stats, fall back to polled engagement data
   const studentData = useMemo(() => {
+    const ws = latestFeedback?.stats;
+    if (ws && ws.totalAttempts > 0) {
+      const clusterLabel = (ws.cluster || 'moderate').toLowerCase() as 'active' | 'moderate' | 'passive';
+      return {
+        engagementLevel: clusterLabel,
+        engagementScore: engagementData?.engagementScore ?? 0,
+        cluster: ws.cluster || 'Not Assigned',
+        questionsAnswered: ws.totalAttempts,
+        correctAnswers: ws.correctAnswers,
+        averageResponseTime: ws.responseTime ?? engagementData?.averageResponseTime ?? 0,
+      };
+    }
     if (engagementData) {
       return {
         engagementLevel: engagementData.engagementLevel as 'active' | 'moderate' | 'passive',
@@ -189,17 +201,25 @@ export const StudentEngagement = () => {
       correctAnswers: 0,
       averageResponseTime: 0,
     };
-  }, [engagementData]);
+  }, [engagementData, latestFeedback]);
 
-  const feedback = realFeedback
+  // Graph history from WebSocket (primary) or polled feedback (fallback)
+  const feedbackHistory = useMemo(() => {
+    if (latestFeedback?.stats?.history?.length) return latestFeedback.stats.history;
+    return [];
+  }, [latestFeedback]);
+
+  // Prefer WebSocket feedback, fall back to polled feedback
+  const activeFeedback = latestFeedback?.feedback ?? realFeedback;
+  const feedback = activeFeedback
     ? [
         {
           id: '1',
-          type: realFeedback.type,
-          message: realFeedback.message,
-          clusterContext: realFeedback.clusterContext,
-          suggestions: realFeedback.suggestions,
-          timestamp: 'Just now',
+          type: activeFeedback.type,
+          message: activeFeedback.message,
+          clusterContext: activeFeedback.clusterContext,
+          suggestions: activeFeedback.suggestions,
+          timestamp: 'Live',
         },
       ]
     : [];
@@ -288,6 +308,14 @@ export const StudentEngagement = () => {
           </div>
         </Card>
       </div>
+
+      {/* Real-time Performance Graphs */}
+      {feedbackHistory.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Performance Trends</h2>
+          <FeedbackGraphs history={feedbackHistory} />
+        </div>
+      )}
 
       <div>
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Personalized Feedback</h2>

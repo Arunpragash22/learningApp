@@ -253,6 +253,7 @@ def _generate_feedback(r) -> dict:
     """
     Generate personalized feedback for one student row.
     Returns a dict with structured feedback data.
+    Produces concise 2-3 sentence feedback; graphs visualize the numbers.
     """
     name = _safe_name(r.get(_COL_NAME))
 
@@ -264,60 +265,6 @@ def _generate_feedback(r) -> dict:
     correct = int(round(r.get("correct_sum", 0))) if not pd.isna(r.get("correct_sum", np.nan)) else 0
     acc = r.get("accuracy", np.nan)
 
-    intro = {
-        "Active": f"Hi {name}, great job staying consistently engaged.",
-        "Moderate": f"Hi {name}, you're participating fairly well—good progress so far.",
-        "Passive": f"Hi {name}, your engagement is low right now, but you can improve step by step.",
-    }[label]
-
-    perf = f"Your accuracy is {_pct(acc)} ({correct}/{total} correct)."
-
-    rt_line = ""
-    if "median_rt_sec" in r.index and not pd.isna(r["median_rt_sec"]):
-        rt_line = f" Your typical response time is about {_num(r['median_rt_sec'], 1)} seconds."
-
-    net_line = ""
-    if "poor_net_ratio" in r.index and not pd.isna(r["poor_net_ratio"]) and float(r["poor_net_ratio"]) >= 0.6:
-        net_line = (
-            " Your network looks weak in many attempts, so some delays may not be "
-            "your fault—try a more stable connection if possible."
-        )
-
-    actions: List[str] = []
-    if pd.isna(acc):
-        actions.append("Attempt a few more questions so we can measure your performance properly")
-    elif acc < 0.50:
-        actions.append("Review the basics and redo wrong questions slowly to understand mistakes")
-        actions.append("Practice 10 easy-to-medium questions on the same topic today")
-    elif acc < 0.75:
-        actions.append("Focus on your most-missed topics and practice 5 similar questions per topic")
-        actions.append("After each quiz, note 2 mistakes and the correct rule/formula")
-    else:
-        actions.append("Maintain performance with a short mixed practice set after each lesson")
-        actions.append("Add 3 harder questions weekly to strengthen weak areas")
-
-    if "median_rt_sec" in r.index and not pd.isna(r["median_rt_sec"]):
-        rt = float(r["median_rt_sec"])
-        if rt > 120:
-            actions.append("Train speed using a 60–90 second timer per MCQ and avoid overthinking")
-        elif rt > 60:
-            actions.append("Reduce time by eliminating wrong options first before choosing the answer")
-        else:
-            actions.append("Keep your speed, but double-check units/signs before submitting")
-
-    if label == "Passive":
-        actions.append("Set a small goal: attempt at least 3 questions daily this week to build consistency")
-    elif label == "Moderate":
-        actions.append("Attempt quizzes on the same day they are shared to move into the Active group")
-    else:
-        actions.append("Keep momentum by adding one extra weekly revision session")
-
-    next_steps = "Next steps: " + "; ".join(actions[:3]) + "."
-    close = "Tell me one topic you find hardest, and I'll suggest a short mini-plan."
-
-    full_text = " ".join([intro, perf + rt_line + net_line, next_steps, close])
-
-    # Determine feedback type for the UI card
     if label == "Active":
         fb_type = "achievement"
     elif label == "Passive":
@@ -325,13 +272,112 @@ def _generate_feedback(r) -> dict:
     else:
         fb_type = "encouragement"
 
+    # Build concise message (2-3 sentences max)
+    if pd.isna(acc) or total == 0:
+        message = f"Hi {name}, answer a few more questions so we can track your progress."
+    elif acc >= 0.75:
+        message = f"Great work, {name}! {_pct(acc)} accuracy across {total} questions. Keep the momentum going."
+    elif acc >= 0.50:
+        message = f"Good effort, {name} — {_pct(acc)} accuracy so far. Focus on your weaker topics to push higher."
+    else:
+        message = f"Hi {name}, your accuracy is {_pct(acc)}. Review mistakes carefully — small improvements add up fast."
+
+    actions: List[str] = []
+    if pd.isna(acc):
+        actions.append("Attempt more questions to build your performance profile")
+    elif acc < 0.50:
+        actions.append("Review wrong answers and redo them slowly")
+    elif acc < 0.75:
+        actions.append("Focus on most-missed topics")
+    else:
+        actions.append("Try harder questions to challenge yourself")
+
+    if label == "Passive":
+        actions.append("Aim for at least 3 questions daily")
+    elif label == "Moderate":
+        actions.append("Answer quizzes promptly to move into Active group")
+
     return {
         "type": fb_type,
-        "message": full_text,
+        "message": message,
         "clusterContext": f"{label} Participants",
         "suggestions": actions[:3],
         "cluster_label": label,
     }
+
+
+# ── Per-question history builder (feeds the frontend graphs) ─────
+
+async def _build_question_history(
+    session_id: str, student_id: str
+) -> List[dict]:
+    """
+    Build a per-question snapshot array for the given student in this session.
+    Each entry: {questionNumber, accuracy, responseTime, cluster}
+    """
+    db = get_database()
+    if db is None:
+        return []
+
+    all_ids = [session_id]
+    try:
+        from bson import ObjectId
+        if len(session_id) == 24:
+            try:
+                doc = await db.sessions.find_one({"_id": ObjectId(session_id)}, {"zoomMeetingId": 1})
+                if doc and doc.get("zoomMeetingId"):
+                    z = str(doc["zoomMeetingId"])
+                    if z not in all_ids:
+                        all_ids.append(z)
+            except Exception:
+                pass
+        for variant in ([session_id] + ([int(session_id)] if session_id.isdigit() else [])):
+            doc = await db.sessions.find_one({"zoomMeetingId": variant}, {"_id": 1, "zoomMeetingId": 1})
+            if doc:
+                mid = str(doc["_id"])
+                if mid not in all_ids:
+                    all_ids.append(mid)
+                zv = doc.get("zoomMeetingId")
+                if zv and str(zv) not in all_ids:
+                    all_ids.append(str(zv))
+    except Exception:
+        pass
+
+    answers = []
+    async for a in db.quiz_answers.find(
+        {"sessionId": {"$in": all_ids}, "studentId": student_id}
+    ).sort("timestamp", 1):
+        answers.append(a)
+
+    if not answers:
+        return []
+
+    # Build cluster map for this session
+    cluster_map_by_time: Dict[str, str] = {}
+    for sid in all_ids:
+        async for c in db.clusters.find({"sessionId": sid}):
+            level = c.get("engagementLevel", "moderate")
+            for s in c.get("students", []):
+                cluster_map_by_time[s] = level
+
+    current_cluster = cluster_map_by_time.get(student_id, "moderate")
+
+    history = []
+    running_correct = 0
+    for i, ans in enumerate(answers, 1):
+        is_correct = ans.get("isCorrect", False)
+        if is_correct:
+            running_correct += 1
+        running_accuracy = round(running_correct / i * 100, 1)
+        history.append({
+            "questionNumber": i,
+            "accuracy": running_accuracy,
+            "responseTime": round(float(ans.get("timeTaken", 0)), 1),
+            "cluster": current_cluster,
+            "isCorrect": is_correct,
+        })
+
+    return history
 
 
 # ── Public API ───────────────────────────────────────────────────
@@ -360,6 +406,9 @@ async def get_student_feedback(
     fb["totalAttempts"] = int(row.get("total_attempts", 0))
     fb["correctAnswers"] = int(round(row.get("correct_sum", 0)))
     fb["medianResponseTime"] = float(row.get("median_rt_sec", 0)) if not pd.isna(row.get("median_rt_sec")) else None
+
+    fb["history"] = await _build_question_history(session_id, student_id)
+
     return fb
 
 

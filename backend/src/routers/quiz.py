@@ -1,7 +1,9 @@
 from typing import Dict, Optional, List
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from pydantic import BaseModel
 from ..services.quiz_service import QuizService
+from ..services.ws_manager import ws_manager
 from ..models.quiz_answer import QuizAnswer, NetworkStrength
 from ..models.quiz_performance import QuizPerformance
 from ..models.session_participant_model import SessionParticipantModel
@@ -57,10 +59,16 @@ async def submit_answer(
             timeTaken=request_data.timeTaken,
             studentId=request_data.studentId,
             sessionId=request_data.sessionId,
-            networkStrength=request_data.networkStrength,  # Include network quality
+            networkStrength=request_data.networkStrength,
         )
 
         result = await quiz_service.submit_answer(answer)
+
+        # Push real-time feedback update via WebSocket (fire-and-forget)
+        asyncio.create_task(
+            _push_feedback_update(request_data.sessionId, request_data.studentId)
+        )
+
         return result
     except Exception as e:
         print(f"Error submitting answer: {e}")
@@ -68,6 +76,61 @@ async def submit_answer(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )
+
+
+async def _push_feedback_update(session_id: str, student_id: str):
+    """Generate updated feedback and push to student via WebSocket."""
+    try:
+        from ..services.feedback_service import get_student_feedback
+        fb = await get_student_feedback(session_id, student_id)
+        if not fb:
+            return
+
+        message = {
+            "type": "feedback_update",
+            "feedback": {
+                "type": fb.get("type", "encouragement"),
+                "message": fb.get("message", ""),
+                "clusterContext": fb.get("clusterContext", ""),
+                "suggestions": fb.get("suggestions", []),
+                "cluster_label": fb.get("cluster_label", "Moderate"),
+            },
+            "stats": {
+                "accuracy": fb.get("accuracy"),
+                "totalAttempts": fb.get("totalAttempts", 0),
+                "correctAnswers": fb.get("correctAnswers", 0),
+                "responseTime": fb.get("medianResponseTime"),
+                "cluster": fb.get("cluster_label", "Moderate"),
+                "history": fb.get("history", []),
+            },
+        }
+
+        sent = await ws_manager.send_to_student_in_session(session_id, student_id, message)
+        if not sent:
+            # Try alternate session IDs (Zoom ↔ MongoDB)
+            from ..database.connection import get_database
+            db = get_database()
+            if db:
+                alt_ids = []
+                try:
+                    from bson import ObjectId
+                    if len(session_id) == 24:
+                        doc = await db.sessions.find_one({"_id": ObjectId(session_id)}, {"zoomMeetingId": 1})
+                        if doc and doc.get("zoomMeetingId"):
+                            alt_ids.append(str(doc["zoomMeetingId"]))
+                except Exception:
+                    pass
+                for variant in ([session_id] + ([int(session_id)] if session_id.isdigit() else [])):
+                    doc = await db.sessions.find_one({"zoomMeetingId": variant}, {"_id": 1})
+                    if doc:
+                        alt_ids.append(str(doc["_id"]))
+                for alt in alt_ids:
+                    if alt != session_id:
+                        sent = await ws_manager.send_to_student_in_session(alt, student_id, message)
+                        if sent:
+                            break
+    except Exception as e:
+        print(f"⚠️ Failed to push feedback_update: {e}")
 
 
 @router.get("/performance/{question_id}")
