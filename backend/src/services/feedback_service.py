@@ -352,30 +352,39 @@ async def _build_question_history(
     if not answers:
         return []
 
-    # Build cluster map for this session
-    cluster_map_by_time: Dict[str, str] = {}
+    # Get the current cluster as fallback for answers without a stamp
+    current_cluster = "moderate"
     for sid in all_ids:
         async for c in db.clusters.find({"sessionId": sid}):
             level = c.get("engagementLevel", "moderate")
             for s in c.get("students", []):
-                cluster_map_by_time[s] = level
-
-    current_cluster = cluster_map_by_time.get(student_id, "moderate")
+                if s == student_id:
+                    current_cluster = level
 
     history = []
     running_correct = 0
+    last_known_cluster = "moderate"
     for i, ans in enumerate(answers, 1):
         is_correct = ans.get("isCorrect", False)
         if is_correct:
             running_correct += 1
         running_accuracy = round(running_correct / i * 100, 1)
+        # Use per-answer cluster stamp if available, otherwise carry forward
+        cluster_at = ans.get("clusterAtAnswer")
+        if cluster_at:
+            last_known_cluster = cluster_at
         history.append({
             "questionNumber": i,
             "accuracy": running_accuracy,
             "responseTime": round(float(ans.get("timeTaken", 0)), 1),
-            "cluster": current_cluster,
+            "cluster": cluster_at or last_known_cluster,
             "isCorrect": is_correct,
         })
+
+    # For the last entry, if it has no stamp yet (clustering still running),
+    # use the current cluster from the clusters collection
+    if history and not answers[-1].get("clusterAtAnswer"):
+        history[-1]["cluster"] = current_cluster
 
     return history
 

@@ -191,6 +191,11 @@ class QuizService:
                     await ClusterModel.update_clusters_for_session(mongo_session_id, clusters)
                     print(f"✅ [BG] Clusters also saved under MongoDB ID: {mongo_session_id}")
 
+                # Stamp the student's latest quiz_answer with their fresh cluster
+                # so the per-question cluster timeline graph shows actual changes.
+                if student_id:
+                    await self._stamp_cluster_on_latest_answer(session_id, student_id)
+
                 # Push corrected feedback to the student now that clusters are fresh
                 if student_id:
                     await self._push_post_clustering_feedback(session_id, student_id)
@@ -199,6 +204,68 @@ class QuizService:
                 import traceback
                 print(f"❌ [BG] Background preprocessing/clustering error: {e}")
                 traceback.print_exc()
+
+    async def _stamp_cluster_on_latest_answer(self, session_id: str, student_id: str):
+        """Save the student's current cluster on their most recent quiz_answer.
+
+        Called right after clustering completes so each answer carries the
+        cluster assignment that was computed using that answer's data.
+        This powers the per-question cluster timeline graph.
+        """
+        try:
+            from ..database.connection import get_database
+            from ..models.cluster_model import ClusterModel
+
+            db = get_database()
+            if db is None:
+                return
+
+            # Resolve all session ID variants
+            all_ids = [session_id]
+            try:
+                from bson import ObjectId
+                if len(session_id) == 24:
+                    doc = await db.sessions.find_one({"_id": ObjectId(session_id)}, {"zoomMeetingId": 1})
+                    if doc and doc.get("zoomMeetingId"):
+                        z = str(doc["zoomMeetingId"])
+                        if z not in all_ids:
+                            all_ids.append(z)
+                for variant in ([session_id] + ([int(session_id)] if session_id.isdigit() else [])):
+                    doc = await db.sessions.find_one({"zoomMeetingId": variant}, {"_id": 1, "zoomMeetingId": 1})
+                    if doc:
+                        mid = str(doc["_id"])
+                        if mid not in all_ids:
+                            all_ids.append(mid)
+                        zv = doc.get("zoomMeetingId")
+                        if zv and str(zv) not in all_ids:
+                            all_ids.append(str(zv))
+            except Exception:
+                pass
+
+            # Get student's cluster from the freshly computed clusters
+            student_cluster = None
+            for sid in all_ids:
+                cluster_map = await ClusterModel.get_student_cluster_map(sid)
+                if cluster_map and student_id in cluster_map:
+                    student_cluster = cluster_map[student_id]
+                    break
+
+            if not student_cluster:
+                return
+
+            # Find the student's most recent answer in this session and stamp it
+            latest_answer = await db.quiz_answers.find_one(
+                {"studentId": student_id, "sessionId": {"$in": all_ids}},
+                sort=[("timestamp", -1)],
+            )
+            if latest_answer:
+                await db.quiz_answers.update_one(
+                    {"_id": latest_answer["_id"]},
+                    {"$set": {"clusterAtAnswer": student_cluster}},
+                )
+                print(f"📌 [BG] Stamped clusterAtAnswer={student_cluster} on answer {latest_answer['_id']}")
+        except Exception as e:
+            print(f"⚠️ [BG] Failed to stamp clusterAtAnswer: {e}")
 
     async def _push_post_clustering_feedback(self, session_id: str, student_id: str):
         """Push corrected feedback via WebSocket after clustering completes.
