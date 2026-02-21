@@ -106,10 +106,12 @@ class QuizService:
         # ── Auto-trigger preprocessing + KMeans clustering ──
         # Every answer (generic or cluster) triggers preprocessing AND clustering.
         # Generic answers build the INITIAL clusters; cluster answers RE-cluster.
+        # Pass student_id so a corrected feedback_update is pushed after clustering.
         asyncio.create_task(
             self._run_preprocessing_and_clustering(
                 answer.sessionId,
                 run_clustering=True,
+                student_id=answer.studentId,
             )
         )
 
@@ -119,7 +121,7 @@ class QuizService:
         }
 
     async def _run_preprocessing_and_clustering(
-        self, session_id: str, run_clustering: bool = True
+        self, session_id: str, run_clustering: bool = True, student_id: str = None
     ) -> None:
         """
         Background task: preprocess engagement data and run KMeans clustering.
@@ -127,6 +129,9 @@ class QuizService:
         Every student answer triggers preprocessing + clustering so that:
         - Generic answers build the INITIAL cluster assignments
         - Cluster answers RE-cluster with updated engagement data
+
+        After clustering completes, pushes updated feedback to the student
+        via WebSocket so the dashboard reflects the correct cluster immediately.
 
         Uses a per-session lock so that concurrent submissions don't
         create duplicate cluster documents (race condition).
@@ -186,10 +191,81 @@ class QuizService:
                     await ClusterModel.update_clusters_for_session(mongo_session_id, clusters)
                     print(f"✅ [BG] Clusters also saved under MongoDB ID: {mongo_session_id}")
 
+                # Push corrected feedback to the student now that clusters are fresh
+                if student_id:
+                    await self._push_post_clustering_feedback(session_id, student_id)
+
             except Exception as e:
                 import traceback
                 print(f"❌ [BG] Background preprocessing/clustering error: {e}")
                 traceback.print_exc()
+
+    async def _push_post_clustering_feedback(self, session_id: str, student_id: str):
+        """Push corrected feedback via WebSocket after clustering completes.
+
+        The initial feedback_update (sent immediately after answer submit)
+        may carry a stale cluster label because clustering hadn't finished yet.
+        This re-sends the feedback with the freshly computed cluster so the
+        student dashboard shows the correct cluster immediately.
+        """
+        try:
+            from ..services.feedback_service import get_student_feedback
+            from ..services.ws_manager import ws_manager
+
+            fb = await get_student_feedback(session_id, student_id)
+            if not fb:
+                return
+
+            message = {
+                "type": "feedback_update",
+                "feedback": {
+                    "type": fb.get("type", "encouragement"),
+                    "message": fb.get("message", ""),
+                    "clusterContext": fb.get("clusterContext", ""),
+                    "suggestions": fb.get("suggestions", []),
+                    "cluster_label": fb.get("cluster_label", "Moderate"),
+                },
+                "stats": {
+                    "accuracy": fb.get("accuracy"),
+                    "totalAttempts": fb.get("totalAttempts", 0),
+                    "correctAnswers": fb.get("correctAnswers", 0),
+                    "responseTime": fb.get("medianResponseTime"),
+                    "cluster": fb.get("cluster_label", "Moderate"),
+                    "history": fb.get("history", []),
+                },
+            }
+
+            sent = await ws_manager.send_to_student_in_session(session_id, student_id, message)
+            if not sent:
+                from ..database.connection import get_database
+                db = get_database()
+                if db:
+                    alt_ids = []
+                    try:
+                        from bson import ObjectId
+                        if len(session_id) == 24:
+                            doc = await db.sessions.find_one({"_id": ObjectId(session_id)}, {"zoomMeetingId": 1})
+                            if doc and doc.get("zoomMeetingId"):
+                                alt_ids.append(str(doc["zoomMeetingId"]))
+                    except Exception:
+                        pass
+                    for variant in ([session_id] + ([int(session_id)] if session_id.isdigit() else [])):
+                        try:
+                            doc = await db.sessions.find_one({"zoomMeetingId": variant}, {"_id": 1})
+                            if doc:
+                                alt_ids.append(str(doc["_id"]))
+                        except Exception:
+                            pass
+                    for alt in alt_ids:
+                        if alt != session_id:
+                            sent = await ws_manager.send_to_student_in_session(alt, student_id, message)
+                            if sent:
+                                break
+
+            print(f"{'✅' if sent else '⚠️'} [BG] Post-clustering feedback push to {student_id[:12]}... "
+                  f"(cluster={fb.get('cluster_label', '?')})")
+        except Exception as e:
+            print(f"⚠️ [BG] Failed to push post-clustering feedback: {e}")
 
     async def get_performance(self, question_id: str, session_id: str) -> QuizPerformance:
         """Get performance data from MongoDB"""

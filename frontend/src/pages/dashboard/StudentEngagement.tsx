@@ -169,15 +169,29 @@ export const StudentEngagement = () => {
     setDownloadingReportId(null);
   };
 
-  // Prefer WebSocket real-time stats, fall back to polled engagement data
+  // Merge WebSocket real-time stats with polled engagement data.
+  // WS sends cluster_label ("Active"/"Moderate"/"Passive"), map to display names.
   const studentData = useMemo(() => {
+    const CLUSTER_DISPLAY: Record<string, { name: string; level: 'active' | 'moderate' | 'passive' }> = {
+      active:   { name: 'Active Participants',   level: 'active' },
+      moderate: { name: 'Moderate Participants',  level: 'moderate' },
+      passive:  { name: 'At-Risk Students',       level: 'passive' },
+    };
+
     const ws = latestFeedback?.stats;
     if (ws && ws.totalAttempts > 0) {
-      const clusterLabel = (ws.cluster || 'moderate').toLowerCase() as 'active' | 'moderate' | 'passive';
+      const rawLabel = (ws.cluster || 'moderate').toLowerCase();
+      const mapped = CLUSTER_DISPLAY[rawLabel] ?? CLUSTER_DISPLAY['moderate'];
+      // If polled data has a more specific cluster name, prefer it
+      const clusterName = engagementData?.cluster && engagementData.cluster !== 'Not Assigned'
+        ? engagementData.cluster
+        : mapped.name;
+      const clusterLevel = engagementData?.engagementLevel || mapped.level;
+
       return {
-        engagementLevel: clusterLabel,
+        engagementLevel: clusterLevel as 'active' | 'moderate' | 'passive',
         engagementScore: engagementData?.engagementScore ?? 0,
-        cluster: ws.cluster || 'Not Assigned',
+        cluster: clusterName,
         questionsAnswered: ws.totalAttempts,
         correctAnswers: ws.correctAnswers,
         averageResponseTime: ws.responseTime ?? engagementData?.averageResponseTime ?? 0,
