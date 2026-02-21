@@ -135,17 +135,17 @@ export const QuizPopup: React.FC<QuizPopupProps> = ({
   const questionText = quiz.question || quiz.text || "No question text";
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-[100]">
-      <div className="bg-white p-6 rounded-lg w-96 max-w-[90vw] shadow-lg">
-        <h2 className="text-lg font-bold mb-3">📝 New Quiz</h2>
-        <p className="font-medium mb-4 text-gray-800">{questionText}</p>
+    <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[100] p-4">
+      <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl w-full max-w-md shadow-2xl">
+        <h2 className="text-lg font-bold mb-3 text-gray-900 dark:text-gray-100">📝 New Quiz</h2>
+        <p className="font-medium mb-4 text-gray-800 dark:text-gray-200">{questionText}</p>
 
         <div className="space-y-2">
           {options.length > 0 ? (
             options.map((op: string, i: number) => (
               <button
                 key={i}
-                className="w-full p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                className="w-full min-h-[48px] p-3 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
                 disabled={isSubmitting || hasSubmitted}
                 onClick={() => handleAnswerClick(i)}
               >
@@ -154,19 +154,19 @@ export const QuizPopup: React.FC<QuizPopupProps> = ({
               </button>
             ))
           ) : (
-            <p className="text-red-500 text-sm">⚠️ No options available</p>
+            <p className="text-red-500 dark:text-red-400 text-sm">No options available</p>
           )}
         </div>
 
-        <div className="mt-4 flex justify-between items-center text-sm text-gray-600">
+        <div className="mt-4 flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
           <span>
-            Time Left: <span className={`font-bold ${timeLeft <= 10 ? "text-red-500" : ""}`}>{timeLeft}s</span>
+            Time Left: <span className={`font-bold ${timeLeft <= 10 ? "text-red-500 dark:text-red-400" : ""}`}>{timeLeft}s</span>
           </span>
-          {isSubmitting && <span className="text-blue-600">Sending...</span>}
+          {isSubmitting && <span className="text-blue-600 dark:text-blue-400">Sending...</span>}
         </div>
 
         <button
-          className="mt-4 w-full p-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm"
+          className="mt-4 w-full min-h-[44px] p-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm transition-colors"
           onClick={onClose}
         >
           Close

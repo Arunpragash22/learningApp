@@ -155,7 +155,7 @@ export const CourseEdit = () => {
       <div className="py-6">
         <Card className="p-6 text-center">
           <div className="animate-spin h-12 w-12 rounded-full border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading course...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading course...</p>
         </Card>
       </div>
     );
@@ -185,7 +185,7 @@ export const CourseEdit = () => {
           <CardContent className="space-y-4">
             {/* Title */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Course Title *
               </label>
               <Input
@@ -199,7 +199,7 @@ export const CourseEdit = () => {
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Description *
               </label>
               <textarea
@@ -209,14 +209,14 @@ export const CourseEdit = () => {
                 placeholder="Describe what students will learn in this course..."
                 rows={4}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Category */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
                   <TagIcon className="h-4 w-4" />
                   Category
                 </label>
@@ -230,7 +230,7 @@ export const CourseEdit = () => {
 
               {/* Duration */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
                   <CalendarIcon className="h-4 w-4" />
                   Duration
                 </label>
@@ -244,7 +244,7 @@ export const CourseEdit = () => {
 
               {/* Course Code */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
                   <HashIcon className="h-4 w-4" />
                   Course Code
                 </label>
@@ -258,7 +258,7 @@ export const CourseEdit = () => {
 
               {/* Max Students */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
                   <UsersIcon className="h-4 w-4" />
                   Max Students
                 </label>
@@ -274,19 +274,19 @@ export const CourseEdit = () => {
 
               {/* Status */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Status
                 </label>
                 <select
                   name="status"
                   value={formData.status}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100"
                 >
                   <option value="draft">Draft</option>
                   <option value="published">Published</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {formData.status === 'draft' 
                     ? 'Draft courses are not visible to students'
                     : 'Published courses are visible to all students'}

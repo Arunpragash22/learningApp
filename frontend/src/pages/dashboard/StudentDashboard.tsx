@@ -289,16 +289,16 @@ export const StudentDashboard = () => {
       {/* Welcome + meeting controls (like screenshot) */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-gray-100">
             Welcome back, {user?.firstName || "Student"}!
           </h1>
-          <p className="mt-1 text-xs sm:text-sm text-gray-500">
+          <p className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
             Here&apos;s what&apos;s happening with your courses today.
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           {connectedSessionId && (
-            <Link to="/dashboard/sessions" className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border text-blue-600 hover:opacity-90">
+            <Link to="/dashboard/sessions" className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700 text-blue-600 dark:text-blue-400 hover:opacity-90">
               <WifiIcon className="h-4 w-4" />
               <ConnectionQualityBadge quality={connectionQuality} rtt={currentRtt} isMonitoring={isLatencyMonitoring} />
               <span className="text-sm font-medium">In meeting</span>
@@ -356,45 +356,45 @@ export const StudentDashboard = () => {
       {/* Upcoming Meetings (next 24 hours) — list or empty state */}
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-medium text-gray-900">Upcoming Meetings</h3>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Upcoming Meetings</h3>
         </div>
-        <p className="text-sm text-gray-500">
-          View-only. Go to <Link to="/dashboard/sessions" className="text-blue-600 hover:underline">Meetings</Link> to join.
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          View-only. Go to <Link to="/dashboard/sessions" className="text-blue-600 dark:text-blue-400 hover:underline">Meetings</Link> to join.
         </p>
 
         {/* Meeting list or empty state */}
         {sessions.length === 0 ? (
-          <div className="bg-white shadow rounded-lg px-4 py-8 text-center text-gray-500">
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg px-4 py-8 text-center text-gray-500 dark:text-gray-400">
             <p className="text-sm">No upcoming meetings</p>
-            <Link to="/dashboard/sessions" className="text-sm text-blue-600 hover:underline mt-2 inline-block">Go to Meetings</Link>
+            <Link to="/dashboard/sessions" className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block">Go to Meetings</Link>
           </div>
         ) : (
           <div className="space-y-4">
             {sessions.filter(s => s.isStandalone === true).length > 0 && (
-              <div className="bg-white shadow rounded-lg">
-                <div className="px-4 py-3 border-b">
-                  <h4 className="text-sm font-semibold text-gray-900">Standalone meetings</h4>
-                  <p className="text-xs text-gray-500 mt-0.5">Meetings you enrolled in with a key</p>
+              <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
+                <div className="px-4 py-3 border-b dark:border-gray-700">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Standalone meetings</h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Meetings you enrolled in with a key</p>
                 </div>
                 {sessions.filter(s => s.isStandalone === true).map((session) => {
                   const sessionKey = session.zoomMeetingId || session.id;
                   const isConnectedToThis = connectedSessionId === sessionKey;
                   return (
-                    <div key={session.id} className="px-4 py-4 border-t hover:bg-gray-50" style={isConnectedToThis ? { backgroundColor: '#eff6ff' } : {}}>
+                    <div key={session.id} className={`px-4 py-4 border-t dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 ${isConnectedToThis ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium" style={{ color: '#3B82F6' }}>{session.title}</p>
+                            <p className="text-sm font-medium text-blue-500">{session.title}</p>
                             {session.status === 'live' && <Badge variant="danger" className="bg-red-600 text-white text-xs">LIVE</Badge>}
                             {isConnectedToThis && <Badge variant="success" className="text-white text-xs" style={{ backgroundColor: '#3B82F6' }}>CONNECTED</Badge>}
                           </div>
-                          <p className="text-xs text-gray-500 mt-1">{session.course} · {session.instructor}</p>
-                          <p className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{session.course} · {session.instructor}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 flex items-center gap-2">
                             <CalendarIcon className="h-3 w-3" />
                             {session.date} · {session.time}
                           </p>
                         </div>
-                        <Link to="/dashboard/sessions" className="text-xs text-blue-600 hover:underline whitespace-nowrap">Join from Meetings →</Link>
+                        <Link to="/dashboard/sessions" className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">Join from Meetings →</Link>
                       </div>
                     </div>
                   );
@@ -403,30 +403,30 @@ export const StudentDashboard = () => {
             )}
 
             {sessions.filter(s => !s.isStandalone).length > 0 && (
-              <div className="bg-white shadow rounded-lg">
-                <div className="px-4 py-3 border-b">
-                  <h4 className="text-sm font-semibold text-gray-900">Course Lessons</h4>
-                  <p className="text-xs text-gray-500 mt-0.5">From your enrolled courses</p>
+              <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
+                <div className="px-4 py-3 border-b dark:border-gray-700">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Course Lessons</h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">From your enrolled courses</p>
                 </div>
                 {sessions.filter(s => !s.isStandalone).map((session) => {
                   const sessionKey = session.zoomMeetingId || session.id;
                   const isConnectedToThis = connectedSessionId === sessionKey;
                   return (
-                    <div key={session.id} className="px-4 py-4 border-t hover:bg-gray-50" style={isConnectedToThis ? { backgroundColor: '#eff6ff' } : {}}>
+                    <div key={session.id} className={`px-4 py-4 border-t dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 ${isConnectedToThis ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium" style={{ color: '#3B82F6' }}>{session.title}</p>
+                            <p className="text-sm font-medium text-blue-500">{session.title}</p>
                             {session.status === 'live' && <Badge variant="danger" className="bg-red-600 text-white text-xs">LIVE</Badge>}
                             {isConnectedToThis && <Badge variant="success" className="text-white text-xs" style={{ backgroundColor: '#3B82F6' }}>CONNECTED</Badge>}
                           </div>
-                          <p className="text-xs text-gray-500 mt-1">{session.course} · {session.instructor}</p>
-                          <p className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{session.course} · {session.instructor}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 flex items-center gap-2">
                             <CalendarIcon className="h-3 w-3" />
                             {session.date} · {session.time}
                           </p>
                         </div>
-                        <Link to="/dashboard/sessions" className="text-xs text-blue-600 hover:underline whitespace-nowrap">Join from Meetings →</Link>
+                        <Link to="/dashboard/sessions" className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">Join from Meetings →</Link>
                       </div>
                     </div>
                   );

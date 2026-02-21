@@ -5,6 +5,7 @@ import { useSessionConnection } from '../../context/SessionConnectionContext';
 import { QuizPopup } from '../quiz/QuizPopup';
 import { Footer } from './Footer';
 import { BookOpenIcon, CalendarIcon, MenuIcon, XIcon, HomeIcon, GraduationCapIcon, LogOutIcon, BarChart3Icon, ActivityIcon, TargetIcon, KeyIcon, ChevronDownIcon } from 'lucide-react';
+import { ThemeToggle } from '../ui/ThemeToggle';
 
 export const DashboardLayout = () => {
   const location = useLocation();
@@ -107,10 +108,10 @@ export const DashboardLayout = () => {
   // Show loading state while checking authentication
   if (isLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
+      <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3B82F6] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     );
@@ -164,6 +165,9 @@ export const DashboardLayout = () => {
 
             {/* Right Side - User Menu & Notifications */}
             <div className="flex items-center space-x-2">
+              {/* Theme Toggle */}
+              <ThemeToggle />
+
               {/* User Menu */}
               <div className="relative">
                 <button
@@ -186,14 +190,14 @@ export const DashboardLayout = () => {
                       className="fixed inset-0 z-10"
                       onClick={() => setUserMenuOpen(false)}
                     ></div>
-                    <div className="absolute right-0 mt-2 w-56 rounded-xl shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20 overflow-hidden">
+                    <div className="absolute right-0 mt-2 w-56 rounded-xl shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 dark:ring-gray-700 z-20 overflow-hidden">
                       <div className="py-1">
                         {/* User Info */}
-                        <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-                          <p className="text-sm font-semibold text-gray-900">
+                        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                             {user?.firstName} {user?.lastName}
                           </p>
-                          <p className="text-xs text-gray-500 capitalize mt-1">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 capitalize mt-1">
                             {user?.role || 'User'}
                           </p>
                         </div>
@@ -202,8 +206,8 @@ export const DashboardLayout = () => {
                         <Link
                           to="/dashboard/profile"
                           onClick={() => setUserMenuOpen(false)}
-                          className={`block px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors ${
-                            isProfileActive ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                          className={`block px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                            isProfileActive ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'
                           }`}
                         >
                           View Profile
@@ -212,7 +216,7 @@ export const DashboardLayout = () => {
                         {/* Logout */}
                         <button
                           onClick={handleLogout}
-                          className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2 transition-colors"
+                          className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center space-x-2 transition-colors"
                         >
                           <LogOutIcon className="h-4 w-4" />
                           <span>Logout</span>
@@ -331,18 +335,18 @@ export const DashboardLayout = () => {
           
           {/* Modal */}
           <div className="flex min-h-full items-center justify-center p-4">
-            <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all">
+            <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all">
               {/* Icon */}
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-                <LogOutIcon className="h-6 w-6 text-red-600" />
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                <LogOutIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
               </div>
               
               {/* Content */}
               <div className="mt-4 text-center">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Confirm Logout
                 </h3>
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                   Are you sure you want to logout? You will need to login again to access your account.
                 </p>
               </div>
@@ -351,7 +355,7 @@ export const DashboardLayout = () => {
               <div className="mt-6 flex gap-3">
                 <button
                   onClick={cancelLogout}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
                 >
                   Cancel
                 </button>

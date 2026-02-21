@@ -242,8 +242,8 @@ export const StudentEngagement = () => {
     <div className="py-6">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">My Engagement Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">My Engagement Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Track your engagement, receive personalized feedback, and improve your learning
           </p>
         </div>
@@ -283,8 +283,8 @@ export const StudentEngagement = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Your Cluster</h3>
-            <Activity className="h-6 w-6 text-indigo-600" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Your Cluster</h3>
+            <Activity className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
           </div>
           <div className="flex items-center space-x-3">
             <div className={`rounded-full p-2.5 text-white ${
@@ -294,8 +294,8 @@ export const StudentEngagement = () => {
               <Activity className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-lg font-semibold text-gray-900">{studentData.cluster}</p>
-              <p className="text-sm text-gray-500">
+              <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{studentData.cluster}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 {studentData.engagementLevel === 'active' ? 'Highly engaged' :
                  studentData.engagementLevel === 'moderate' ? 'Moderately engaged' : 'Needs improvement'}
               </p>
@@ -305,19 +305,19 @@ export const StudentEngagement = () => {
 
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Quiz Performance</h3>
-            <Target className="h-6 w-6 text-purple-600" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quiz Performance</h3>
+            <Target className="h-6 w-6 text-purple-600 dark:text-purple-400" />
           </div>
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-gray-600">Correct Answers</span>
-              <span className="font-semibold text-gray-900">
+              <span className="text-gray-600 dark:text-gray-400">Correct Answers</span>
+              <span className="font-semibold text-gray-900 dark:text-gray-100">
                 {studentData.correctAnswers}/{studentData.questionsAnswered}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Avg Response Time</span>
-              <span className="font-semibold text-gray-900">{studentData.averageResponseTime}s</span>
+              <span className="text-gray-600 dark:text-gray-400">Avg Response Time</span>
+              <span className="font-semibold text-gray-900 dark:text-gray-100">{studentData.averageResponseTime}s</span>
             </div>
           </div>
         </Card>
@@ -326,28 +326,28 @@ export const StudentEngagement = () => {
       {/* Real-time Performance Graphs */}
       {feedbackHistory.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Performance Trends</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Performance Trends</h2>
           <FeedbackGraphs history={feedbackHistory} />
         </div>
       )}
 
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Personalized Feedback</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Personalized Feedback</h2>
         <PersonalizedFeedback feedback={feedback} studentName={user?.firstName} />
       </div>
 
       {/* Session Reports Section — at the bottom */}
-      <div className="mt-6 pt-6 border-t border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Session Reports</h2>
+      <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Session Reports</h2>
         {completedSessions.length > 0 ? (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50 p-4 rounded-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
             <div className="flex items-center gap-2">
-              <label htmlFor="student-session-report" className="text-sm font-medium text-gray-700">Session:</label>
+              <label htmlFor="student-session-report" className="text-sm font-medium text-gray-700 dark:text-gray-300">Session:</label>
               <select
                 id="student-session-report"
                 value={selectedReportSession || ''}
                 onChange={(e) => setSelectedReportSession(e.target.value || null)}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 max-w-md"
+                className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 max-w-md"
               >
                 {completedSessions.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -379,7 +379,7 @@ export const StudentEngagement = () => {
             )}
           </div>
         ) : (
-          <div className="bg-gray-50 p-4 rounded-lg text-center text-gray-500">
+          <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg text-center text-gray-500 dark:text-gray-400">
             No completed sessions yet. Reports will appear here after you participate in sessions.
           </div>
         )}

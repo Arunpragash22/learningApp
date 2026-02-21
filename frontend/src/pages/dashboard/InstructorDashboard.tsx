@@ -196,18 +196,17 @@ export const InstructorDashboard = () => {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
             Instructor Dashboard
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Welcome back, {user?.firstName}! Here's an overview of your teaching activities.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Trigger Question: send one random question to all joined students (only when session is live) */}
           {(selectedSession?.status === 'live' || sessions.some(s => s.status === 'live')) && (
             <Button
               variant="primary"
@@ -224,8 +223,7 @@ export const InstructorDashboard = () => {
 
       {/* ================= CARDS SECTION ================= */}
       <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-1">
-        {/* 📶 Connection Quality Card */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
+        <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
           <div className="p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
@@ -236,16 +234,16 @@ export const InstructorDashboard = () => {
                     ? 'bg-yellow-500' 
                     : connectionQuality === 'poor' || connectionQuality === 'critical'
                     ? 'bg-red-500'
-                    : 'bg-gray-400'
+                    : 'bg-gray-400 dark:bg-gray-500'
                 }`}>
                   <WifiIcon className="h-5 w-5 text-white" />
                 </div>
                 <div className="ml-4">
-                  <dt className="text-sm font-medium text-gray-500 truncate">
+                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
                     Connection Quality
                   </dt>
                   <dd className="flex items-center">
-                    <div className="text-lg font-medium text-gray-900 capitalize">
+                    <div className="text-lg font-medium text-gray-900 dark:text-gray-100 capitalize">
                       {connectionQuality}
                     </div>
                     {isLatencyMonitoring && (
@@ -259,22 +257,22 @@ export const InstructorDashboard = () => {
               </div>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-center">
-              <div className="bg-gray-50 rounded p-2">
-                <div className="font-medium text-gray-900">{currentRtt ? `${Math.round(currentRtt)}ms` : '--'}</div>
-                <div className="text-gray-500">RTT</div>
+              <div className="bg-gray-50 dark:bg-gray-700 rounded p-2">
+                <div className="font-medium text-gray-900 dark:text-gray-100">{currentRtt ? `${Math.round(currentRtt)}ms` : '--'}</div>
+                <div className="text-gray-500 dark:text-gray-400">RTT</div>
               </div>
-              <div className="bg-gray-50 rounded p-2">
-                <div className="font-medium text-gray-900">{latencyStats.jitter.toFixed(0)}ms</div>
-                <div className="text-gray-500">Jitter</div>
+              <div className="bg-gray-50 dark:bg-gray-700 rounded p-2">
+                <div className="font-medium text-gray-900 dark:text-gray-100">{latencyStats.jitter.toFixed(0)}ms</div>
+                <div className="text-gray-500 dark:text-gray-400">Jitter</div>
               </div>
-              <div className="bg-gray-50 rounded p-2">
-                <div className="font-medium text-gray-900">{latencyStats.stabilityScore.toFixed(0)}%</div>
-                <div className="text-gray-500">Stability</div>
+              <div className="bg-gray-50 dark:bg-gray-700 rounded p-2">
+                <div className="font-medium text-gray-900 dark:text-gray-100">{latencyStats.stabilityScore.toFixed(0)}%</div>
+                <div className="text-gray-500 dark:text-gray-400">Stability</div>
               </div>
             </div>
           </div>
-          <div className="bg-gray-50 px-5 py-3">
-            <div className="text-xs text-gray-500 flex items-center">
+          <div className="bg-gray-50 dark:bg-gray-700 px-5 py-3">
+            <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
               <ActivityIcon className="h-3 w-3 mr-1" />
               {isLatencyMonitoring ? 'WebRTC Monitoring Active' : 'Not Monitoring'}
             </div>
@@ -285,17 +283,17 @@ export const InstructorDashboard = () => {
       {/* ================= REAL UPCOMING SESSION LIST - VIEW-ONLY, NEXT 24H ================= */}
       <div className="mt-8">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-medium text-gray-900">Upcoming Meetings</h2>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Upcoming Meetings</h2>
         </div>
-        <p className="text-xs text-gray-500 mb-2">
-          View-only. Go to <Link to="/dashboard/sessions" className="text-indigo-600 hover:underline">Meetings</Link> to start or manage.
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+          View-only. Go to <Link to="/dashboard/sessions" className="text-indigo-600 dark:text-indigo-400 hover:underline">Meetings</Link> to start or manage.
         </p>
 
         {sessions.length === 0 ? (
-          <div className="bg-white shadow overflow-hidden sm:rounded-md px-4 py-8 text-center text-gray-500">
+          <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md px-4 py-8 text-center text-gray-500 dark:text-gray-400">
             <p>No upcoming meetings</p>
             <Link to="/dashboard/sessions">
-              <span className="text-sm text-indigo-600 hover:underline mt-2 inline-block">Go to Meetings</span>
+              <span className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline mt-2 inline-block">Go to Meetings</span>
             </Link>
           </div>
         ) : (
@@ -306,30 +304,30 @@ export const InstructorDashboard = () => {
                 <div className="mb-3 flex items-center gap-2">
                   <span className="text-lg"></span>
                   <div>
-                    <h3 className="text-md font-semibold text-gray-900">Standalone Meetings</h3>
-                    <p className="text-xs text-gray-500">Meetings with enrollment keys</p>
+                    <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100">Standalone Meetings</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Meetings with enrollment keys</p>
                   </div>
                 </div>
-                <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                  <ul className="divide-y divide-gray-200">
+                <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md">
+                  <ul className="divide-y divide-gray-200 dark:divide-gray-700">
                     {sessions.filter(s => s.isStandalone === true).map((session) => (
-                      <li key={session.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                      <li key={session.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium text-indigo-600 truncate">
+                              <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400 truncate">
                                 {session.title}
                               </p>
                               {session.status === 'live' && (
                                 <Badge variant="danger" className="bg-red-600 text-white">LIVE</Badge>
                               )}
                             </div>
-                            <p className="mt-1 text-xs text-gray-500">
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                               {session.date} · {session.time}
                               {session.instructor && ` · ${session.instructor}`}
                             </p>
                           </div>
-                          <Link to="/dashboard/sessions" className="text-xs font-medium text-indigo-600 hover:underline whitespace-nowrap">
+                          <Link to="/dashboard/sessions" className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap">
                             Start from Meetings →
                           </Link>
                         </div>
@@ -346,30 +344,30 @@ export const InstructorDashboard = () => {
                 <div className="mb-3 flex items-center gap-2">
                   <span className="text-lg"></span>
                   <div>
-                    <h3 className="text-md font-semibold text-gray-900">Course Lessons</h3>
-                    <p className="text-xs text-gray-500">Lessons from your courses</p>
+                    <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100">Course Lessons</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Lessons from your courses</p>
                   </div>
                 </div>
-                <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                  <ul className="divide-y divide-gray-200">
+                <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md">
+                  <ul className="divide-y divide-gray-200 dark:divide-gray-700">
                     {sessions.filter(s => !s.isStandalone).map((session) => (
-                      <li key={session.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                      <li key={session.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium text-indigo-600 truncate">
+                              <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400 truncate">
                                 {session.title}
                               </p>
                               {session.status === 'live' && (
                                 <Badge variant="danger" className="bg-red-600 text-white">LIVE</Badge>
                               )}
                             </div>
-                            <p className="mt-1 text-xs text-gray-500">
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                               {session.date} · {session.time}
                               {session.instructor && ` · ${session.instructor}`}
                             </p>
                           </div>
-                          <Link to="/dashboard/sessions" className="text-xs font-medium text-indigo-600 hover:underline whitespace-nowrap">
+                          <Link to="/dashboard/sessions" className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap">
                             Start from Meetings →
                           </Link>
                         </div>
@@ -385,8 +383,8 @@ export const InstructorDashboard = () => {
 
       {/* ================= CONNECTION QUALITY DETAILED PANEL ================= */}
       <div className="mt-8">
-        <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-          <WifiIcon className="h-5 w-5 mr-2 text-indigo-600" />
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4 flex items-center">
+          <WifiIcon className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
           Your Connection Status
         </h2>
         <ConnectionQualityIndicator
@@ -395,17 +393,17 @@ export const InstructorDashboard = () => {
           currentRtt={currentRtt}
           isMonitoring={isLatencyMonitoring}
           showDetails={true}
-          className="bg-white shadow rounded-lg"
+          className="bg-white dark:bg-gray-800 shadow rounded-lg"
         />
         {shouldAdjustEngagement() && (
-          <div className="mt-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="mt-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
             <div className="flex items-start">
               <div className="flex-shrink-0">
-                <WifiIcon className="h-5 w-5 text-yellow-600" />
+                <WifiIcon className="h-5 w-5 text-yellow-600 dark:text-yellow-300" />
               </div>
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800">Connection Quality Alert</h3>
-                <p className="mt-1 text-sm text-yellow-700">
+                <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Connection Quality Alert</h3>
+                <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
                   Your connection quality is currently <strong>{connectionQuality}</strong>. 
                   Engagement analytics will be adjusted to account for potential network-related issues.
                   Students with similar connectivity problems will not be misclassified as disengaged.
@@ -419,8 +417,8 @@ export const InstructorDashboard = () => {
       {/* ================= STUDENT NETWORK MONITOR ================= */}
       <div className="mt-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-gray-900 flex items-center">
-            <UsersIcon className="h-5 w-5 mr-2 text-indigo-600" />
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center">
+            <UsersIcon className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
             Student Network Monitor
             {selectedSession?.status === 'live' && (
               <Badge variant="danger" className="ml-2">LIVE</Badge>
@@ -430,14 +428,14 @@ export const InstructorDashboard = () => {
           {/* Session Selector Dropdown */}
           {sessions.length > 0 && (
             <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-500">Select Session:</label>
+              <label className="text-sm text-gray-500 dark:text-gray-400">Select Session:</label>
               <select
                 value={selectedSession?.id || ''}
                 onChange={(e) => {
                   const session = sessions.find(s => s.id === e.target.value);
                   setSelectedSession(session || null);
                 }}
-                className="block w-64 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                className="block w-64 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
               >
                 <option value="">-- Select a session --</option>
                 {sessions.map((session) => (
@@ -459,16 +457,15 @@ export const InstructorDashboard = () => {
             className=""
           />
         ) : sessions.length > 0 ? (
-          /* Has sessions but none selected */
-          <div className="bg-white shadow rounded-lg p-8 text-center">
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-8 text-center">
             <div className="flex flex-col items-center">
-              <div className="rounded-full bg-indigo-100 p-4 mb-4">
+              <div className="rounded-full bg-indigo-100 dark:bg-indigo-900/30 p-4 mb-4">
                 <UsersIcon className="h-8 w-8 text-indigo-500" />
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                 Select a Session to View Student Network
               </h3>
-              <p className="text-sm text-gray-500 max-w-md mb-4">
+              <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mb-4">
                 Choose a session from the dropdown above to monitor your students' 
                 network quality and connection status.
               </p>
@@ -487,16 +484,15 @@ export const InstructorDashboard = () => {
             </div>
           </div>
         ) : (
-          /* No sessions at all */
-          <div className="bg-white shadow rounded-lg p-8 text-center">
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-8 text-center">
             <div className="flex flex-col items-center">
-              <div className="rounded-full bg-gray-100 p-4 mb-4">
-                <WifiIcon className="h-8 w-8 text-gray-400" />
+              <div className="rounded-full bg-gray-100 dark:bg-gray-700 p-4 mb-4">
+                <WifiIcon className="h-8 w-8 text-gray-400 dark:text-gray-500" />
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                 No Sessions Available
               </h3>
-              <p className="text-sm text-gray-500 max-w-md">
+              <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md">
                 Create a session to start monitoring your students' network quality.
               </p>
               <Link to="/dashboard/sessions/create">
@@ -509,33 +505,33 @@ export const InstructorDashboard = () => {
         )}
         
         {/* Connection Quality Legend */}
-        <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Connection Quality Guide</h4>
-          <div className="grid grid-cols-5 gap-2 text-center text-xs">
-            <div className="p-2 bg-white rounded border border-blue-200">
+        <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Connection Quality Guide</h4>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-center text-xs">
+            <div className="p-2 bg-white dark:bg-gray-800 rounded border border-blue-200 dark:border-blue-800">
               <div className="w-3 h-3 rounded-full bg-blue-500 mx-auto mb-1"></div>
-              <span className="text-blue-700 font-medium">Excellent</span>
-              <div className="text-gray-500">&lt;50ms</div>
+              <span className="text-blue-700 dark:text-blue-400 font-medium">Excellent</span>
+              <div className="text-gray-500 dark:text-gray-400">&lt;50ms</div>
             </div>
-            <div className="p-2 bg-white rounded border border-blue-200">
+            <div className="p-2 bg-white dark:bg-gray-800 rounded border border-blue-200 dark:border-blue-800">
               <div className="w-3 h-3 rounded-full bg-blue-400 mx-auto mb-1"></div>
-              <span className="text-blue-600 font-medium">Good</span>
-              <div className="text-gray-500">&lt;100ms</div>
+              <span className="text-blue-600 dark:text-blue-400 font-medium">Good</span>
+              <div className="text-gray-500 dark:text-gray-400">&lt;100ms</div>
             </div>
-            <div className="p-2 bg-white rounded border border-yellow-200">
+            <div className="p-2 bg-white dark:bg-gray-800 rounded border border-yellow-200 dark:border-yellow-800">
               <div className="w-3 h-3 rounded-full bg-yellow-500 mx-auto mb-1"></div>
-              <span className="text-yellow-700 font-medium">Fair</span>
-              <div className="text-gray-500">&lt;200ms</div>
+              <span className="text-yellow-700 dark:text-yellow-300 font-medium">Fair</span>
+              <div className="text-gray-500 dark:text-gray-400">&lt;200ms</div>
             </div>
-            <div className="p-2 bg-white rounded border border-orange-200">
+            <div className="p-2 bg-white dark:bg-gray-800 rounded border border-orange-200 dark:border-orange-800">
               <div className="w-3 h-3 rounded-full bg-orange-500 mx-auto mb-1"></div>
-              <span className="text-orange-700 font-medium">Poor</span>
-              <div className="text-gray-500">&lt;500ms</div>
+              <span className="text-orange-700 dark:text-orange-400 font-medium">Poor</span>
+              <div className="text-gray-500 dark:text-gray-400">&lt;500ms</div>
             </div>
-            <div className="p-2 bg-white rounded border border-red-200">
+            <div className="p-2 bg-white dark:bg-gray-800 rounded border border-red-200 dark:border-red-800">
               <div className="w-3 h-3 rounded-full bg-red-500 mx-auto mb-1"></div>
-              <span className="text-red-700 font-medium">Critical</span>
-              <div className="text-gray-500">≥500ms</div>
+              <span className="text-red-700 dark:text-red-400 font-medium">Critical</span>
+              <div className="text-gray-500 dark:text-gray-400">≥500ms</div>
             </div>
           </div>
         </div>

@@ -18,7 +18,7 @@ export const Footer = () => {
   return (
     <footer className="mt-auto">
       {/* Top Contact Banner */}
-      <div className="bg-gradient-to-r from-[#3B82F6] via-[#2563eb] to-[#1d4ed8]">
+      <div className="bg-gradient-to-r from-[#3B82F6] via-[#2563eb] to-[#1d4ed8] dark:from-[#1e40af] dark:via-[#1d4ed8] dark:to-[#1e3a8a]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-white text-center">
             {/* Phone */}

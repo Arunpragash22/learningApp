@@ -222,15 +222,15 @@ export const QuestionManagement = () => {
   return (
     <div className="py-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Question Bank Management</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Question Bank Management</h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           Create, organize, and manage questions for your meetings
         </p>
         {isInstructor && (
           <div className="mt-4 flex flex-wrap items-center gap-4">
             {/* Meeting Type Selection */}
             <div className="flex items-center gap-2">
-              <label htmlFor="meeting-type" className="text-sm font-medium text-gray-700">Meeting:</label>
+              <label htmlFor="meeting-type" className="text-sm font-medium text-gray-700 dark:text-gray-300">Meeting:</label>
               <select
                 id="meeting-type"
                 value={meetingType}
@@ -239,7 +239,7 @@ export const QuestionManagement = () => {
                   setSelectedSessionId(''); // Reset session when type changes
                   setSelectedCourseId(''); // Reset course when type changes
                 }}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                className="rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
               >
                 <option value="all">All my questions</option>
                 <option value="standalone">Standalone Meeting</option>
@@ -250,7 +250,7 @@ export const QuestionManagement = () => {
             {/* Course Selection - Only show for Course Lesson type */}
             {meetingType === 'course' && (
               <div className="flex items-center gap-2">
-                <label htmlFor="course-select" className="text-sm font-medium text-gray-700">Course:</label>
+                <label htmlFor="course-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">Course:</label>
                 <select
                   id="course-select"
                   value={selectedCourseId}
@@ -258,7 +258,7 @@ export const QuestionManagement = () => {
                     setSelectedCourseId(e.target.value);
                     setSelectedSessionId(''); // Reset session when course changes
                   }}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 min-w-[200px]"
+                  className="rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 min-w-[200px]"
                 >
                   <option value="">Select a course</option>
                   {courses.map((c) => (
@@ -273,12 +273,12 @@ export const QuestionManagement = () => {
             {/* Session Selection for Standalone */}
             {meetingType === 'standalone' && (
               <div className="flex items-center gap-2">
-                <label htmlFor="session-select" className="text-sm font-medium text-gray-700">Lesson:</label>
+                <label htmlFor="session-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">Lesson:</label>
                 <select
                   id="session-select"
                   value={selectedSessionId}
                   onChange={(e) => setSelectedSessionId(e.target.value)}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 min-w-[200px]"
+                  className="rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 min-w-[200px]"
                 >
                   <option value="">Select a session</option>
                   {filteredSessions.map((s) => (
@@ -293,12 +293,12 @@ export const QuestionManagement = () => {
             {/* Session Selection for Course Meeting - Only show after course is selected */}
             {meetingType === 'course' && selectedCourseId && (
               <div className="flex items-center gap-2">
-                <label htmlFor="session-select" className="text-sm font-medium text-gray-700">Lesson:</label>
+                <label htmlFor="session-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">Lesson:</label>
                 <select
                   id="session-select"
                   value={selectedSessionId}
                   onChange={(e) => setSelectedSessionId(e.target.value)}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 min-w-[200px]"
+                  className="rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 min-w-[200px]"
                 >
                   <option value="">Select a lesson</option>
                   {filteredSessions.map((s) => (
@@ -310,7 +310,7 @@ export const QuestionManagement = () => {
               </div>
             )}
 
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
               {meetingType === 'all' && 'Showing all your questions'}
               {meetingType === 'standalone' && !selectedSessionId && 'Select a standalone session'}
               {meetingType === 'course' && !selectedCourseId && 'Select a course first'}
@@ -326,55 +326,55 @@ export const QuestionManagement = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Questions</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Total Questions</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</p>
             </div>
-            <div className="p-3 bg-indigo-100 rounded-lg">
-              <TargetIcon className="h-6 w-6 text-indigo-600" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Generic</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.generic}</p>
-            </div>
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Users className="h-6 w-6 text-purple-600" />
+            <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+              <TargetIcon className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
             </div>
           </div>
         </Card>
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Passive</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.byCluster.passive}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Generic</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.generic}</p>
             </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <BookOpenIcon className="h-6 w-6 text-blue-600" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Moderate</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.byCluster.moderate}</p>
-            </div>
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <BookOpenIcon className="h-6 w-6 text-yellow-600" />
+            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+              <Users className="h-6 w-6 text-purple-600 dark:text-purple-400" />
             </div>
           </div>
         </Card>
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Active</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.byCluster.active}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Passive</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.byCluster.passive}</p>
             </div>
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <BookOpenIcon className="h-6 w-6 text-orange-600" />
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <BookOpenIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Moderate</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.byCluster.moderate}</p>
+            </div>
+            <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+              <BookOpenIcon className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Active</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.byCluster.active}</p>
+            </div>
+            <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+              <BookOpenIcon className="h-6 w-6 text-orange-600 dark:text-orange-400" />
             </div>
           </div>
         </Card>
@@ -383,12 +383,12 @@ export const QuestionManagement = () => {
       {/* Question Type Selection Modal */}
       {showTypeModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">Select Question Type</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Select Question Type</h3>
               <button
                 onClick={handleTypeModalCancel}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -399,16 +399,16 @@ export const QuestionManagement = () => {
                 onClick={() => setSelectedQuestionType('generic')}
                 className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
                   selectedQuestionType === 'generic' 
-                    ? 'border-indigo-500 bg-indigo-50' 
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' 
+                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
-                <Users className={`h-6 w-6 ${selectedQuestionType === 'generic' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                <Users className={`h-6 w-6 ${selectedQuestionType === 'generic' ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500'}`} />
                 <div>
-                  <p className={`font-medium ${selectedQuestionType === 'generic' ? 'text-indigo-900' : 'text-gray-700'}`}>
+                  <p className={`font-medium ${selectedQuestionType === 'generic' ? 'text-indigo-900 dark:text-indigo-200' : 'text-gray-700 dark:text-gray-300'}`}>
                     Generic
                   </p>
-                  <p className="text-sm text-gray-500">Send to all students</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Send to all students</p>
                 </div>
               </div>
 
@@ -417,41 +417,41 @@ export const QuestionManagement = () => {
                 onClick={() => setSelectedQuestionType('cluster')}
                 className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
                   selectedQuestionType === 'cluster' 
-                    ? 'border-indigo-500 bg-indigo-50' 
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' 
+                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
-                <Target className={`h-6 w-6 ${selectedQuestionType === 'cluster' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                <Target className={`h-6 w-6 ${selectedQuestionType === 'cluster' ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500'}`} />
                 <div>
-                  <p className={`font-medium ${selectedQuestionType === 'cluster' ? 'text-indigo-900' : 'text-gray-700'}`}>
+                  <p className={`font-medium ${selectedQuestionType === 'cluster' ? 'text-indigo-900 dark:text-indigo-200' : 'text-gray-700 dark:text-gray-300'}`}>
                     Cluster
                   </p>
-                  <p className="text-sm text-gray-500">Target specific engagement cluster</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Target specific engagement cluster</p>
                 </div>
               </div>
 
               {/* Cluster Selection - Only shown when cluster is selected */}
               {selectedQuestionType === 'cluster' && (
-                <div className="mt-4 pl-4 border-l-2 border-indigo-200">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="mt-4 pl-4 border-l-2 border-indigo-200 dark:border-indigo-700">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Select Target Cluster
                   </label>
                   <select
                     value={selectedCluster}
                     onChange={(e) => setSelectedCluster(e.target.value as 'passive' | 'moderate' | 'active')}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     <option value="passive">Passive (At-Risk / Low Engagement)</option>
                     <option value="moderate">Moderate (Medium Engagement)</option>
                     <option value="active">Active (Highly Engaged)</option>
                   </select>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Question will be sent to students in the selected cluster
                   </p>
                 </div>
               )}
             </div>
-            <div className="flex justify-end gap-3 p-4 border-t bg-gray-50 rounded-b-lg">
+            <div className="flex justify-end gap-3 p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-700 rounded-b-lg">
               <Button variant="outline" onClick={handleTypeModalCancel}>
                 Cancel
               </Button>
@@ -478,7 +478,7 @@ export const QuestionManagement = () => {
       ) : (
         isLoading ? (
           <Card className="p-12 text-center">
-            <p className="text-gray-500">Loading questions...</p>
+            <p className="text-gray-500 dark:text-gray-400">Loading questions...</p>
           </Card>
         ) : (
           <QuestionBank

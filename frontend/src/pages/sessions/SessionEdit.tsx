@@ -83,10 +83,10 @@ export const SessionEdit = () => {
 
   if (!isInstructor) {
     return (
-      <div className="py-6">
-        <Card className="p-6 text-center">
-          <h2 className="text-xl font-semibold">Access Denied</h2>
-          <p>Only instructors can edit sessions.</p>
+      <div className="py-4 sm:py-6">
+        <Card className="p-4 sm:p-6 text-center">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Access Denied</h2>
+          <p className="text-gray-600 dark:text-gray-400">Only instructors can edit sessions.</p>
           <Button onClick={() => navigate("/dashboard/sessions")}>
             Go Back
           </Button>
@@ -97,10 +97,10 @@ export const SessionEdit = () => {
 
   if (loading) {
     return (
-      <div className="py-6">
-        <Card className="p-6 text-center">
-          <div className="animate-spin h-12 w-12 rounded-full border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading session...</p>
+      <div className="py-4 sm:py-6">
+        <Card className="p-4 sm:p-6 text-center">
+          <div className="animate-spin h-12 w-12 rounded-full border-b-2 border-indigo-600 dark:border-indigo-400 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading session...</p>
         </Card>
       </div>
     );
@@ -108,9 +108,9 @@ export const SessionEdit = () => {
 
   if (!initialData) {
     return (
-      <div className="py-6">
-        <Card className="p-6 text-center">
-          <h2 className="text-xl font-semibold">Session not found</h2>
+      <div className="py-4 sm:py-6">
+        <Card className="p-4 sm:p-6 text-center">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Session not found</h2>
           <Button onClick={() => navigate("/dashboard/sessions")}>
             Go Back
           </Button>
@@ -174,7 +174,7 @@ export const SessionEdit = () => {
   };
 
   return (
-    <div className="py-6">
+    <div className="py-4 sm:py-6">
       <Button
         variant="outline"
         leftIcon={<ArrowLeftIcon className="h-4 w-4" />}
@@ -184,7 +184,7 @@ export const SessionEdit = () => {
         Back
       </Button>
 
-      <h1 className="text-2xl font-semibold">Edit Session</h1>
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Edit Session</h1>
 
       <SessionForm
         initialData={initialData}

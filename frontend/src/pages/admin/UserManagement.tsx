@@ -73,8 +73,8 @@ export const UserManagement = () => {
   return (
     <div className="py-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">User Management</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">User Management</h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           View and manage all registered users
         </p>
       </div>
@@ -84,34 +84,34 @@ export const UserManagement = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</p>
             </div>
             <UsersIcon className="h-8 w-8 text-blue-600" />
           </div>
         </Card>
         <Card className="p-4">
           <div>
-            <p className="text-sm text-gray-600">Students</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Students</p>
             <p className="text-2xl font-bold text-blue-600">{stats.students}</p>
           </div>
         </Card>
         <Card className="p-4">
           <div>
-            <p className="text-sm text-gray-600">Instructors</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Instructors</p>
             <p className="text-2xl font-bold text-orange-600">{stats.instructors}</p>
           </div>
         </Card>
         <Card className="p-4">
           <div>
-            <p className="text-sm text-gray-600">Admins</p>
-            <p className="text-2xl font-bold text-red-600">{stats.admins}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Admins</p>
+            <p className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.admins}</p>
           </div>
         </Card>
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Active</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Active</p>
               <p className="text-2xl font-bold text-blue-600">{stats.active}</p>
             </div>
             <UserCheckIcon className="h-6 w-6 text-blue-600" />
@@ -120,7 +120,7 @@ export const UserManagement = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Pending</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Pending</p>
               <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
             </div>
             <UserXIcon className="h-6 w-6 text-yellow-600" />
@@ -133,20 +133,20 @@ export const UserManagement = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <SearchIcon className="h-5 w-5 text-gray-400" />
+              <SearchIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
             </div>
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by name or email..."
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             />
           </div>
           <select
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           >
             <option value="all">All Roles</option>
             <option value="student">Students</option>
@@ -160,7 +160,7 @@ export const UserManagement = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-gray-900">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
               Registered Users ({filteredUsers.length})
             </h2>
             <Button variant="primary" size="sm" onClick={loadUsers}>
@@ -171,57 +171,57 @@ export const UserManagement = () => {
         <CardContent>
           {isLoading ? (
             <div className="text-center py-12">
-              <p className="text-gray-500">Loading users...</p>
+              <p className="text-gray-500 dark:text-gray-400">Loading users...</p>
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="text-center py-12">
-              <UsersIcon className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No users found</h3>
-              <p className="mt-1 text-sm text-gray-500">
+              <UsersIcon className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No users found</h3>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {searchTerm || filterRole !== 'all' ? 'Try adjusting your filters.' : 'No users have registered yet.'}
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Name
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Email
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Role
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Status
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Registered
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50">
+                    <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                            <span className="text-indigo-600 font-semibold">
+                          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                            <span className="text-indigo-600 dark:text-indigo-400 font-semibold">
                               {user.firstName.charAt(0)}{user.lastName.charAt(0)}
                             </span>
                           </div>
                           <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
+                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                               {user.firstName} {user.lastName}
                             </div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{user.email}</div>
+                        <div className="text-sm text-gray-900 dark:text-gray-100">{user.email}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={getRoleBadgeVariant(user.role) as any} size="sm">
@@ -233,7 +233,7 @@ export const UserManagement = () => {
                           {user.status === 1 ? 'Active' : 'Pending'}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
                       </td>
                     </tr>
@@ -247,5 +247,3 @@ export const UserManagement = () => {
     </div>
   );
 };
-
-

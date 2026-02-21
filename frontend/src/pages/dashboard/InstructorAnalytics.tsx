@@ -327,7 +327,7 @@ export const InstructorAnalytics = () => {
       {/* Title and subtitle at top */}
       <div className="mb-4">
         <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Real-Time Analytics Dashboard</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-gray-100">Real-Time Analytics Dashboard</h1>
           {selectedTimeRange === 'live' && isLive && (
             <Badge variant="danger" className="animate-pulse w-fit">
               <Radio className="h-3 w-3 mr-1" />
@@ -335,13 +335,13 @@ export const InstructorAnalytics = () => {
             </Badge>
           )}
         </div>
-        <p className="mt-1 text-xs sm:text-sm text-gray-500">
+        <p className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
           Monitor student engagement in real-time
         </p>
       </div>
 
       {loadingSessions && (
-        <div className="py-8 text-center text-gray-500">Loading sessions...</div>
+        <div className="py-8 text-center text-gray-500 dark:text-gray-400">Loading sessions...</div>
       )}
 
       {/* Key Metrics: Total Students in Session + Questions per Student (real-time) */}
@@ -351,14 +351,14 @@ export const InstructorAnalytics = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Students in Session</p>
-              <p className="text-2xl font-bold text-gray-900">{engagementMetrics.totalStudents}</p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Total Students in Session</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{engagementMetrics.totalStudents}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {engagementMetrics.activeNow} active
               </p>
             </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Users className="h-6 w-6 text-blue-600" />
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
         </Card>
@@ -366,16 +366,16 @@ export const InstructorAnalytics = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Questions Sent (real-time)</p>
-              <p className="text-2xl font-bold text-gray-900">{engagementMetrics.questionsAnswered}</p>
-              <p className="text-xs text-purple-600 mt-1">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Questions Sent (real-time)</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{engagementMetrics.questionsAnswered}</p>
+              <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
                 {engagementMetrics.totalStudents > 0 && engagementMetrics.questionsAnswered > 0
                   ? `${(engagementMetrics.questionsAnswered / engagementMetrics.totalStudents).toFixed(1)} per student`
                   : '0 per student'}
               </p>
             </div>
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Target className="h-6 w-6 text-purple-600" />
+            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+              <Target className="h-6 w-6 text-purple-600 dark:text-purple-400" />
             </div>
           </div>
         </Card>
@@ -383,7 +383,7 @@ export const InstructorAnalytics = () => {
 
       {/* Clustering Visualization */}
       <div className="mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Student Clusters</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Student Clusters</h2>
         <ClusterVisualization clusters={clusters} showPredictions={true} />
       </div>
 
@@ -392,31 +392,31 @@ export const InstructorAnalytics = () => {
         <Card>
           <div className="p-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
                 {studentListView === 'at-risk' ? (
                   <>
-                    <AlertCircle className="h-5 w-5 mr-2 text-red-600" />
+                    <AlertCircle className="h-5 w-5 mr-2 text-red-600 dark:text-red-400" />
                     At-Risk Students (Passive)
                   </>
                 ) : studentListView === 'moderate' ? (
                   <>
-                    <Target className="h-5 w-5 mr-2 text-yellow-500" />
+                    <Target className="h-5 w-5 mr-2 text-yellow-500 dark:text-yellow-400" />
                     Moderate Students
                   </>
                 ) : (
                   <>
-                    <Target className="h-5 w-5 mr-2 text-green-600" />
+                    <Target className="h-5 w-5 mr-2 text-green-600 dark:text-green-400" />
                     Active Students
                   </>
                 )}
               </h3>
               <div className="flex items-center gap-3">
-                <label htmlFor="student-list-view" className="text-sm font-medium text-gray-700">Show:</label>
+                <label htmlFor="student-list-view" className="text-sm font-medium text-gray-700 dark:text-gray-300">Show:</label>
                 <select
                   id="student-list-view"
                   value={studentListView}
                   onChange={(e) => setStudentListView(e.target.value as 'at-risk' | 'moderate' | 'active')}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100"
                 >
                   <option value="at-risk">At-Risk / Passive</option>
                   <option value="moderate">Moderate</option>
@@ -429,7 +429,7 @@ export const InstructorAnalytics = () => {
             </div>
             <div className="space-y-3">
               {displayedStudents.length === 0 && (
-                <div className="text-center py-6 text-gray-400">
+                <div className="text-center py-6 text-gray-400 dark:text-gray-500">
                   <p className="text-sm">No students clustered yet.</p>
                   <p className="text-xs mt-1">Clusters will appear after students submit quiz answers.</p>
                 </div>
@@ -438,21 +438,21 @@ export const InstructorAnalytics = () => {
                 <div
                   key={student.id}
                   className={`flex items-center justify-between p-3 rounded-lg ${
-                    studentListView === 'at-risk' ? 'bg-red-50' :
-                    studentListView === 'moderate' ? 'bg-yellow-50' : 'bg-green-50'
+                    studentListView === 'at-risk' ? 'bg-red-50 dark:bg-red-900/20' :
+                    studentListView === 'moderate' ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-green-50 dark:bg-green-900/20'
                   }`}
                 >
                   <div className="flex-1">
-                    <p className="font-medium text-gray-900">{student.name}</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100">{student.name}</p>
                     <div className="flex items-center space-x-2 mt-1">
-                      <span className="text-xs text-gray-500">ID: {student.id.slice(0, 12)}...</span>
-                      <span className="text-xs text-gray-400">•</span>
-                      <span className="text-xs text-gray-500">{student.lastActive}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">ID: {student.id.slice(0, 12)}...</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">•</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">{student.lastActive}</span>
                       {!isAtRiskView && (
                         <>
-                          <span className="text-xs text-gray-400">•</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">•</span>
                           <span className={`text-xs font-medium ${
-                            student.cluster === 'Active Participants' ? 'text-green-600' : 'text-yellow-600'
+                            student.cluster === 'Active Participants' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'
                           }`}>{student.cluster}</span>
                         </>
                       )}
@@ -472,16 +472,16 @@ export const InstructorAnalytics = () => {
 
       {/* Session Reports Section — at the bottom, completed sessions only */}
       {sessions.filter(s => s.status === 'completed').length > 0 && (
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Session Reports</h2>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50 p-4 rounded-lg">
+        <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Session Reports</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
             <div className="flex items-center gap-2">
-              <label htmlFor="analytics-session" className="text-sm font-medium text-gray-700">Session:</label>
+              <label htmlFor="analytics-session" className="text-sm font-medium text-gray-700 dark:text-gray-300">Session:</label>
               <select
                 id="analytics-session"
                 value={selectedSession || ''}
                 onChange={(e) => setSelectedSession(e.target.value || null)}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 max-w-md"
+                className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100 max-w-md"
               >
                 {sessions.filter(s => s.status === 'completed').map((s) => (
                   <option key={s.id} value={s.id}>

@@ -4,7 +4,7 @@ export default {
   './index.html',
   './src/**/*.{js,ts,jsx,tsx}'
 ],
-  darkMode: 'media', // Automatically use device theme preference
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {

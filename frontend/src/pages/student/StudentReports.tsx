@@ -403,7 +403,7 @@ export const StudentReports = () => {
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2Icon className="h-8 w-8 animate-spin text-blue-600" />
+          <Loader2Icon className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
         </div>
       ) : (
         <>
@@ -427,16 +427,16 @@ export const StudentReports = () => {
                     </Button>
                   </div>
                 </div>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   These are your personal reports from completed sessions. Shows only your own data.
                 </p>
               </CardHeader>
               <CardContent>
                 {storedReports.length === 0 ? (
                   <div className="text-center py-12">
-                    <FileTextIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 text-lg">No session reports yet</p>
-                    <p className="text-gray-400 text-sm mt-2">
+                    <FileTextIcon className="h-16 w-16 text-gray-300 dark:text-gray-500 mx-auto mb-4" />
+                    <p className="text-gray-500 dark:text-gray-400 text-lg">No session reports yet</p>
+                    <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">
                       Reports are generated after the instructor ends a session you participated in
                     </p>
                   </div>
@@ -445,14 +445,14 @@ export const StudentReports = () => {
                     <table className="w-full">
                       <thead className="bg-gray-50 dark:bg-gray-800">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Session</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Course</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">My Questions</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">My Correct</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">My Score</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Attendance</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Session</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Course</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">My Questions</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">My Correct</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">My Score</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Attendance</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -471,7 +471,7 @@ export const StudentReports = () => {
                               {report.myTotalQuestions}
                             </td>
                             <td className="px-4 py-3">
-                              <span className="inline-flex items-center gap-1 text-blue-600">
+                              <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400">
                                 <CheckCircleIcon className="h-4 w-4" />
                                 {report.myCorrectAnswers}
                               </span>
@@ -482,7 +482,7 @@ export const StudentReports = () => {
                                   {report.myScore}%
                                 </Badge>
                               ) : (
-                                <span className="text-gray-400">-</span>
+                                <span className="text-gray-400 dark:text-gray-500">-</span>
                               )}
                             </td>
                             <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
@@ -528,7 +528,7 @@ export const StudentReports = () => {
                     My Attendance Report
                   </h3>
                   {attendanceSummary && (
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
                       Total: {attendanceSummary.totalSessionsAttended} sessions • {attendanceSummary.totalMinutesAttended} minutes
                     </div>
                   )}
@@ -536,7 +536,7 @@ export const StudentReports = () => {
               </CardHeader>
               <CardContent>
                 {attendanceData.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                     <ClockIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
                     <p>You haven't attended any sessions yet</p>
                   </div>
@@ -545,10 +545,10 @@ export const StudentReports = () => {
                     <table className="w-full">
                       <thead className="bg-gray-50 dark:bg-gray-800">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Session</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Course</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Session</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Course</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Status</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -587,28 +587,28 @@ export const StudentReports = () => {
                       <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                         {quizOverall.totalSessionsWithQuiz}
                       </p>
-                      <p className="text-sm text-gray-500">Sessions with Quiz</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Sessions with Quiz</p>
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                         {quizOverall.totalQuestionsAttempted}
                       </p>
-                      <p className="text-sm text-gray-500">Questions Attempted</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Questions Attempted</p>
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-blue-600">
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                         {quizOverall.totalCorrectAnswers}
                       </p>
-                      <p className="text-sm text-gray-500">Correct Answers</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Correct Answers</p>
                     </div>
                     <div>
                       <p className={`text-2xl font-bold ${
-                        quizOverall.overallScore >= 80 ? 'text-blue-600' : 
-                        quizOverall.overallScore >= 60 ? 'text-yellow-600' : 'text-red-600'
+                        quizOverall.overallScore >= 80 ? 'text-blue-600 dark:text-blue-400' : 
+                        quizOverall.overallScore >= 60 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
                       }`}>
                         {quizOverall.overallScore}%
                       </p>
-                      <p className="text-sm text-gray-500">Overall Score</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Overall Score</p>
                     </div>
                   </div>
                 </Card>
@@ -617,8 +617,8 @@ export const StudentReports = () => {
               {/* Quiz by Session */}
               {quizData.length === 0 ? (
                 <Card className="p-8 text-center">
-                  <FileTextIcon className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-                  <p className="text-gray-500">You haven't attempted any quizzes yet</p>
+                  <FileTextIcon className="h-12 w-12 mx-auto mb-3 text-gray-400 dark:text-gray-500" />
+                  <p className="text-gray-500 dark:text-gray-400">You haven't attempted any quizzes yet</p>
                 </Card>
               ) : (
                 quizData.map((session) => (
@@ -634,19 +634,19 @@ export const StudentReports = () => {
                           <h4 className="font-semibold text-gray-900 dark:text-gray-100">
                             {session.sessionName}
                           </h4>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
                             {session.courseName} • {session.sessionDate}
                           </p>
                         </div>
                         <div className="flex items-center gap-4">
                           <div className="text-right">
                             <p className={`text-xl font-bold ${
-                              session.score >= 80 ? 'text-blue-600' : 
-                              session.score >= 60 ? 'text-yellow-600' : 'text-red-600'
+                              session.score >= 80 ? 'text-blue-600 dark:text-blue-400' : 
+                              session.score >= 60 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
                             }`}>
                               {session.score}%
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
                               {session.correctAnswers}/{session.totalQuestions} correct
                             </p>
                           </div>
@@ -667,7 +667,7 @@ export const StudentReports = () => {
                                 q.isCorrect 
                                   ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500' 
                                   : q.yourAnswer === null
-                                    ? 'bg-gray-50 dark:bg-gray-800 border-gray-300'
+                                    ? 'bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
                                     : 'bg-red-50 dark:bg-red-900/20 border-red-500'
                               }`}
                             >
@@ -682,16 +682,16 @@ export const StudentReports = () => {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {q.timeTaken && (
-                                    <span className="text-xs text-gray-500">
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
                                       {q.timeTaken.toFixed(1)}s
                                     </span>
                                   )}
                                   {q.isCorrect ? (
-                                    <CheckCircleIcon className="h-5 w-5 text-blue-500" />
+                                    <CheckCircleIcon className="h-5 w-5 text-blue-500 dark:text-blue-400" />
                                   ) : q.yourAnswer === null ? (
-                                    <span className="text-xs text-gray-400">Not answered</span>
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">Not answered</span>
                                   ) : (
-                                    <XCircleIcon className="h-5 w-5 text-red-500" />
+                                    <XCircleIcon className="h-5 w-5 text-red-500 dark:text-red-400" />
                                   )}
                                 </div>
                               </div>
@@ -716,7 +716,7 @@ export const StudentReports = () => {
               </CardHeader>
               <CardContent>
                 {sessionHistory.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                     <BookOpenIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
                     <p>No session history found</p>
                   </div>
@@ -725,24 +725,24 @@ export const StudentReports = () => {
                     {sessionHistory.map((session) => (
                       <div 
                         key={session.sessionId}
-                        className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-300 transition-colors"
+                        className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
                       >
                         <div className="flex items-start justify-between">
                           <div>
                             <h4 className="font-semibold text-gray-900 dark:text-gray-100">
                               {session.sessionName}
                             </h4>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
                               {session.courseName} • {session.instructorName}
                             </p>
-                            <p className="text-xs text-gray-400 mt-1">
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                               {session.sessionDate} at {session.sessionTime}
                             </p>
                           </div>
                           <div className="text-right">
                             {getStatusBadge(session.sessionStatus)}
                             {session.durationMinutes !== null && (
-                              <p className="text-sm text-gray-500 mt-2">
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                                 Attended: {session.durationMinutes} min
                               </p>
                             )}
@@ -751,13 +751,13 @@ export const StudentReports = () => {
                         
                         {/* Quiz participation summary */}
                         {session.quizParticipation.totalQuestions > 0 && (
-                          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                            <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
                             <div className="flex items-center gap-4 text-sm">
-                              <span className="text-gray-500">Quiz:</span>
+                              <span className="text-gray-500 dark:text-gray-400">Quiz:</span>
                               <span className="text-gray-700 dark:text-gray-300">
                                 {session.quizParticipation.questionsAnswered}/{session.quizParticipation.totalQuestions} answered
                               </span>
-                              <span className="text-blue-600">
+                              <span className="text-blue-600 dark:text-blue-400">
                                 {session.quizParticipation.correctAnswers} correct
                               </span>
                               {session.quizParticipation.score !== null && (

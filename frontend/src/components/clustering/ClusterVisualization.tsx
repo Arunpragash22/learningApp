@@ -36,11 +36,11 @@ export const ClusterVisualization: React.FC<ClusterVisualizationProps> = ({
     if (!prediction) return null;
     switch (prediction) {
       case 'improving':
-        return <TrendingUp className="h-4 w-4 text-blue-600" />;
+        return <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
       case 'declining':
-        return <TrendingDown className="h-4 w-4 text-red-600" />;
+        return <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />;
       default:
-        return <Activity className="h-4 w-4 text-yellow-600" />;
+        return <Activity className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />;
     }
   };
 
@@ -62,14 +62,14 @@ export const ClusterVisualization: React.FC<ClusterVisualizationProps> = ({
                     {getIcon(cluster.engagementLevel)}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900">{cluster.name}</h3>
-                    <p className="text-xs text-gray-500">{cluster.description}</p>
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">{cluster.name}</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{cluster.description}</p>
                   </div>
                 </div>
                 {showPredictions && cluster.prediction && (
                   <div className="flex items-center space-x-1">
                     {getPredictionIcon(cluster.prediction)}
-                    <span className="text-xs text-gray-600 capitalize">
+                    <span className="text-xs text-gray-600 dark:text-gray-400 capitalize">
                       {cluster.prediction}
                     </span>
                   </div>
@@ -78,18 +78,18 @@ export const ClusterVisualization: React.FC<ClusterVisualizationProps> = ({
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Users className="h-4 w-4 text-gray-400" />
-                  <span className="text-2xl font-bold text-gray-900">
+                  <Users className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                  <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                     {cluster.studentCount}
                   </span>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
                     ({totalStudents > 0 ? ((cluster.studentCount / totalStudents) * 100).toFixed(1) : '0.0'}%)
                   </span>
                 </div>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  cluster.engagementLevel === 'active' ? 'bg-blue-100 text-blue-800' :
-                  cluster.engagementLevel === 'moderate' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-red-100 text-red-800'
+                  cluster.engagementLevel === 'active' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300' :
+                  cluster.engagementLevel === 'moderate' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
+                  'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                 }`}>
                   {cluster.engagementLevel.toUpperCase()}
                 </span>
@@ -97,7 +97,7 @@ export const ClusterVisualization: React.FC<ClusterVisualizationProps> = ({
 
               {/* Progress Bar */}
               <div className="mt-3">
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                   <div
                     className="h-2 rounded-full transition-all"
                     style={{

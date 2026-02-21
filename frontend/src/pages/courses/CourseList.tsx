@@ -130,8 +130,8 @@ export const CourseList = () => {
       <div className="py-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
-            <RefreshCwIcon className="h-8 w-8 animate-spin text-indigo-600 mx-auto mb-4" />
-            <p className="text-gray-500">Loading courses...</p>
+            <RefreshCwIcon className="h-8 w-8 animate-spin text-indigo-600 dark:text-indigo-400 mx-auto mb-4" />
+            <p className="text-gray-500 dark:text-gray-400">Loading courses...</p>
           </div>
         </div>
       </div>
@@ -142,8 +142,8 @@ export const CourseList = () => {
     <div className="py-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">My Courses</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">My Courses</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {isInstructor ? 'Courses you are teaching' : 'Courses you are enrolled in'}
           </p>
         </div>
@@ -175,14 +175,14 @@ export const CourseList = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="relative flex-1 max-w-md">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <SearchIcon className="h-5 w-5 text-gray-400" />
+                <SearchIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
               </div>
               <input
                 type="text"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Search courses..."
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 dark:text-gray-100 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               />
             </div>
             <div className="flex gap-2">
@@ -191,8 +191,8 @@ export const CourseList = () => {
                 onClick={() => setFilterActive(!filterActive)}
                 className={`inline-flex items-center px-4 py-2 border rounded-md text-sm font-medium ${
                   filterActive
-                    ? 'border-indigo-600 text-indigo-600 bg-indigo-50'
-                    : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
+                    ? 'border-indigo-600 text-indigo-600 bg-indigo-50 dark:border-indigo-400 dark:text-indigo-400 dark:bg-indigo-900/20'
+                    : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700'
                 } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
               >
                 <FilterIcon className="-ml-1 mr-2 h-5 w-5" />
@@ -203,16 +203,16 @@ export const CourseList = () => {
 
           {/* Filter Options */}
           {filterActive && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="max-w-xs">
-                <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Status
                 </label>
                 <select
                   id="status"
                   value={statusFilter}
                   onChange={e => setStatusFilter(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                 >
                   <option value="all">All Courses</option>
                   <option value="published">Published</option>
@@ -239,13 +239,13 @@ export const CourseList = () => {
       {/* Course Grid */}
       {filteredCourses.length === 0 ? (
         <Card className="p-12 text-center">
-          <BookOpenIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-lg font-medium text-gray-900">
+          <BookOpenIcon className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
+          <h3 className="mt-2 text-lg font-medium text-gray-900 dark:text-gray-100">
             {courses.length === 0 
               ? (isInstructor ? 'No courses created yet' : 'No courses enrolled')
               : 'No courses found'}
           </h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {courses.length === 0 
               ? (isInstructor 
                   ? 'Create your first course to get started.'
@@ -286,61 +286,61 @@ export const CourseList = () => {
 
               <div className="p-6">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
                     <UsersIcon className="h-4 w-4 mr-1" />
                     <span>{course.instructorName}</span>
                   </div>
                   {course.courseCode && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                    <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
                       {course.courseCode}
                     </span>
                   )}
                 </div>
 
-                <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
                   {course.description}
                 </p>
 
                 {/* Enrollment Key for Instructors */}
                 {isInstructor && course.enrollmentKey && (
-                  <div className="mb-4 p-3 bg-indigo-50 rounded-lg">
+                  <div className="mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center text-sm">
-                        <KeyIcon className="h-4 w-4 text-indigo-600 mr-2" />
-                        <span className="font-mono font-bold text-indigo-700">{course.enrollmentKey}</span>
+                        <KeyIcon className="h-4 w-4 text-indigo-600 dark:text-indigo-400 mr-2" />
+                        <span className="font-mono font-bold text-indigo-700 dark:text-indigo-300">{course.enrollmentKey}</span>
                       </div>
                       <button
                         onClick={(e) => handleCopyKey(course.enrollmentKey!, e)}
-                        className="p-1 hover:bg-indigo-100 rounded"
+                        className="p-1 hover:bg-indigo-100 dark:hover:bg-indigo-800 rounded"
                         title="Copy key"
                       >
-                        <CopyIcon className="h-4 w-4 text-indigo-600" />
+                        <CopyIcon className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                       </button>
                     </div>
-                    <p className="text-xs text-indigo-600 mt-1">
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">
                       {course.enrollmentKeyActive ? '✅ Enrollment open' : '❌ Enrollment closed'}
                     </p>
                   </div>
                 )}
 
                 {/* Stats */}
-                <div className="grid grid-cols-2 gap-4 mb-4 pt-4 border-t border-gray-200">
+                <div className="grid grid-cols-2 gap-4 mb-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <div>
-                    <div className="flex items-center text-sm text-gray-600 mb-1">
+                    <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mb-1">
                       <UsersIcon className="h-4 w-4 mr-1" />
                       <span>Students</span>
                     </div>
-                    <p className="text-lg font-semibold text-gray-900">
+                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                       {course.enrolledStudents?.length || 0}
-                      {course.maxStudents && <span className="text-sm text-gray-500">/{course.maxStudents}</span>}
+                      {course.maxStudents && <span className="text-sm text-gray-500 dark:text-gray-400">/{course.maxStudents}</span>}
                     </p>
                   </div>
                   <div>
-                    <div className="flex items-center text-sm text-gray-600 mb-1">
+                    <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mb-1">
                       <CalendarIcon className="h-4 w-4 mr-1" />
                       <span>Duration</span>
                     </div>
-                    <p className="text-lg font-semibold text-gray-900">
+                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                       {course.duration || 'Ongoing'}
                     </p>
                   </div>
@@ -365,7 +365,7 @@ export const CourseList = () => {
                       </Link>
                       <Link
                         to={`/dashboard/courses/${course.id}/edit`}
-                        className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 transition-colors"
+                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       >
                         Edit
                       </Link>

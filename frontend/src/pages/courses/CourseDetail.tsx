@@ -331,7 +331,7 @@ export const CourseDetail = () => {
   if (courseLoading) {
     return (
       <div className="py-6 flex items-center justify-center min-h-[200px]">
-        <Loader2Icon className="h-10 w-10 text-blue-600 animate-spin" />
+        <Loader2Icon className="h-10 w-10 text-blue-600 dark:text-blue-400 animate-spin" />
       </div>
     );
   }
@@ -341,12 +341,12 @@ export const CourseDetail = () => {
       <div className="py-6">
         <Link
           to="/dashboard/courses"
-          className="text-blue-600 hover:text-blue-800 text-sm font-medium mb-4 inline-block"
+          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium mb-4 inline-block"
         >
           ← Back to Courses
         </Link>
         <Card className="p-6">
-          <p className="text-gray-600">{courseError ?? 'Course not found.'}</p>
+          <p className="text-gray-600 dark:text-gray-400">{courseError ?? 'Course not found.'}</p>
         </Card>
       </div>
     );
@@ -367,42 +367,42 @@ export const CourseDetail = () => {
             <div className="flex items-center space-x-3 mb-2">
               <Link
                 to="/dashboard/courses"
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium"
               >
                 ← Back to Courses
               </Link>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900">{course.title}</h1>
-            {course.courseCode && <p className="mt-1 text-lg text-gray-600">Course Code: {course.courseCode}</p>}
-            <p className="mt-2 text-sm text-gray-500">Instructor: {course.instructorName}</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{course.title}</h1>
+            {course.courseCode && <p className="mt-1 text-lg text-gray-600 dark:text-gray-400">Course Code: {course.courseCode}</p>}
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Instructor: {course.instructorName}</p>
           </div>
         </div>
 
         {/* Course details: instructor, description, duration from database */}
         <Card className="p-6 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Course details</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Course details</h3>
           <div className="space-y-4">
             <div>
-              <p className="text-sm font-medium text-gray-600">Instructor</p>
-              <p className="text-gray-900">{course.instructorName}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Instructor</p>
+              <p className="text-gray-900 dark:text-gray-100">{course.instructorName}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-600">Description</p>
-              <p className="text-gray-700 leading-relaxed">{course.description || '—'}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Description</p>
+              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{course.description || '—'}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-600">Duration</p>
-              <p className="text-gray-900">{durationDisplay}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Duration</p>
+              <p className="text-gray-900 dark:text-gray-100">{durationDisplay}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-600">Number of enrolled students</p>
-              <p className="text-gray-900">{course.enrolledStudents?.length ?? 0}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Number of enrolled students</p>
+              <p className="text-gray-900 dark:text-gray-100">{course.enrolledStudents?.length ?? 0}</p>
             </div>
           </div>
         </Card>
       </div>
 
-      <div className="mb-6 border-b border-gray-200">
+      <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
         <nav className="-mb-px flex space-x-8">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -414,8 +414,8 @@ export const CourseDetail = () => {
                   flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm
                   ${
                     activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }
                 `}
               >
@@ -435,8 +435,8 @@ export const CourseDetail = () => {
             {isInstructor && (
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Course Lessons</h3>
-                  <p className="text-sm text-gray-500">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Course Lessons</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     Lessons created here are accessible to all enrolled students without a separate enrollment key.
                   </p>
                 </div>
@@ -452,27 +452,27 @@ export const CourseDetail = () => {
 
             {/* Create Session Form */}
             {showCreateSession && isInstructor && (
-              <Card className="border-2 border-indigo-200">
+              <Card className="border-2 border-indigo-200 dark:border-indigo-700">
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-semibold text-gray-900">Create New Lesson</h4>
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create New Lesson</h4>
                     <button
                       onClick={() => setShowCreateSession(false)}
-                      className="p-1 rounded-full hover:bg-gray-100"
+                      className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
-                      <XIcon className="h-5 w-5 text-gray-500" />
+                      <XIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                     </button>
                   </div>
 
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-                    <p className="text-sm text-green-800">
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-green-800 dark:text-green-300">
                       <strong>✓ No enrollment key needed:</strong> Students enrolled in "{course.title}" can access this lesson directly.
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Lesson Title *
                       </label>
                       <Input
@@ -484,11 +484,11 @@ export const CourseDetail = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Date *
                       </label>
                       <div className="relative">
-                        <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-gray-500" />
                         <Input
                           type="date"
                           value={newSession.date}
@@ -500,11 +500,11 @@ export const CourseDetail = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Start Time *
                       </label>
                       <div className="relative">
-                        <ClockIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <ClockIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-gray-500" />
                         <Input
                           type="time"
                           value={newSession.startTime}
@@ -516,11 +516,11 @@ export const CourseDetail = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         End Time *
                       </label>
                       <div className="relative">
-                        <ClockIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <ClockIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-gray-500" />
                         <Input
                           type="time"
                           value={newSession.endTime}
@@ -532,7 +532,7 @@ export const CourseDetail = () => {
                     </div>
 
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Description (optional)
                       </label>
                       <textarea
@@ -540,7 +540,7 @@ export const CourseDetail = () => {
                         onChange={(e) => setNewSession({ ...newSession, description: e.target.value })}
                         placeholder="Brief description of what will be covered..."
                         rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100"
                       />
                     </div>
                   </div>
@@ -567,17 +567,17 @@ export const CourseDetail = () => {
             {/* Upcoming Sessions */}
             {courseSessions.upcoming.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Lessons</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Upcoming Lessons</h3>
                 <div className="space-y-3">
                   {courseSessions.upcoming.map(session => (
                     <Card key={session.id} className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
-                            <h4 className="text-lg font-semibold text-gray-900">{session.title}</h4>
+                            <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{session.title}</h4>
                             <Badge variant="success">Upcoming</Badge>
                           </div>
-                          <div className="flex items-center space-x-4 text-sm text-gray-600">
+                          <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
                             <div className="flex items-center">
                               <CalendarIcon className="h-4 w-4 mr-1" />
                               {session.date}
@@ -612,17 +612,17 @@ export const CourseDetail = () => {
             {/* Past Sessions */}
             {courseSessions.past.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Past Lessons</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Past Lessons</h3>
                 <div className="space-y-3">
                   {courseSessions.past.map(session => (
                     <Card key={session.id} className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
-                            <h4 className="text-lg font-semibold text-gray-900">{session.title}</h4>
+                            <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{session.title}</h4>
                             <Badge variant="default">Completed</Badge>
                           </div>
-                          <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
+                          <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mb-2">
                             <div className="flex items-center">
                               <CalendarIcon className="h-4 w-4 mr-1" />
                               {session.date}
@@ -661,9 +661,9 @@ export const CourseDetail = () => {
             {/* Empty State */}
             {courseSessions.upcoming.length === 0 && courseSessions.past.length === 0 && (
               <Card className="p-8 text-center">
-                <CalendarIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No Lessons Yet</h3>
-                <p className="text-gray-500 mb-4">
+                <CalendarIcon className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-500 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Lessons Yet</h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-4">
                   {isInstructor
                     ? 'Create your first lesson for this course.'
                     : 'No lessons have been scheduled for this course yet.'}
@@ -687,8 +687,8 @@ export const CourseDetail = () => {
             {isInstructor && (
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Course Materials</h3>
-                  <p className="text-sm text-gray-500">Add PDF materials that enrolled students can download.</p>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Course Materials</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Add PDF materials that enrolled students can download.</p>
                 </div>
                 <Button
                   variant="primary"
@@ -700,23 +700,23 @@ export const CourseDetail = () => {
               </div>
             )}
             {!isInstructor && (
-              <h3 className="text-lg font-semibold text-gray-900">Course Materials</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Course Materials</h3>
             )}
 
             {showAddMaterial && isInstructor && (
-              <Card className="border-2 border-indigo-200 p-6">
+              <Card className="border-2 border-indigo-200 dark:border-indigo-700 p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-lg font-semibold text-gray-900">Add New Material (PDF)</h4>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Add New Material (PDF)</h4>
                   <button
                     onClick={() => { setShowAddMaterial(false); setNewMaterial({ title: '', description: '', file: null }); }}
-                    className="p-1 rounded-full hover:bg-gray-100"
+                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
                   >
-                    <XIcon className="h-5 w-5 text-gray-500" />
+                    <XIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                   </button>
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title *</label>
                     <Input
                       value={newMaterial.title}
                       onChange={(e) => setNewMaterial({ ...newMaterial, title: e.target.value })}
@@ -724,25 +724,25 @@ export const CourseDetail = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description (optional)</label>
                     <textarea
                       value={newMaterial.description}
                       onChange={(e) => setNewMaterial({ ...newMaterial, description: e.target.value })}
                       placeholder="Brief description of the material"
                       rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">PDF file *</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">PDF file *</label>
                     <input
                       type="file"
                       accept=".pdf,application/pdf"
                       onChange={(e) => setNewMaterial({ ...newMaterial, file: e.target.files?.[0] ?? null })}
-                      className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      className="block w-full text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-blue-50 dark:file:bg-blue-900/20 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/30"
                     />
                     {newMaterial.file && (
-                      <p className="mt-1 text-sm text-gray-500">{newMaterial.file.name}</p>
+                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{newMaterial.file.name}</p>
                     )}
                   </div>
                   <div className="flex justify-end space-x-3">
@@ -763,13 +763,13 @@ export const CourseDetail = () => {
                   <Card key={index} className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4 flex-1">
-                        <div className="p-3 rounded-lg bg-blue-100">
-                          <FileTextIcon className="h-6 w-6 text-blue-600" />
+                        <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                          <FileTextIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div className="flex-1">
-                          <h4 className="text-lg font-semibold text-gray-900">{item.title}</h4>
+                          <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{item.title}</h4>
                           {item.description && (
-                            <p className="mt-1 text-sm text-gray-600">{item.description}</p>
+                            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{item.description}</p>
                           )}
                         </div>
                       </div>
@@ -788,8 +788,8 @@ export const CourseDetail = () => {
                 ))
               ) : (
                 <Card className="p-8 text-center">
-                  <FileTextIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-500">
+                  <FileTextIcon className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-500 mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400">
                     {isInstructor ? 'No materials yet. Click "Add Material" to add one.' : 'No materials have been added for this course yet.'}
                   </p>
                 </Card>

@@ -183,8 +183,8 @@ export const CourseManagement = () => {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <RefreshCwIcon className="h-8 w-8 animate-spin text-indigo-600 mx-auto mb-4" />
-          <p className="text-gray-500">Loading your courses...</p>
+          <RefreshCwIcon className="h-8 w-8 animate-spin text-indigo-600 dark:text-indigo-400 mx-auto mb-4" />
+          <p className="text-gray-500 dark:text-gray-400">Loading your courses...</p>
         </div>
       </div>
     );
@@ -195,8 +195,8 @@ export const CourseManagement = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Course Management</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Course Management</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Create courses, manage enrollment keys, and view enrolled students
           </p>
         </div>
@@ -214,15 +214,15 @@ export const CourseManagement = () => {
           <Card>
             <CardHeader>
               <h2 className="text-lg font-semibold flex items-center">
-                <BookOpenIcon className="h-5 w-5 mr-2 text-indigo-600" />
+                <BookOpenIcon className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
                 My Courses ({courses.length})
               </h2>
             </CardHeader>
             <CardContent className="p-0">
               {courses.length === 0 ? (
                 <div className="p-6 text-center">
-                  <BookOpenIcon className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500 mb-4">No courses yet</p>
+                  <BookOpenIcon className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-500 dark:text-gray-400 mb-4">No courses yet</p>
                   <Button
                     size="sm"
                     onClick={() => navigate('/dashboard/courses/create')}
@@ -232,32 +232,32 @@ export const CourseManagement = () => {
                   </Button>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-200">
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
                   {courses.map(course => (
                     <div
                       key={course.id}
                       onClick={() => handleSelectCourse(course)}
-                      className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
-                        selectedCourse?.id === course.id ? 'bg-indigo-50 border-l-4 border-indigo-600' : ''
+                      className={`p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                        selectedCourse?.id === course.id ? 'bg-indigo-50 dark:bg-indigo-900/20 border-l-4 border-indigo-600 dark:border-indigo-400' : ''
                       }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-gray-900 truncate">{course.title}</h3>
-                          <p className="text-sm text-gray-500 mt-1">{course.category || 'No category'}</p>
+                          <h3 className="font-medium text-gray-900 dark:text-gray-100 truncate">{course.title}</h3>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{course.category || 'No category'}</p>
                           <div className="flex items-center gap-2 mt-2">
                             <Badge variant={getStatusColor(course.status) as any} size="sm">
                               {course.status.toUpperCase()}
                             </Badge>
                             {course.courseCode && (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
                                 {course.courseCode}
                               </span>
                             )}
                           </div>
                         </div>
                         <div className="text-right ml-2">
-                          <div className="flex items-center text-sm text-gray-500">
+                          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
                             <UsersIcon className="h-4 w-4 mr-1" />
                             {course.enrolledStudents?.length || 0}
                           </div>
@@ -279,8 +279,8 @@ export const CourseManagement = () => {
               <Card>
                 <CardHeader className="flex flex-row items-start justify-between">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">{selectedCourse.title}</h2>
-                    <p className="text-sm text-gray-500 mt-1">{selectedCourse.description}</p>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{selectedCourse.title}</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{selectedCourse.description}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {selectedCourse.status === 'draft' && (
@@ -312,23 +312,23 @@ export const CourseManagement = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-xs text-gray-500 uppercase">Status</p>
+                    <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">Status</p>
                       <Badge variant={getStatusColor(selectedCourse.status) as any} className="mt-1">
                         {selectedCourse.status.toUpperCase()}
                       </Badge>
                     </div>
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-xs text-gray-500 uppercase">Course Code</p>
-                      <p className="font-medium text-gray-900 mt-1">{selectedCourse.courseCode || 'Not set'}</p>
+                    <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">Course Code</p>
+                      <p className="font-medium text-gray-900 dark:text-gray-100 mt-1">{selectedCourse.courseCode || 'Not set'}</p>
                     </div>
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-xs text-gray-500 uppercase">Duration</p>
-                      <p className="font-medium text-gray-900 mt-1">{selectedCourse.duration || 'Not set'}</p>
+                    <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">Duration</p>
+                      <p className="font-medium text-gray-900 dark:text-gray-100 mt-1">{selectedCourse.duration || 'Not set'}</p>
                     </div>
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-xs text-gray-500 uppercase">Enrolled</p>
-                      <p className="font-medium text-gray-900 mt-1">
+                    <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">Enrolled</p>
+                      <p className="font-medium text-gray-900 dark:text-gray-100 mt-1">
                         {selectedCourse.enrolledStudents?.length || 0}
                         {selectedCourse.maxStudents && ` / ${selectedCourse.maxStudents}`}
                       </p>
@@ -338,21 +338,21 @@ export const CourseManagement = () => {
               </Card>
 
               {/* Enrollment Key Card */}
-              <Card className="border-2 border-indigo-200 bg-indigo-50/30">
+              <Card className="border-2 border-indigo-200 dark:border-indigo-800 bg-indigo-50/30 dark:bg-indigo-900/10">
                 <CardHeader>
                   <h3 className="text-lg font-semibold flex items-center">
-                    <KeyIcon className="h-5 w-5 mr-2 text-indigo-600" />
+                    <KeyIcon className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
                     Enrollment Key
                   </h3>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="flex-1">
-                      <p className="text-sm text-gray-600 mb-2">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                         Share this key with students to let them enroll in your course:
                       </p>
                       <div className="flex items-center gap-2">
-                        <code className="flex-1 px-4 py-3 bg-white border-2 border-indigo-300 rounded-lg font-mono text-xl font-bold text-indigo-700 tracking-widest text-center">
+                        <code className="flex-1 px-4 py-3 bg-white dark:bg-gray-800 border-2 border-indigo-300 dark:border-indigo-700 rounded-lg font-mono text-xl font-bold text-indigo-700 dark:text-indigo-300 tracking-widest text-center">
                           {selectedCourse.enrollmentKey || 'Generating...'}
                         </code>
                         <Button
@@ -387,12 +387,12 @@ export const CourseManagement = () => {
                   </div>
                   <div className="mt-3 flex items-center">
                     {selectedCourse.enrollmentKeyActive ? (
-                      <span className="flex items-center text-sm text-blue-600">
+                      <span className="flex items-center text-sm text-blue-600 dark:text-blue-400">
                         <CheckCircleIcon className="h-4 w-4 mr-1" />
                         Enrollment is open - students can use this key to join
                       </span>
                     ) : (
-                      <span className="flex items-center text-sm text-red-600">
+                      <span className="flex items-center text-sm text-red-600 dark:text-red-400">
                         <XCircleIcon className="h-4 w-4 mr-1" />
                         Enrollment is closed - key is currently disabled
                       </span>
@@ -405,7 +405,7 @@ export const CourseManagement = () => {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <h3 className="text-lg font-semibold flex items-center">
-                    <UsersIcon className="h-5 w-5 mr-2 text-indigo-600" />
+                    <UsersIcon className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
                     Enrolled Students ({students.length})
                   </h3>
                   <Button
@@ -420,45 +420,45 @@ export const CourseManagement = () => {
                 <CardContent>
                   {loadingStudents ? (
                     <div className="text-center py-8">
-                      <RefreshCwIcon className="h-6 w-6 animate-spin text-indigo-600 mx-auto mb-2" />
-                      <p className="text-gray-500">Loading students...</p>
+                      <RefreshCwIcon className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400 mx-auto mb-2" />
+                      <p className="text-gray-500 dark:text-gray-400">Loading students...</p>
                     </div>
                   ) : students.length === 0 ? (
                     <div className="text-center py-8">
-                      <UsersIcon className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-500">No students enrolled yet</p>
-                      <p className="text-sm text-gray-400 mt-1">
+                      <UsersIcon className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                      <p className="text-gray-500 dark:text-gray-400">No students enrolled yet</p>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
                         Share your enrollment key with students to get started
                       </p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-700">
                           <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Enrolled</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Student</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Email</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Enrolled</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                           {students.map(student => (
-                            <tr key={student.id} className="hover:bg-gray-50">
+                            <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                               <td className="px-4 py-3 whitespace-nowrap">
                                 <div className="flex items-center">
-                                  <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                                    <span className="text-sm font-medium text-indigo-600">
+                                  <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                                    <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
                                       {student.name.charAt(0).toUpperCase()}
                                     </span>
                                   </div>
-                                  <span className="ml-3 font-medium text-gray-900">{student.name}</span>
+                                  <span className="ml-3 font-medium text-gray-900 dark:text-gray-100">{student.name}</span>
                                 </div>
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                 {student.email}
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                 {new Date(student.enrolledAt).toLocaleDateString()}
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-right">
@@ -482,9 +482,9 @@ export const CourseManagement = () => {
             </>
           ) : (
             <Card className="p-12 text-center">
-              <BookOpenIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Course</h3>
-              <p className="text-gray-500">
+              <BookOpenIcon className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Select a Course</h3>
+              <p className="text-gray-500 dark:text-gray-400">
                 Click on a course from the list to view details, manage enrollment keys, and see enrolled students.
               </p>
             </Card>

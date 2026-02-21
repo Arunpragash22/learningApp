@@ -104,18 +104,18 @@ export const CourseCreate = () => {
             </p>
 
             {/* Enrollment Key Display */}
-            <div className="bg-white rounded-lg p-6 mb-6 border-2 border-blue-300">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 mb-6 border-2 border-blue-300">
               <div className="flex items-center justify-center mb-3">
-                <KeyIcon className="h-6 w-6 text-indigo-600 mr-2" />
-                <h3 className="text-lg font-semibold text-gray-900">Enrollment Key</h3>
+                <KeyIcon className="h-6 w-6 text-indigo-600 dark:text-indigo-400 mr-2" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Enrollment Key</h3>
               </div>
               
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 Share this key with your students so they can enroll:
               </p>
               
               <div className="flex items-center justify-center gap-3">
-                <code className="px-6 py-3 bg-indigo-50 border-2 border-indigo-300 rounded-lg font-mono text-2xl font-bold text-indigo-700 tracking-widest">
+                <code className="px-6 py-3 bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-300 dark:border-indigo-600 rounded-lg font-mono text-2xl font-bold text-indigo-700 dark:text-indigo-300 tracking-widest">
                   {createdCourse.enrollmentKey}
                 </code>
                 <Button variant="outline" onClick={handleCopyKey}>
@@ -123,7 +123,7 @@ export const CourseCreate = () => {
                 </Button>
               </div>
               
-              <p className="text-xs text-gray-500 mt-4">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
                 {createdCourse.status === 'draft' 
                   ? '⚠️ Note: Publish the course to allow students to enroll.'
                   : '✅ Course is published and ready for enrollment.'}
@@ -173,11 +173,11 @@ export const CourseCreate = () => {
           Back to Courses
         </Button>
 
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-          <BookOpenIcon className="h-7 w-7 mr-3 text-indigo-600" />
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
+          <BookOpenIcon className="h-7 w-7 mr-3 text-indigo-600 dark:text-indigo-400" />
           Create New Course
         </h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           Fill in the details to create a new course. An enrollment key will be automatically generated.
         </p>
       </div>
@@ -192,7 +192,7 @@ export const CourseCreate = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Course Title *
                   </label>
                   <Input
@@ -205,7 +205,7 @@ export const CourseCreate = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Description *
                   </label>
                   <textarea
@@ -214,14 +214,14 @@ export const CourseCreate = () => {
                     onChange={handleChange}
                     rows={4}
                     placeholder="Describe what students will learn in this course..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100"
                     required
                   />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       <TagIcon className="h-4 w-4 inline mr-1" />
                       Category
                     </label>
@@ -234,7 +234,7 @@ export const CourseCreate = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       <CalendarIcon className="h-4 w-4 inline mr-1" />
                       Duration (Weeks)
                     </label>
@@ -249,7 +249,7 @@ export const CourseCreate = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       <HashIcon className="h-4 w-4 inline mr-1" />
                       Course Code
                     </label>
@@ -262,7 +262,7 @@ export const CourseCreate = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       <UsersIcon className="h-4 w-4 inline mr-1" />
                       Max Students
                     </label>
@@ -288,7 +288,7 @@ export const CourseCreate = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Status
                   </label>
                   <div className="space-y-2">
@@ -301,7 +301,7 @@ export const CourseCreate = () => {
                         onChange={handleChange}
                         className="h-4 w-4 text-indigo-600 focus:ring-indigo-500"
                       />
-                      <span className="ml-2 text-sm text-gray-700">
+                      <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                         Draft - Not visible to students
                       </span>
                     </label>
@@ -314,7 +314,7 @@ export const CourseCreate = () => {
                         onChange={handleChange}
                         className="h-4 w-4 text-indigo-600 focus:ring-indigo-500"
                       />
-                      <span className="ml-2 text-sm text-gray-700">
+                      <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                         Published - Students can enroll
                       </span>
                     </label>
@@ -334,16 +334,16 @@ export const CourseCreate = () => {
               </CardContent>
             </Card>
 
-            <Card className="bg-indigo-50 border-indigo-200">
+            <Card className="bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800">
               <CardContent className="p-4">
                 <div className="flex items-start">
-                  <KeyIcon className="h-5 w-5 text-indigo-600 mr-3 mt-0.5" />
+                  <KeyIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400 mr-3 mt-0.5" />
                   <div>
-                    <h3 className="font-medium text-indigo-900">Enrollment Key</h3>
-                    <p className="text-sm text-indigo-700 mt-1">
+                    <h3 className="font-medium text-indigo-900 dark:text-indigo-100">Enrollment Key</h3>
+                    <p className="text-sm text-indigo-700 dark:text-indigo-300 mt-1">
                       A unique enrollment key (e.g., ABC12345) will be automatically generated when you create the course.
                     </p>
-                    <p className="text-sm text-indigo-700 mt-2">
+                    <p className="text-sm text-indigo-700 dark:text-indigo-300 mt-2">
                       Share this key with your students so they can enroll.
                     </p>
                   </div>

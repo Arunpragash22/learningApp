@@ -88,24 +88,24 @@ export const StudentEnrollment = () => {
     <div className="py-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Course Enrollment</h1>
-        <p className="text-gray-500">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Course Enrollment</h1>
+        <p className="text-gray-500 dark:text-gray-400">
           Enter the enrollment key provided by your instructor to join a course
         </p>
       </div>
 
       {/* Enrollment Form */}
-      <Card className="mb-8 border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-white">
+      <Card className="mb-8 border-2 border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-900/20 dark:to-gray-800">
         <CardContent className="p-8">
           <form onSubmit={handleEnroll} className="space-y-6">
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-full mb-4">
-                <KeyIcon className="h-8 w-8 text-indigo-600" />
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 dark:bg-indigo-900/20 rounded-full mb-4">
+                <KeyIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
               </div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
                 Enter Enrollment Key
               </h2>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 Get this key from your instructor
               </p>
             </div>
@@ -116,7 +116,7 @@ export const StudentEnrollment = () => {
                 value={enrollmentKey}
                 onChange={(e) => setEnrollmentKey(e.target.value.toUpperCase())}
                 placeholder="Enter key (e.g., ABC12345)"
-                className="block w-full px-6 py-4 text-center text-2xl font-mono font-bold tracking-widest border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 uppercase placeholder:text-gray-400 placeholder:text-base placeholder:font-normal placeholder:tracking-normal"
+                className="block w-full px-6 py-4 text-center text-2xl font-mono font-bold tracking-widest border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 uppercase placeholder:text-gray-400 dark:placeholder:text-gray-500 placeholder:text-base placeholder:font-normal placeholder:tracking-normal dark:bg-gray-700 dark:text-gray-100"
                 maxLength={10}
               />
             </div>
@@ -137,18 +137,18 @@ export const StudentEnrollment = () => {
 
       {/* Recently Enrolled Success */}
       {recentlyEnrolled && (
-        <Card className="mb-8 border-2 border-blue-200 bg-blue-50">
+        <Card className="mb-8 border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
           <CardContent className="p-6">
             <div className="flex items-start">
-              <CheckCircleIcon className="h-8 w-8 text-blue-500 mr-4 flex-shrink-0" />
+              <CheckCircleIcon className="h-8 w-8 text-blue-500 dark:text-blue-400 mr-4 flex-shrink-0" />
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-blue-800 mb-1">
+                <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-1">
                   Successfully Enrolled!
                 </h3>
-                <p className="text-blue-700 mb-3">
+                <p className="text-blue-700 dark:text-blue-300 mb-3">
                   You are now enrolled in <strong>{recentlyEnrolled.title}</strong>
                 </p>
-                <p className="text-sm text-blue-600 mb-4">
+                <p className="text-sm text-blue-600 dark:text-blue-400 mb-4">
                   Instructor: {recentlyEnrolled.instructorName}
                 </p>
                 <div className="flex gap-3">
@@ -177,7 +177,7 @@ export const StudentEnrollment = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <h2 className="text-lg font-semibold flex items-center">
-            <BookOpenIcon className="h-5 w-5 mr-2 text-indigo-600" />
+            <BookOpenIcon className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
             My Enrolled Courses ({enrolledCourses.length})
           </h2>
           <Button
@@ -192,14 +192,14 @@ export const StudentEnrollment = () => {
         <CardContent>
           {loading ? (
             <div className="text-center py-12">
-              <RefreshCwIcon className="h-8 w-8 animate-spin text-indigo-600 mx-auto mb-4" />
-              <p className="text-gray-500">Loading your courses...</p>
+              <RefreshCwIcon className="h-8 w-8 animate-spin text-indigo-600 dark:text-indigo-400 mx-auto mb-4" />
+              <p className="text-gray-500 dark:text-gray-400">Loading your courses...</p>
             </div>
           ) : enrolledCourses.length === 0 ? (
             <div className="text-center py-12">
-              <BookOpenIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No courses yet</h3>
-              <p className="text-gray-500 mb-4">
+              <BookOpenIcon className="h-16 w-16 text-gray-300 dark:text-gray-500 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No courses yet</h3>
+              <p className="text-gray-500 dark:text-gray-400 mb-4">
                 Enter an enrollment key above to join your first course
               </p>
             </div>
@@ -208,25 +208,25 @@ export const StudentEnrollment = () => {
               {enrolledCourses.map(course => (
                 <div
                   key={course.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{course.title}</h3>
-                      <p className="text-sm text-gray-500 mt-1">{course.instructorName}</p>
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">{course.title}</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{course.instructorName}</p>
                     </div>
                     {course.courseCode && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
                         {course.courseCode}
                       </span>
                     )}
                   </div>
 
-                  <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
                     {course.description}
                   </p>
 
-                  <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+                  <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-4">
                     {course.duration && (
                       <span className="flex items-center">
                         <ClockIcon className="h-4 w-4 mr-1" />
@@ -252,7 +252,7 @@ export const StudentEnrollment = () => {
                       size="sm"
                       onClick={() => handleUnenroll(course.id, course.title)}
                       leftIcon={<LogOutIcon className="h-4 w-4" />}
-                      className="text-red-600 hover:bg-red-50"
+                      className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
                     >
                       Leave
                     </Button>
@@ -265,20 +265,20 @@ export const StudentEnrollment = () => {
       </Card>
 
       {/* Help Section */}
-      <Card className="mt-8 bg-gray-50">
+      <Card className="mt-8 bg-gray-50 dark:bg-gray-700">
         <CardContent className="p-6">
-          <h3 className="font-semibold text-gray-900 mb-3">How to Enroll</h3>
-          <ol className="space-y-2 text-sm text-gray-600">
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">How to Enroll</h3>
+          <ol className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
             <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-medium mr-3">1</span>
+              <span className="flex-shrink-0 w-6 h-6 bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center text-xs font-medium mr-3">1</span>
               <span>Get the enrollment key from your instructor (looks like: ABC12345)</span>
             </li>
             <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-medium mr-3">2</span>
+              <span className="flex-shrink-0 w-6 h-6 bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center text-xs font-medium mr-3">2</span>
               <span>Enter the key in the box above and click "Enroll in Course"</span>
             </li>
             <li className="flex items-start">
-              <span className="flex-shrink-0 w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-medium mr-3">3</span>
+              <span className="flex-shrink-0 w-6 h-6 bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center text-xs font-medium mr-3">3</span>
               <span>Once enrolled, you can access course lessons and materials</span>
             </li>
           </ol>
