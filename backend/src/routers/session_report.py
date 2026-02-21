@@ -376,6 +376,144 @@ async def send_report_email(
         raise HTTPException(status_code=500, detail="Failed to send report emails")
 
 
+def _build_performance_graphs_html(quiz_details: list) -> str:
+    """Build inline SVG performance trend graphs for the PDF report."""
+    if not quiz_details or len(quiz_details) < 1:
+        return ""
+
+    n = len(quiz_details)
+    chart_w = 200
+    chart_h = 120
+    pad_l, pad_r, pad_t, pad_b = 35, 10, 10, 25
+    plot_w = chart_w - pad_l - pad_r
+    plot_h = chart_h - pad_t - pad_b
+
+    # ── 1. Accuracy Over Time (line chart) ────────────────────────
+    acc_values = [q.get("runningAccuracy", 0) for q in quiz_details]
+    acc_points = []
+    for i, v in enumerate(acc_values):
+        x = pad_l + (i / max(n - 1, 1)) * plot_w if n > 1 else pad_l + plot_w / 2
+        y = pad_t + plot_h - (v / 100) * plot_h
+        acc_points.append((x, y))
+
+    acc_line = " ".join(f"{x:.1f},{y:.1f}" for x, y in acc_points)
+    acc_dots = "".join(
+        f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3" fill="#6366f1"/>' for x, y in acc_points
+    )
+    # Y-axis labels and grid
+    acc_y_labels = ""
+    for pct in [0, 25, 50, 75, 100]:
+        y = pad_t + plot_h - (pct / 100) * plot_h
+        acc_y_labels += f'<text x="{pad_l - 3}" y="{y + 3}" text-anchor="end" font-size="7" fill="#9ca3af">{pct}%</text>'
+        acc_y_labels += f'<line x1="{pad_l}" y1="{y}" x2="{chart_w - pad_r}" y2="{y}" stroke="#f0f0f0" stroke-width="0.5"/>'
+    # 75% reference line
+    ref_y = pad_t + plot_h - 0.75 * plot_h
+    acc_ref = f'<line x1="{pad_l}" y1="{ref_y}" x2="{chart_w - pad_r}" y2="{ref_y}" stroke="#22c55e" stroke-width="0.7" stroke-dasharray="3,3"/>'
+    # X-axis labels
+    acc_x_labels = ""
+    for i in range(n):
+        x = pad_l + (i / max(n - 1, 1)) * plot_w if n > 1 else pad_l + plot_w / 2
+        acc_x_labels += f'<text x="{x}" y="{chart_h - 5}" text-anchor="middle" font-size="7" fill="#9ca3af">Q{i+1}</text>'
+
+    accuracy_svg = f'''<svg viewBox="0 0 {chart_w} {chart_h}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
+        {acc_y_labels}{acc_ref}{acc_x_labels}
+        <polyline points="{acc_line}" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round"/>
+        {acc_dots}
+    </svg>'''
+
+    # ── 2. Response Time (bar chart) ──────────────────────────────
+    rt_values = [round(q.get("timeTaken", 0) or 0, 1) for q in quiz_details]
+    max_rt = max(rt_values) if rt_values else 1
+    if max_rt == 0:
+        max_rt = 1
+    bar_w = plot_w / max(n, 1) * 0.6
+    bar_gap = plot_w / max(n, 1)
+
+    rt_bars = ""
+    rt_x_labels = ""
+    for i, v in enumerate(rt_values):
+        x = pad_l + i * bar_gap + (bar_gap - bar_w) / 2
+        h = (v / max_rt) * plot_h
+        y = pad_t + plot_h - h
+        rt_bars += f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{h:.1f}" rx="2" fill="#8b5cf6"/>'
+        lx = pad_l + i * bar_gap + bar_gap / 2
+        rt_x_labels += f'<text x="{lx:.1f}" y="{chart_h - 5}" text-anchor="middle" font-size="7" fill="#9ca3af">Q{i+1}</text>'
+
+    # Y-axis for response time
+    rt_y_labels = ""
+    for frac in [0, 0.25, 0.5, 0.75, 1.0]:
+        val = max_rt * frac
+        y = pad_t + plot_h - frac * plot_h
+        label = f"{val:.0f}s" if val == int(val) else f"{val:.1f}s"
+        rt_y_labels += f'<text x="{pad_l - 3}" y="{y + 3}" text-anchor="end" font-size="7" fill="#9ca3af">{label}</text>'
+        rt_y_labels += f'<line x1="{pad_l}" y1="{y}" x2="{chart_w - pad_r}" y2="{y}" stroke="#f0f0f0" stroke-width="0.5"/>'
+
+    response_svg = f'''<svg viewBox="0 0 {chart_w} {chart_h}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
+        {rt_y_labels}{rt_x_labels}{rt_bars}
+    </svg>'''
+
+    # ── 3. Cluster Level (step chart) ─────────────────────────────
+    CLUSTER_NUM = {"passive": 1, "moderate": 2, "active": 3}
+    CLUSTER_COLOR = {"passive": "#ef4444", "moderate": "#f59e0b", "active": "#22c55e"}
+    cluster_values = [CLUSTER_NUM.get((q.get("clusterAtAnswer") or "moderate").lower(), 2) for q in quiz_details]
+
+    # Build step-after path
+    cl_points = []
+    for i, v in enumerate(cluster_values):
+        x = pad_l + (i / max(n - 1, 1)) * plot_w if n > 1 else pad_l + plot_w / 2
+        y = pad_t + plot_h - ((v - 0.5) / 3) * plot_h
+        if i > 0 and n > 1:
+            cl_points.append((x, cl_points[-1][1]))
+        cl_points.append((x, y))
+
+    cl_line = " ".join(f"{x:.1f},{y:.1f}" for x, y in cl_points)
+    # Fill area
+    if cl_points:
+        base_y = pad_t + plot_h
+        fill_pts = f"{cl_points[0][0]:.1f},{base_y:.1f} " + cl_line + f" {cl_points[-1][0]:.1f},{base_y:.1f}"
+    else:
+        fill_pts = ""
+
+    cl_y_labels = ""
+    for label, num in [("Passive", 1), ("Moderate", 2), ("Active", 3)]:
+        y = pad_t + plot_h - ((num - 0.5) / 3) * plot_h
+        cl_y_labels += f'<text x="{pad_l - 3}" y="{y + 3}" text-anchor="end" font-size="7" fill="#9ca3af">{label}</text>'
+        cl_y_labels += f'<line x1="{pad_l}" y1="{y}" x2="{chart_w - pad_r}" y2="{y}" stroke="#f0f0f0" stroke-width="0.5"/>'
+
+    cl_x_labels = ""
+    for i in range(n):
+        x = pad_l + (i / max(n - 1, 1)) * plot_w if n > 1 else pad_l + plot_w / 2
+        cl_x_labels += f'<text x="{x}" y="{chart_h - 5}" text-anchor="middle" font-size="7" fill="#9ca3af">Q{i+1}</text>'
+
+    cluster_svg = f'''<svg viewBox="0 0 {chart_w} {chart_h}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
+        {cl_y_labels}{cl_x_labels}
+        <polygon points="{fill_pts}" fill="#d1fae5" opacity="0.6"/>
+        <polyline points="{cl_line}" fill="none" stroke="#10b981" stroke-width="2" stroke-linejoin="round"/>
+    </svg>'''
+
+    return f'''
+    <div style="margin-bottom: 20px;">
+        <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: bold; color: #111827;">Performance Trends</h3>
+        <table style="width: 100%; border-collapse: separate; border-spacing: 8px 0;">
+            <tr>
+                <td style="width: 33%; vertical-align: top; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;">
+                    <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #374151;">Accuracy Over Time</p>
+                    {accuracy_svg}
+                </td>
+                <td style="width: 33%; vertical-align: top; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;">
+                    <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #374151;">Response Time</p>
+                    {response_svg}
+                </td>
+                <td style="width: 33%; vertical-align: top; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;">
+                    <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #374151;">Cluster Level</p>
+                    {cluster_svg}
+                </td>
+            </tr>
+        </table>
+    </div>
+    '''
+
+
 def _generate_report_html(report: dict, user_role: str) -> str:
     """Generate downloadable HTML report — different content for student vs instructor."""
     year = datetime.now().year
@@ -455,6 +593,8 @@ def _generate_report_html(report: dict, user_role: str) -> str:
 
         quiz_details = s.get("quizDetails", [])
         if quiz_details:
+            student_personal_section += _build_performance_graphs_html(quiz_details)
+
             student_personal_section += """
             <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px;">
                 <div style="padding: 15px 20px; border-bottom: 1px solid #e5e7eb;">
