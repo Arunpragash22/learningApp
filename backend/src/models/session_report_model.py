@@ -653,8 +653,17 @@ class SessionReportModel:
             # option texts, running accuracy, cluster progression
             quiz_details = []
             source = student_assignments if student_assignments else student_answers
+
+            # Build a lookup from questionId → clusterAtAnswer from quiz_answers
+            answer_cluster_map = {}
+            for ans in student_answers:
+                qid_ans = ans.get("questionId")
+                if qid_ans and ans.get("clusterAtAnswer"):
+                    answer_cluster_map[qid_ans] = ans["clusterAtAnswer"]
+
             running_correct = 0
             running_total = 0
+            last_known_cluster = "moderate"
             for item in source:
                 qid = item.get("questionId")
                 q = questions.get(qid, {})
@@ -668,8 +677,17 @@ class SessionReportModel:
                     running_correct += 1
                 running_accuracy = round((running_correct / running_total) * 100, 1)
 
-                # Determine cluster at time of this answer (use session cluster data)
-                cluster_at_answer = cluster_map.get(student_id, "moderate")
+                # Per-answer cluster: prefer stamp from quiz_answer, then item,
+                # then carry forward last known, then current cluster_map
+                cluster_at_answer = (
+                    answer_cluster_map.get(qid)
+                    or item.get("clusterAtAnswer")
+                    or None
+                )
+                if cluster_at_answer:
+                    last_known_cluster = cluster_at_answer
+                else:
+                    cluster_at_answer = last_known_cluster
 
                 quiz_details.append({
                     "questionId": qid or "",
@@ -687,6 +705,10 @@ class SessionReportModel:
                     "runningTotal": running_total,
                     "clusterAtAnswer": cluster_at_answer,
                 })
+
+            # For the last entry, use current cluster if no stamp exists
+            if quiz_details and not answer_cluster_map.get(quiz_details[-1].get("questionId")):
+                quiz_details[-1]["clusterAtAnswer"] = cluster_map.get(student_id, last_known_cluster)
             
             # Calculate attendance duration
             joined_at = participant.get("joinedAt")
@@ -932,9 +954,21 @@ class SessionReportModel:
         if avg_time is not None:
             student_data["averageResponseTime"] = round(avg_time, 2)
 
+        # Build clusterAtAnswer lookup from quiz_answers
+        answer_cluster_map = {}
+        for sid in session_ids:
+            async for ans in database.quiz_answers.find(
+                {"sessionId": sid, "studentId": student_id, "clusterAtAnswer": {"$exists": True}},
+                {"questionId": 1, "clusterAtAnswer": 1},
+            ):
+                qid_ans = ans.get("questionId")
+                if qid_ans:
+                    answer_cluster_map[qid_ans] = ans["clusterAtAnswer"]
+
         quiz_details = []
         running_correct = 0
         running_total = 0
+        last_known_cluster = "moderate"
         for item in items:
             qid = item.get("questionId")
             q = {}
@@ -955,6 +989,16 @@ class SessionReportModel:
                 running_correct += 1
             running_accuracy = round((running_correct / running_total) * 100, 1)
 
+            cluster_at_answer = (
+                answer_cluster_map.get(qid)
+                or item.get("clusterAtAnswer")
+                or None
+            )
+            if cluster_at_answer:
+                last_known_cluster = cluster_at_answer
+            else:
+                cluster_at_answer = last_known_cluster
+
             quiz_details.append({
                 "questionId": qid or "",
                 "question": q.get("question", "Unknown question"),
@@ -969,6 +1013,7 @@ class SessionReportModel:
                 "runningAccuracy": running_accuracy,
                 "runningCorrect": running_correct,
                 "runningTotal": running_total,
+                "clusterAtAnswer": cluster_at_answer,
             })
         student_data["quizDetails"] = quiz_details
 

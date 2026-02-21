@@ -18,8 +18,10 @@ import {
 import { Card, CardHeader, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { FeedbackGraphs } from '../../components/feedback/FeedbackGraphs';
 import { sessionService, SessionReport as SessionReportType } from '../../services/sessionService';
 import { toast } from 'sonner';
+import type { FeedbackHistoryEntry } from '../../context/SessionConnectionContext';
 
 export const SessionReport = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -526,6 +528,25 @@ export const SessionReport = () => {
                     <p className="text-xs text-blue-700 dark:text-blue-400">Avg. Response Time</p>
                   </div>
                 </div>
+
+                {/* Performance Trend Graphs */}
+                {studentData.quizDetails.length > 0 && (() => {
+                  const graphHistory: FeedbackHistoryEntry[] = studentData.quizDetails.map((q, i) => ({
+                    questionNumber: i + 1,
+                    accuracy: q.runningAccuracy ?? 0,
+                    responseTime: q.timeTaken ? Math.round(q.timeTaken * 10) / 10 : 0,
+                    cluster: q.clusterAtAnswer || 'moderate',
+                    isCorrect: q.isCorrect ?? false,
+                  }));
+                  return (
+                    <div className="mb-6">
+                      <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3">
+                        Performance Trends
+                      </h4>
+                      <FeedbackGraphs history={graphHistory} />
+                    </div>
+                  );
+                })()}
 
                 {/* Quiz Details */}
                 <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3">
