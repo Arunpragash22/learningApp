@@ -351,13 +351,21 @@ class QuizService:
         if not questions:
             raise ValueError("No questions available in the database")
 
-        # ── Two-phase cluster-aware filtering ──
-        # Phase 1 (no clustering): ONLY generic questions
-        # Phase 2 (clustering done): ONLY cluster-specific questions for this student
-        # get_student_cluster_map now auto-resolves alternate session IDs (MongoDB ↔ Zoom)
+        # ── First question = generic, subsequent = cluster-wise ──
+        # Check if this student has already answered any question in this session.
+        # If not, this is their first question → always generic.
+        # If yes, use cluster-specific questions (fall back to generic if none).
         from ..models.cluster_model import ClusterModel
         student_cluster = None
         has_clustering = False
+        is_first_question = True
+        try:
+            answered_ids = await QuizAnswerModel.get_answered_question_ids(student_id, session_id)
+            if len(answered_ids) > 0:
+                is_first_question = False
+        except Exception:
+            pass
+
         try:
             cluster_map = await ClusterModel.get_student_cluster_map(session_id)
             if cluster_map:
@@ -368,17 +376,18 @@ class QuizService:
 
         generic_qs = [q for q in questions if q.get("questionType", "generic") == "generic" or not q.get("questionType")]
 
-        if has_clustering and student_cluster:
-            # Phase 2: ONLY this student's cluster questions (matched by category)
-            # Falls back to generic — NEVER to other clusters' questions
+        if is_first_question:
+            eligible_questions = generic_qs if generic_qs else questions
+            print(f"🟢 First question for {student_id[:12]}... → GENERIC only")
+        elif has_clustering and student_cluster:
             cluster_qs = [
                 q for q in questions
                 if q.get("questionType") == "cluster"
                 and q.get("category", "").lower() == student_cluster
             ]
             eligible_questions = cluster_qs if cluster_qs else generic_qs
+            print(f"🔵 Subsequent question for {student_id[:12]}... (cluster={student_cluster}) → CLUSTER-WISE")
         else:
-            # Phase 1: ONLY generic questions (fall back to all only in Phase 1)
             eligible_questions = generic_qs if generic_qs else questions
 
         active_question_ids = await QuestionAssignmentModel.find_active_question_ids(session_id, activation_version)

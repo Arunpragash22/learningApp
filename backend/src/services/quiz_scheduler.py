@@ -293,10 +293,17 @@ class QuizScheduler:
 
             has_clustering = bool(student_cluster_map)
 
-            if has_clustering:
-                print(f"📋 Auto-trigger: Clustering active ({len(student_cluster_map)} mapped) — generic first, then cluster")
+            # Determine if this is the first question for the session
+            schedule_info = self.active_schedules.get(session_id, {})
+            current_config = schedule_info.get("config", {})
+            is_first_question = current_config.get("questions_sent", 0) == 0
+
+            if is_first_question:
+                print(f"🟢 Auto-trigger: First question → GENERIC only for all students")
+            elif has_clustering:
+                print(f"🔵 Auto-trigger: Subsequent question, clustering active ({len(student_cluster_map)} mapped) → CLUSTER-WISE")
             else:
-                print(f"📋 Auto-trigger: No clustering — generic questions only ({len(generic_qs)} available)")
+                print(f"📋 Auto-trigger: Subsequent question, no clustering → generic questions only ({len(generic_qs)} available)")
 
             # ── 4. Collect all joined students ──────────────────────────
             ids_to_try = [str(s) for s in session_ids_to_check]
@@ -326,28 +333,35 @@ class QuizScheduler:
             for sid_val in students_to_send:
                 student_cluster = student_cluster_map.get(sid_val) if has_clustering else None
 
-                if has_clustering and student_cluster:
-                    student_cluster_qs = [
-                        q for q in cluster_qs_all
-                        if q.get("category", "").lower() == student_cluster
-                    ]
+                if is_first_question:
+                    # First question → ONLY generic
+                    unsent_generic = [q for q in generic_qs if str(q["_id"]) not in sent_ids]
+                    if unsent_generic:
+                        q = random.choice(unsent_generic)
+                    else:
+                        q = random.choice(generic_qs) if generic_qs else (random.choice(questions) if questions else None)
                 else:
-                    student_cluster_qs = []
+                    # Subsequent questions → cluster-wise first, then generic fallback
+                    if has_clustering and student_cluster:
+                        student_cluster_qs = [
+                            q for q in cluster_qs_all
+                            if q.get("category", "").lower() == student_cluster
+                        ]
+                    else:
+                        student_cluster_qs = []
 
-                # Generic first, then cluster-specific
-                unsent_generic = [q for q in generic_qs if str(q["_id"]) not in sent_ids]
-                if unsent_generic:
-                    q = random.choice(unsent_generic)
-                else:
                     unsent_cluster = [q for q in student_cluster_qs if str(q["_id"]) not in sent_ids]
                     if unsent_cluster:
                         q = random.choice(unsent_cluster)
                     else:
-                        # All sent — recycle from available pool
-                        pool = generic_qs + student_cluster_qs
-                        if not pool:
-                            pool = generic_qs if generic_qs else questions
-                        q = random.choice(pool) if pool else None
+                        unsent_generic = [q for q in generic_qs if str(q["_id"]) not in sent_ids]
+                        if unsent_generic:
+                            q = random.choice(unsent_generic)
+                        else:
+                            pool = student_cluster_qs + generic_qs
+                            if not pool:
+                                pool = generic_qs if generic_qs else questions
+                            q = random.choice(pool) if pool else None
 
                 if q:
                     student_questions[sid_val] = q

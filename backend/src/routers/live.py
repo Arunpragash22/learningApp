@@ -5,7 +5,8 @@ Trigger questions → Sent ONLY to students who JOINED the session via WebSocket
 
 Question delivery strategy:
   - Fallback: current session → previous session → general questions
-  - Ordering: generic questions first, then cluster-specific questions
+  - First question of session: ALWAYS generic for all students
+  - Subsequent questions: cluster-wise (based on each student's cluster)
 """
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -28,22 +29,23 @@ def _get_eligible_questions(
     all_questions: list,
     student_cluster: Optional[str],
     has_clustering_data: bool = False,
+    is_first_question: bool = False,
 ) -> list:
     """
     Return the list of questions a student is eligible to receive.
 
-    Phase 1 — BEFORE clustering:
-      → ONLY generic questions
-
-    Phase 2 — AFTER clustering:
-      → ONLY questions whose category matches the student's cluster
-      → Falls back to generic if no matching cluster questions exist
-      → NEVER returns questions from a different cluster
+    First question of the session → ALWAYS generic (regardless of clustering).
+    Subsequent questions → cluster-matched if clustering data exists,
+                           falls back to generic if no match,
+                           NEVER returns questions from a different cluster.
     """
     generic = [
         q for q in all_questions
         if q.get("questionType", "generic") == "generic" or not q.get("questionType")
     ]
+
+    if is_first_question:
+        return generic if generic else all_questions
 
     if not has_clustering_data or not student_cluster:
         return generic if generic else all_questions
@@ -65,22 +67,28 @@ def _pick_question_ordered(
     cluster_pool: list,
     sent_generic_ids: set,
     sent_cluster_ids: set,
+    is_first_question: bool = False,
 ) -> Optional[dict]:
     """
-    Pick the next question following the ordering rule:
-      1. First exhaust unsent generic questions
-      2. Then send cluster-specific questions
+    Pick the next question following the rule:
+      - First question of session: ONLY from generic pool
+      - Subsequent questions: cluster-specific pool first, then generic fallback
     If all have been sent, reset and cycle again.
     """
-    unsent_generic = [q for q in generic_pool if str(q["_id"]) not in sent_generic_ids]
-    if unsent_generic:
-        return random.choice(unsent_generic)
+    if is_first_question:
+        unsent_generic = [q for q in generic_pool if str(q["_id"]) not in sent_generic_ids]
+        if unsent_generic:
+            return random.choice(unsent_generic)
+        return random.choice(generic_pool) if generic_pool else None
 
     unsent_cluster = [q for q in cluster_pool if str(q["_id"]) not in sent_cluster_ids]
     if unsent_cluster:
         return random.choice(unsent_cluster)
 
-    # All questions sent — pick from any available pool
+    unsent_generic = [q for q in generic_pool if str(q["_id"]) not in sent_generic_ids]
+    if unsent_generic:
+        return random.choice(unsent_generic)
+
     combined = generic_pool + cluster_pool
     return random.choice(combined) if combined else None
 
@@ -190,7 +198,23 @@ async def trigger_question(meeting_id: str):
 
         has_clustering = bool(student_cluster_map)
 
-        # 4) Send questions: generic first, then cluster-specific
+        # 4) Determine if this is the first question for the session
+        is_first_question = True
+        try:
+            existing_answers = await db.database.quiz_answers.count_documents(
+                {"sessionId": {"$in": session_ids_to_check}}
+            )
+            if existing_answers > 0:
+                is_first_question = False
+        except Exception:
+            pass
+
+        if is_first_question:
+            print(f"   🟢 First question for session → sending GENERIC to all students")
+        else:
+            print(f"   🔵 Subsequent question → sending CLUSTER-WISE questions")
+
+        # 5) Send questions: first question = generic, after that = cluster-wise
         ws_sent_count = 0
         sent_questions = []
         sent_generic_ids: set = set()
@@ -201,7 +225,7 @@ async def trigger_question(meeting_id: str):
             student_session_id = participant.get("sessionId", meeting_id)
             student_cluster = student_cluster_map.get(student_id)
 
-            if has_clustering and student_cluster:
+            if not is_first_question and has_clustering and student_cluster:
                 student_cluster_qs = [
                     q for q in cluster_qs
                     if q.get("category", "").lower() == student_cluster
@@ -209,7 +233,7 @@ async def trigger_question(meeting_id: str):
             else:
                 student_cluster_qs = []
 
-            q = _pick_question_ordered(generic_qs, student_cluster_qs, sent_generic_ids, sent_cluster_ids)
+            q = _pick_question_ordered(generic_qs, student_cluster_qs, sent_generic_ids, sent_cluster_ids, is_first_question)
 
             if not q:
                 print(f"   ⚠️ No questions available for {participant.get('studentName', student_id)}")
@@ -375,7 +399,23 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
 
         has_clustering = bool(student_cluster_map)
 
-        # Send questions: generic first, then cluster-specific
+        # Determine if this is the first question for the session
+        is_first_question = True
+        try:
+            existing_answers = await db.database.quiz_answers.count_documents(
+                {"sessionId": {"$in": session_ids_to_check}}
+            )
+            if existing_answers > 0:
+                is_first_question = False
+        except Exception:
+            pass
+
+        if is_first_question:
+            print(f"   🟢 First question for session → sending GENERIC to all students")
+        else:
+            print(f"   🔵 Subsequent question → sending CLUSTER-WISE questions")
+
+        # Send questions: first = generic, after that = cluster-wise
         ws_sent_count = 0
         sent_generic_ids: set = set()
         sent_cluster_ids: set = set()
@@ -385,7 +425,7 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
             student_session_id = participant.get("sessionId", effective_meeting_id)
             student_cluster = student_cluster_map.get(student_id)
 
-            if has_clustering and student_cluster:
+            if not is_first_question and has_clustering and student_cluster:
                 student_cluster_qs = [
                     q for q in cluster_qs
                     if q.get("category", "").lower() == student_cluster
@@ -393,7 +433,7 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
             else:
                 student_cluster_qs = []
 
-            q = _pick_question_ordered(generic_qs, student_cluster_qs, sent_generic_ids, sent_cluster_ids)
+            q = _pick_question_ordered(generic_qs, student_cluster_qs, sent_generic_ids, sent_cluster_ids, is_first_question)
             if not q:
                 continue
 
