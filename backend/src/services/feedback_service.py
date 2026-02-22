@@ -253,11 +253,18 @@ def _num(x, nd=1):
     return "N/A" if pd.isna(x) else str(round(float(x), nd))
 
 
+def _fallback_encouragement(name: str, label: str) -> str:
+    if label == "Active":
+        return "great job staying consistently engaged!"
+    elif label == "Passive":
+        return "every small step counts — let's build momentum together."
+    return "you're making progress — keep pushing forward!"
+
+
 def _generate_feedback(r) -> dict:
     """
     Generate personalized feedback for one student row.
-    Returns a dict with structured feedback data.
-    Produces concise 2-3 sentence feedback; graphs visualize the numbers.
+    Uses NLP for encouragement + programmatic stats for accuracy.
     """
     name = _safe_name(r.get(_COL_NAME))
 
@@ -276,45 +283,54 @@ def _generate_feedback(r) -> dict:
     else:
         fb_type = "encouragement"
 
-    # ---- NLP Feedback Generation ----
-    prompt = f"""
-Student name: {name}
-Engagement level: {label}
-Accuracy: {0 if pd.isna(acc) else int(acc * 100)}%
-Total questions answered: {total}
-Median response time: {r.get('median_rt_sec', 0)} seconds
-Network quality: {r.get('net_quality_mode', 'good')}
+    acc_pct = 0 if pd.isna(acc) else int(round(acc * 100))
+    median_rt = round(float(r.get("median_rt_sec", 0)), 1) if not pd.isna(r.get("median_rt_sec", np.nan)) else 0
 
-Write a short personalized feedback message encouraging improvement.
-Keep it under 2 sentences.
-"""
-
+    # ---- NLP: generate only a short encouragement sentence ----
+    prompt = (
+        f"Write one short encouraging sentence for a student named {name} "
+        f"who is in the {label} engagement group with {acc_pct}% accuracy."
+    )
     try:
-        inputs = _fb_tokenizer(prompt, return_tensors="pt", max_length=256, truncation=True)
+        inputs = _fb_tokenizer(prompt, return_tensors="pt", max_length=128, truncation=True)
         outputs = _fb_model.generate(
             **inputs,
-            max_new_tokens=60,
+            max_new_tokens=40,
             temperature=0.7,
             do_sample=True,
         )
-        message = _fb_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
-        if not message or len(message) < 10:
-            message = f"Hi {name}, keep practicing and improving step by step."
+        nlp_sentence = _fb_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+        if not nlp_sentence or len(nlp_sentence) < 10:
+            nlp_sentence = _fallback_encouragement(name, label)
     except Exception:
-        message = f"Hi {name}, keep practicing and improving step by step."
+        nlp_sentence = _fallback_encouragement(name, label)
 
+    # ---- Build structured message with real stats ----
+    parts = [f"Hi {name}, {nlp_sentence}"]
+    if pd.isna(acc) or total == 0:
+        parts.append("Answer a few more questions so we can track your progress.")
+    else:
+        parts.append(f"Your accuracy is {acc_pct}% ({correct}/{total} correct).")
+        parts.append(f"Your typical response time is about {median_rt} seconds.")
+
+    message = " ".join(parts)
+
+    # ---- Actionable next steps ----
     actions: List[str] = []
-    if pd.isna(acc):
+    if pd.isna(acc) or total == 0:
         actions.append("Attempt more questions to build your performance profile")
     elif acc < 0.50:
         actions.append("Review wrong answers and redo them slowly")
+        actions.append("Focus on understanding concepts before speed")
     elif acc < 0.75:
-        actions.append("Focus on most-missed topics")
+        actions.append("Focus on most-missed topics to push higher")
+        actions.append("Add a few harder questions weekly to strengthen weak areas")
     else:
         actions.append("Try harder questions to challenge yourself")
+        actions.append("Maintain performance with short mixed practice sets")
 
     if label == "Passive":
-        actions.append("Aim for at least 3 questions daily")
+        actions.append("Aim for at least 3 questions daily to build consistency")
     elif label == "Moderate":
         actions.append("Answer quizzes promptly to move into Active group")
 

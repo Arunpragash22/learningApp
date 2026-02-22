@@ -90,9 +90,15 @@ export const PersonalizedFeedback: React.FC<PersonalizedFeedbackProps> = ({
                   {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
                 </Badge>
                 {item.clusterContext && (
-                  <Badge variant="default">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                    item.clusterContext.toLowerCase().includes('active')
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                      : item.clusterContext.toLowerCase().includes('passive') || item.clusterContext.toLowerCase().includes('risk')
+                        ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300'
+                  }`}>
                     {item.clusterContext}
-                  </Badge>
+                  </span>
                 )}
               </div>
               <span className="text-xs text-gray-500 dark:text-gray-400">{item.timestamp}</span>
