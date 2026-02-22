@@ -28,6 +28,17 @@ from bson import ObjectId
 from ..database.connection import get_database
 
 
+def _serialize(obj):
+    """Recursively convert ObjectId instances to strings for JSON serialization."""
+    if isinstance(obj, ObjectId):
+        return str(obj)
+    if isinstance(obj, dict):
+        return {k: _serialize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_serialize(i) for i in obj]
+    return obj
+
+
 class QuizSummary(BaseModel):
     """Summary of a quiz question in the report"""
     questionId: str
@@ -360,7 +371,7 @@ class SessionReportModel:
             if report:
                 report["id"] = str(report["_id"])
                 del report["_id"]
-            return report
+            return _serialize(report) if report else None
         except:
             return None
     
@@ -375,7 +386,7 @@ class SessionReportModel:
         async for report in database.session_reports.find({"sessionId": session_id}):
             report["id"] = str(report["_id"])
             del report["_id"]
-            reports.append(report)
+            reports.append(_serialize(report))
         return reports
     
     @staticmethod
@@ -388,22 +399,19 @@ class SessionReportModel:
         reports = []
         
         if user_role in ["instructor", "admin"]:
-            # Instructors see reports for their sessions
             query = {"instructorId": user_id} if user_role == "instructor" else {}
             async for report in database.session_reports.find(query).sort("generatedAt", -1):
                 report["id"] = str(report["_id"])
                 del report["_id"]
-                reports.append(report)
+                reports.append(_serialize(report))
         else:
-            # Students see reports where they participated
             async for report in database.session_reports.find({
                 "students.studentId": user_id
             }).sort("generatedAt", -1):
                 report["id"] = str(report["_id"])
                 del report["_id"]
-                # Filter student data to only show their own
                 report["students"] = [s for s in report.get("students", []) if s.get("studentId") == user_id]
-                reports.append(report)
+                reports.append(_serialize(report))
         
         return reports
     
@@ -427,7 +435,7 @@ class SessionReportModel:
         if report:
             report["id"] = str(report["_id"])
             del report["_id"]
-        return report
+        return _serialize(report) if report else None
     
     @staticmethod
     async def update_report(report_id: str, report_data: Dict) -> bool:
