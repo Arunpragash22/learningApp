@@ -20,8 +20,15 @@ import csv
 import numpy as np
 import pandas as pd
 from typing import List, Dict, Optional, Tuple
+from transformers import pipeline
 from ..database.connection import get_database
 
+# Load NLP model once at startup
+feedback_generator = pipeline(
+    "text2text-generation",
+    model="google/flan-t5-small",
+    device=-1  # use CPU; change to 0 if GPU available
+)
 
 POOR_RTT = 3000
 POOR_JITTER = 1500
@@ -272,15 +279,29 @@ def _generate_feedback(r) -> dict:
     else:
         fb_type = "encouragement"
 
-    # Build concise message (2-3 sentences max)
-    if pd.isna(acc) or total == 0:
-        message = f"Hi {name}, answer a few more questions so we can track your progress."
-    elif acc >= 0.75:
-        message = f"Great work, {name}! {_pct(acc)} accuracy across {total} questions. Keep the momentum going."
-    elif acc >= 0.50:
-        message = f"Good effort, {name} — {_pct(acc)} accuracy so far. Focus on your weaker topics to push higher."
-    else:
-        message = f"Hi {name}, your accuracy is {_pct(acc)}. Review mistakes carefully — small improvements add up fast."
+    # ---- NLP Feedback Generation ----
+    prompt = f"""
+Student name: {name}
+Engagement level: {label}
+Accuracy: {0 if pd.isna(acc) else int(acc * 100)}%
+Total questions answered: {total}
+Median response time: {r.get('median_rt_sec', 0)} seconds
+Network quality: {r.get('net_quality_mode', 'good')}
+
+Write a short personalized feedback message encouraging improvement.
+Keep it under 2 sentences.
+"""
+
+    try:
+        result = feedback_generator(
+            prompt,
+            max_length=60,
+            temperature=0.7,
+            do_sample=True
+        )
+        message = result[0]["generated_text"].strip()
+    except Exception:
+        message = f"Hi {name}, keep practicing and improving step by step."
 
     actions: List[str] = []
     if pd.isna(acc):
