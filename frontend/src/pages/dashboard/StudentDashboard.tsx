@@ -278,7 +278,7 @@ export const StudentDashboard = () => {
     };
 
     return () => ws.close();
-  }, [user?.id, loadSessions]);
+  }, [user?.id, loadSessions, leaveSession]);
 
   // ===========================================================
   // UI RENDER — Student dashboard: welcome + Learning Summary + meeting details

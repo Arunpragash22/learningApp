@@ -521,6 +521,22 @@ async def end_session(
         # Get zoomMeetingId for participant lookup
         zoom_meeting_id = session.get("zoomMeetingId")
         
+        # 📢 Broadcast meeting_ended to all connected students so they leave the session
+        meeting_ended_event = {
+            "type": "meeting_ended",
+            "sessionId": session_id,
+            "zoomMeetingId": str(zoom_meeting_id) if zoom_meeting_id else None,
+            "status": "completed",
+            "message": "Meeting has ended",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        if zoom_meeting_id:
+            await ws_manager.broadcast_to_session(str(zoom_meeting_id), meeting_ended_event)
+        if str(zoom_meeting_id) != session_id:
+            await ws_manager.broadcast_to_session(session_id, meeting_ended_event)
+        await ws_manager.broadcast_global(meeting_ended_event)
+        print(f"📢 Meeting ended event broadcasted to session + global")
+        
         # Get participant count - check BOTH MongoDB session_id AND zoomMeetingId
         participant_count = await db.database.session_participants.count_documents({
             "sessionId": session_id

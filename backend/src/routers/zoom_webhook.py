@@ -266,8 +266,10 @@ async def zoom_events(
                     # Also broadcast using MongoDB session_id
                     if str(zoom_meeting_id) != session_id:
                         await ws_manager.broadcast_to_session(session_id, meeting_ended_event)
+                    # Also broadcast globally so StudentDashboard global WS picks it up
+                    await ws_manager.broadcast_global(meeting_ended_event)
                     
-                    print(f"📢 Meeting ended event broadcasted to all participants")
+                    print(f"📢 Meeting ended event broadcasted to session + global")
                     
                     # Generate and save MASTER report
                     report = await SessionReportModel.generate_master_report(
