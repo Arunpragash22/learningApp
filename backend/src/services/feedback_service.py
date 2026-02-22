@@ -21,12 +21,7 @@ import random as _random
 import numpy as np
 import pandas as pd
 from typing import List, Dict, Optional, Tuple
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from ..database.connection import get_database
-
-# Load NLP model once at startup
-_fb_tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-small")
-_fb_model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-small")
 
 POOR_RTT = 3000
 POOR_JITTER = 1500
@@ -317,28 +312,10 @@ def _pick_encouragement(label: str, acc_pct: int) -> str:
     return _random.choice(pool)
 
 
-def _nlp_encouragement(name: str, label: str, acc_pct: int) -> str:
-    """Try NLP first; if the output is low-quality, fall back to curated pool."""
-    prompt = f"Encourage {name} who scored {acc_pct}% in a quiz:"
-    try:
-        inputs = _fb_tokenizer(prompt, return_tensors="pt", max_length=64, truncation=True)
-        outputs = _fb_model.generate(**inputs, max_new_tokens=30, do_sample=True, temperature=0.8)
-        text = _fb_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
-        low = text.lower()
-        is_echo = any(w in low for w in ["accuracy", "group", "moderate", "active", "passive", "engagement"])
-        if not text or len(text) < 10 or len(text) > 120 or is_echo:
-            return _pick_encouragement(label, acc_pct)
-        if not text.endswith((".", "!")):
-            text += "!"
-        return text[0].lower() + text[1:]
-    except Exception:
-        return _pick_encouragement(label, acc_pct)
-
-
 def _generate_feedback(r) -> dict:
     """
     Generate personalized feedback for one student row.
-    NLP for encouragement (with strict validation) + programmatic stats.
+    Curated encouragement pool + programmatic stats.
     """
     name = _safe_name(r.get(_COL_NAME))
 
@@ -360,7 +337,7 @@ def _generate_feedback(r) -> dict:
     acc_pct = 0 if pd.isna(acc) else int(round(acc * 100))
     median_rt = round(float(r.get("median_rt_sec", 0)), 1) if not pd.isna(r.get("median_rt_sec", np.nan)) else 0
 
-    encouragement = _nlp_encouragement(name, label, acc_pct)
+    encouragement = _pick_encouragement(label, acc_pct)
 
     # ---- Build structured message with real stats ----
     parts = [f"Hi {name}, {encouragement}"]
