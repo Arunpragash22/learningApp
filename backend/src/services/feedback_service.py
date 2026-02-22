@@ -25,7 +25,7 @@ from ..database.connection import get_database
 
 # Load NLP model once at startup
 feedback_generator = pipeline(
-    "text2text-generation",
+    "text-generation",
     model="google/flan-t5-small",
     device=-1  # use CPU; change to 0 if GPU available
 )
