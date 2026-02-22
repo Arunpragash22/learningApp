@@ -17,6 +17,7 @@ The feedback generation logic is kept EXACTLY as the original Colab notebook.
 
 import io
 import csv
+import random as _random
 import numpy as np
 import pandas as pd
 from typing import List, Dict, Optional, Tuple
@@ -253,18 +254,91 @@ def _num(x, nd=1):
     return "N/A" if pd.isna(x) else str(round(float(x), nd))
 
 
-def _fallback_encouragement(name: str, label: str) -> str:
-    if label == "Active":
-        return "great job staying consistently engaged!"
-    elif label == "Passive":
-        return "every small step counts — let's build momentum together."
-    return "you're making progress — keep pushing forward!"
+_ENCOURAGEMENTS = {
+    "Active": {
+        "high": [
+            "great job staying consistently engaged!",
+            "you're performing excellently — keep it up!",
+            "fantastic work — you're setting a great example!",
+            "your dedication is really paying off!",
+            "outstanding effort — you're on fire!",
+        ],
+        "mid": [
+            "solid engagement! A little more accuracy and you'll be unstoppable.",
+            "great participation — tighten up on tricky questions to stay on top.",
+            "you're highly engaged, now let's sharpen those answers!",
+        ],
+        "low": [
+            "love your engagement! Let's focus on boosting accuracy next.",
+            "your participation is excellent — review mistakes to turn that around.",
+        ],
+    },
+    "Moderate": {
+        "high": [
+            "nice accuracy! Stay more consistent to move into the Active group.",
+            "your answers are strong — engage a bit more to reach the top tier!",
+            "great scores! Pick up the pace and you'll be Active in no time.",
+        ],
+        "mid": [
+            "you're making progress — keep pushing forward!",
+            "good effort so far — consistency will take you to the next level.",
+            "you're on the right track — a few more sessions and you'll see big gains!",
+        ],
+        "low": [
+            "every question you attempt builds your skills — keep going!",
+            "don't give up — review your wrong answers and you'll improve quickly.",
+            "progress takes time — focus on one topic at a time.",
+        ],
+    },
+    "Passive": {
+        "high": [
+            "your accuracy is great when you participate — try to answer more often!",
+            "you clearly know the material — jump in more frequently!",
+        ],
+        "mid": [
+            "every small step counts — let's build momentum together!",
+            "try answering a few more questions each session to build your confidence.",
+            "you've got potential — engage more and the results will follow!",
+        ],
+        "low": [
+            "it's okay to struggle — what matters is that you keep trying!",
+            "start with the easier questions to build confidence, then work up.",
+            "every expert was once a beginner — keep at it!",
+        ],
+    },
+}
+
+
+def _pick_encouragement(label: str, acc_pct: int) -> str:
+    tier = "high" if acc_pct >= 75 else ("mid" if acc_pct >= 50 else "low")
+    pool = _ENCOURAGEMENTS.get(label, _ENCOURAGEMENTS["Moderate"]).get(tier, [])
+    if not pool:
+        pool = _ENCOURAGEMENTS["Moderate"]["mid"]
+    return _random.choice(pool)
+
+
+def _nlp_encouragement(name: str, label: str, acc_pct: int) -> str:
+    """Try NLP first; if the output is low-quality, fall back to curated pool."""
+    prompt = f"Encourage {name} who scored {acc_pct}% in a quiz:"
+    try:
+        inputs = _fb_tokenizer(prompt, return_tensors="pt", max_length=64, truncation=True)
+        outputs = _fb_model.generate(**inputs, max_new_tokens=30, do_sample=True, temperature=0.8)
+        text = _fb_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+        low = text.lower()
+        is_echo = any(w in low for w in ["accuracy", "group", "moderate", "active", "passive", "engagement"])
+        if not text or len(text) < 10 or len(text) > 120 or is_echo:
+            return _pick_encouragement(label, acc_pct)
+        if not text.endswith((".", "!")):
+            text += "!"
+        return text[0].lower() + text[1:]
+    except Exception:
+        return _pick_encouragement(label, acc_pct)
 
 
 def _generate_feedback(r) -> dict:
     """
     Generate personalized feedback for one student row.
-    Uses NLP for encouragement + programmatic stats for accuracy.
+    NLP for encouragement (with strict validation) + programmatic stats.
     """
     name = _safe_name(r.get(_COL_NAME))
 
@@ -286,27 +360,10 @@ def _generate_feedback(r) -> dict:
     acc_pct = 0 if pd.isna(acc) else int(round(acc * 100))
     median_rt = round(float(r.get("median_rt_sec", 0)), 1) if not pd.isna(r.get("median_rt_sec", np.nan)) else 0
 
-    # ---- NLP: generate only a short encouragement sentence ----
-    prompt = (
-        f"Write one short encouraging sentence for a student named {name} "
-        f"who is in the {label} engagement group with {acc_pct}% accuracy."
-    )
-    try:
-        inputs = _fb_tokenizer(prompt, return_tensors="pt", max_length=128, truncation=True)
-        outputs = _fb_model.generate(
-            **inputs,
-            max_new_tokens=40,
-            temperature=0.7,
-            do_sample=True,
-        )
-        nlp_sentence = _fb_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
-        if not nlp_sentence or len(nlp_sentence) < 10:
-            nlp_sentence = _fallback_encouragement(name, label)
-    except Exception:
-        nlp_sentence = _fallback_encouragement(name, label)
+    encouragement = _nlp_encouragement(name, label, acc_pct)
 
     # ---- Build structured message with real stats ----
-    parts = [f"Hi {name}, {nlp_sentence}"]
+    parts = [f"Hi {name}, {encouragement}"]
     if pd.isna(acc) or total == 0:
         parts.append("Answer a few more questions so we can track your progress.")
     else:
