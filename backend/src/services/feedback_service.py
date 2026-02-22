@@ -20,15 +20,12 @@ import csv
 import numpy as np
 import pandas as pd
 from typing import List, Dict, Optional, Tuple
-from transformers import pipeline
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from ..database.connection import get_database
 
 # Load NLP model once at startup
-feedback_generator = pipeline(
-    "text-generation",
-    model="google/flan-t5-small",
-    device=-1  # use CPU; change to 0 if GPU available
-)
+_fb_tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-small")
+_fb_model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-small")
 
 POOR_RTT = 3000
 POOR_JITTER = 1500
@@ -293,13 +290,16 @@ Keep it under 2 sentences.
 """
 
     try:
-        result = feedback_generator(
-            prompt,
-            max_length=60,
+        inputs = _fb_tokenizer(prompt, return_tensors="pt", max_length=256, truncation=True)
+        outputs = _fb_model.generate(
+            **inputs,
+            max_new_tokens=60,
             temperature=0.7,
-            do_sample=True
+            do_sample=True,
         )
-        message = result[0]["generated_text"].strip()
+        message = _fb_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+        if not message or len(message) < 10:
+            message = f"Hi {name}, keep practicing and improving step by step."
     except Exception:
         message = f"Hi {name}, keep practicing and improving step by step."
 
