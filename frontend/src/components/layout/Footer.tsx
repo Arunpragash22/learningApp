@@ -52,7 +52,7 @@ export const Footer = () => {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-white">ClassPulse</h3>
-                  <p className="text-xs text-blue-300">by TechSnatcherrs</p>
+                  <p className="text-xs text-blue-300">by TechSnatchers</p>
                 </div>
               </div>
               <p className="text-blue-200/70 text-sm mb-4">
@@ -95,7 +95,7 @@ export const Footer = () => {
               <h4 className="text-white font-semibold mb-4 border-b border-blue-500/50 pb-2">ABOUT</h4>
               <ul className="space-y-2">
                 <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">About ClassPulse</a></li>
-                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">About TechSnatcherrs</a></li>
+                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">About TechSnatchers</a></li>
                 <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Our Team</a></li>
               </ul>
             </div>
@@ -121,7 +121,7 @@ export const Footer = () => {
           <div className="flex flex-col md:flex-row items-center justify-between gap-3">
             <p className="text-sm text-blue-200/70">
               Copyright © {currentYear} - ClassPulse - All Rights Reserved. Concept, Design & Development By{' '}
-              <span className="text-white font-medium">TechSnatcherrs</span>.
+              <span className="text-white font-medium">TechSnatchers</span>.
             </p>
             <div className="flex gap-4">
               <a href="#" className="text-sm text-blue-200/70 hover:text-white transition-colors">Privacy Policy</a>
