@@ -42,10 +42,12 @@ export const CourseDetail = () => {
     endTime: '',
     duration: '90 min',
     description: '',
-    clusterQuestionSource: null as string | null,
+    clusterQuestionSource: null as string | string[] | null,
   });
   const [sessionErrors, setSessionErrors] = useState<Record<string, string>>({});
   const [useClusterFromPrevious, setUseClusterFromPrevious] = useState(false);
+  const [selectAllSessions, setSelectAllSessions] = useState(false);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
   const [previousSessions, setPreviousSessions] = useState<{sessionId: string; title: string; date: string; course: string; clusterQuestionCount: number}[]>([]);
   const [loadingPrevSessions, setLoadingPrevSessions] = useState(false);
 
@@ -230,7 +232,9 @@ export const CourseDetail = () => {
         description: newSession.description,
         materials: [],
         isStandalone: false,  // Course session - no enrollment key needed
-        clusterQuestionSource: useClusterFromPrevious ? newSession.clusterQuestionSource : null,
+        clusterQuestionSource: useClusterFromPrevious
+          ? (selectAllSessions ? 'all' : selectedSessionIds.length > 0 ? (selectedSessionIds.length === 1 ? selectedSessionIds[0] : selectedSessionIds) : null)
+          : null,
       };
 
       console.log("📤 Creating course session:", payload);
@@ -581,33 +585,81 @@ export const CourseDetail = () => {
                     </p>
                     <div className="space-y-2">
                       <label className={`flex items-center gap-2 p-2 rounded-md cursor-pointer text-sm ${!useClusterFromPrevious ? 'bg-blue-100 dark:bg-blue-800/40' : ''}`}>
-                        <input type="radio" checked={!useClusterFromPrevious} onChange={() => { setUseClusterFromPrevious(false); setNewSession({ ...newSession, clusterQuestionSource: null }); }} className="h-4 w-4 text-blue-600" />
+                        <input type="radio" checked={!useClusterFromPrevious} onChange={() => { setUseClusterFromPrevious(false); setSelectAllSessions(false); setSelectedSessionIds([]); }} className="h-4 w-4 text-blue-600" />
                         <span className="text-gray-800 dark:text-gray-200">Current session only</span>
                       </label>
                       <label className={`flex items-center gap-2 p-2 rounded-md cursor-pointer text-sm ${useClusterFromPrevious ? 'bg-blue-100 dark:bg-blue-800/40' : ''}`}>
                         <input type="radio" checked={useClusterFromPrevious} onChange={() => setUseClusterFromPrevious(true)} className="h-4 w-4 text-blue-600" />
-                        <span className="text-gray-800 dark:text-gray-200">Copy from a previous session</span>
+                        <span className="text-gray-800 dark:text-gray-200">Copy from previous sessions</span>
                       </label>
                     </div>
                     {useClusterFromPrevious && (
-                      <div className="mt-3">
+                      <div className="mt-3 space-y-2">
                         {loadingPrevSessions ? (
                           <p className="text-xs text-gray-500 dark:text-gray-400">Loading...</p>
                         ) : previousSessions.length === 0 ? (
                           <p className="text-xs text-amber-700 dark:text-amber-300">No previous sessions with cluster questions found.</p>
                         ) : (
-                          <select
-                            value={newSession.clusterQuestionSource || ''}
-                            onChange={(e) => setNewSession({ ...newSession, clusterQuestionSource: e.target.value || null })}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                          >
-                            <option value="">-- Select a session --</option>
-                            {previousSessions.map((s) => (
-                              <option key={s.sessionId} value={s.sessionId}>
-                                {s.title} — {s.date} ({s.clusterQuestionCount} cluster Qs)
-                              </option>
-                            ))}
-                          </select>
+                          <>
+                            {/* All sessions checkbox */}
+                            <label className={`flex items-center gap-2 p-2 rounded-md cursor-pointer text-sm ${selectAllSessions ? 'bg-green-50 dark:bg-green-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
+                              <input
+                                type="checkbox"
+                                checked={selectAllSessions}
+                                onChange={(e) => {
+                                  setSelectAllSessions(e.target.checked);
+                                  if (e.target.checked) {
+                                    setSelectedSessionIds(previousSessions.map(s => s.sessionId));
+                                  } else {
+                                    setSelectedSessionIds([]);
+                                  }
+                                }}
+                                className="h-4 w-4 text-blue-600 rounded"
+                              />
+                              <span className="font-medium text-gray-800 dark:text-gray-200">All previous sessions</span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
+                                ({previousSessions.reduce((sum, s) => sum + s.clusterQuestionCount, 0)} Qs)
+                              </span>
+                            </label>
+
+                            {/* Individual session checkboxes */}
+                            <div className="max-h-36 overflow-y-auto space-y-1 pl-1">
+                              {previousSessions.map((s) => {
+                                const isChecked = selectAllSessions || selectedSessionIds.includes(s.sessionId);
+                                return (
+                                  <label key={s.sessionId} className={`flex items-center gap-2 p-2 rounded-md cursor-pointer text-sm ${isChecked ? 'bg-blue-50/50 dark:bg-blue-900/10' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      disabled={selectAllSessions}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedSessionIds(prev => [...prev, s.sessionId]);
+                                        } else {
+                                          setSelectedSessionIds(prev => prev.filter(id => id !== s.sessionId));
+                                        }
+                                      }}
+                                      className="h-4 w-4 text-blue-600 rounded"
+                                    />
+                                    <span className="text-gray-800 dark:text-gray-200 truncate">{s.title}</span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto whitespace-nowrap">
+                                      {s.date} · {s.clusterQuestionCount} Qs
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+
+                            {/* Selection summary */}
+                            {(selectAllSessions || selectedSessionIds.length > 0) && (
+                              <p className="text-xs text-green-600 dark:text-green-400">
+                                {selectAllSessions
+                                  ? `All ${previousSessions.length} sessions selected.`
+                                  : `${selectedSessionIds.length} session${selectedSessionIds.length > 1 ? 's' : ''} selected.`
+                                }
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
                     )}

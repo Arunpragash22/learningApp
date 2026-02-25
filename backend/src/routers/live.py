@@ -147,22 +147,23 @@ async def trigger_question(meeting_id: str):
 
         generic_qs, cluster_qs = Question.split_generic_and_cluster(questions)
 
-        # If session has a clusterQuestionSource (previous session), fetch cluster questions from there
-        cluster_source_session = session_doc.get("clusterQuestionSource") if session_doc else None
-        if cluster_source_session and cluster_source_session not in ("none", ""):
+        # Fetch cluster questions from configured source sessions
+        if session_doc:
             try:
-                prev_cluster_qs = []
-                async for q in db.database.questions.find({
-                    "sessionId": cluster_source_session,
-                    "questionType": "cluster"
-                }):
-                    q["id"] = str(q["_id"])
-                    prev_cluster_qs.append(q)
-                if prev_cluster_qs:
-                    cluster_qs = prev_cluster_qs
-                    print(f"   📋 Using {len(cluster_qs)} cluster questions from previous session {cluster_source_session}")
+                from src.routers.session import _normalize_cluster_sources, _fetch_cluster_questions_from_sources
+                source_ids = _normalize_cluster_sources(
+                    session_doc.get("clusterQuestionSource"),
+                    session_doc.get("instructorId"),
+                )
+                if source_ids:
+                    prev_cluster_qs = await _fetch_cluster_questions_from_sources(
+                        source_ids, session_doc.get("instructorId"), str(session_doc["_id"])
+                    )
+                    if prev_cluster_qs:
+                        cluster_qs = prev_cluster_qs
+                        print(f"   📋 Using {len(cluster_qs)} cluster questions from source sessions {source_ids}")
             except Exception as prev_err:
-                print(f"   ⚠️ Failed to fetch cluster questions from previous session: {prev_err}")
+                print(f"   ⚠️ Failed to fetch cluster questions from sources: {prev_err}")
 
         print(f"   Generic: {len(generic_qs)} | Cluster-specific: {len(cluster_qs)}")
 
@@ -214,6 +215,23 @@ async def trigger_question(meeting_id: str):
         except Exception as cluster_err:
             print(f"⚠️ Could not load cluster data (non-fatal): {cluster_err}")
 
+        # If no clustering data, trigger clustering on-demand
+        if not student_cluster_map:
+            try:
+                from src.services.clustering_service import ClusteringService
+                clustering_svc = ClusteringService()
+                for sid in session_ids_to_check:
+                    await clustering_svc.update_clusters(sid)
+                    cmap = await ClusterModel.get_student_cluster_map(sid)
+                    if cmap:
+                        student_cluster_map.update(cmap)
+                    if student_cluster_map:
+                        break
+                if student_cluster_map:
+                    print(f"🔄 Trigger: On-demand clustering → {len(student_cluster_map)} students mapped")
+            except Exception as e:
+                print(f"⚠️ Trigger: on-demand clustering failed (non-fatal): {e}")
+
         has_clustering = bool(student_cluster_map)
 
         # 4) Determine if this is the first question for the session
@@ -233,6 +251,8 @@ async def trigger_question(meeting_id: str):
             print(f"   🔵 Subsequent question → sending CLUSTER-WISE questions")
 
         # 5) Send questions: first question = generic, after that = cluster-wise
+        import random as _random
+        _cluster_labels = ["active", "moderate", "passive"]
         ws_sent_count = 0
         sent_questions = []
         sent_generic_ids: set = set()
@@ -248,6 +268,14 @@ async def trigger_question(meeting_id: str):
                     q for q in cluster_qs
                     if q.get("category", "").lower() == student_cluster
                 ]
+            elif not is_first_question and cluster_qs:
+                rand_cluster = _random.choice(_cluster_labels)
+                student_cluster_qs = [
+                    q for q in cluster_qs
+                    if q.get("category", "").lower() == rand_cluster
+                ]
+                if not student_cluster_qs:
+                    student_cluster_qs = list(cluster_qs)
             else:
                 student_cluster_qs = []
 
@@ -379,22 +407,23 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
 
         generic_qs, cluster_qs = Question.split_generic_and_cluster(questions)
 
-        # If session has a clusterQuestionSource (previous session), fetch cluster questions from there
-        cluster_source_session = session_doc.get("clusterQuestionSource") if session_doc else None
-        if cluster_source_session and cluster_source_session not in ("none", ""):
+        # Fetch cluster questions from configured source sessions
+        if session_doc:
             try:
-                prev_cluster_qs = []
-                async for q in db.database.questions.find({
-                    "sessionId": cluster_source_session,
-                    "questionType": "cluster"
-                }):
-                    q["id"] = str(q["_id"])
-                    prev_cluster_qs.append(q)
-                if prev_cluster_qs:
-                    cluster_qs = prev_cluster_qs
-                    print(f"   📋 Using {len(cluster_qs)} cluster questions from previous session {cluster_source_session}")
+                from src.routers.session import _normalize_cluster_sources, _fetch_cluster_questions_from_sources
+                source_ids = _normalize_cluster_sources(
+                    session_doc.get("clusterQuestionSource"),
+                    session_doc.get("instructorId"),
+                )
+                if source_ids:
+                    prev_cluster_qs = await _fetch_cluster_questions_from_sources(
+                        source_ids, session_doc.get("instructorId"), str(session_doc["_id"])
+                    )
+                    if prev_cluster_qs:
+                        cluster_qs = prev_cluster_qs
+                        print(f"   📋 Using {len(cluster_qs)} cluster questions from source sessions {source_ids}")
             except Exception as prev_err:
-                print(f"   ⚠️ Failed to fetch cluster questions from previous session: {prev_err}")
+                print(f"   ⚠️ Failed to fetch cluster questions from sources: {prev_err}")
 
         print(f"   Generic: {len(generic_qs)} | Cluster-specific: {len(cluster_qs)}")
 
@@ -433,6 +462,23 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
         except Exception as cluster_err:
             print(f"⚠️ trigger-same: Could not load clusters (non-fatal): {cluster_err}")
 
+        # If no clustering data, trigger clustering on-demand
+        if not student_cluster_map:
+            try:
+                from src.services.clustering_service import ClusteringService
+                clustering_svc = ClusteringService()
+                for sid in session_ids_to_check:
+                    await clustering_svc.update_clusters(sid)
+                    cmap = await ClusterModel.get_student_cluster_map(sid)
+                    if cmap:
+                        student_cluster_map.update(cmap)
+                    if student_cluster_map:
+                        break
+                if student_cluster_map:
+                    print(f"🔄 trigger-same: On-demand clustering → {len(student_cluster_map)} students mapped")
+            except Exception as e:
+                print(f"⚠️ trigger-same: on-demand clustering failed (non-fatal): {e}")
+
         has_clustering = bool(student_cluster_map)
 
         # Determine if this is the first question for the session
@@ -452,6 +498,8 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
             print(f"   🔵 Subsequent question → sending CLUSTER-WISE questions")
 
         # Send questions: first = generic, after that = cluster-wise
+        import random as _random
+        _cluster_labels = ["active", "moderate", "passive"]
         ws_sent_count = 0
         sent_generic_ids: set = set()
         sent_cluster_ids: set = set()
@@ -466,6 +514,14 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
                     q for q in cluster_qs
                     if q.get("category", "").lower() == student_cluster
                 ]
+            elif not is_first_question and cluster_qs:
+                rand_cluster = _random.choice(_cluster_labels)
+                student_cluster_qs = [
+                    q for q in cluster_qs
+                    if q.get("category", "").lower() == rand_cluster
+                ]
+                if not student_cluster_qs:
+                    student_cluster_qs = list(cluster_qs)
             else:
                 student_cluster_qs = []
 

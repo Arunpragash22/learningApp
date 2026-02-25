@@ -272,22 +272,23 @@ class QuizScheduler:
 
             generic_qs, cluster_qs_all = Question.split_generic_and_cluster(questions)
 
-            # If session has a clusterQuestionSource (previous session), fetch cluster questions from there
-            cluster_source_session = session_doc.get("clusterQuestionSource") if session_doc else None
-            if cluster_source_session and cluster_source_session not in ("none", ""):
+            # If session has clusterQuestionSource(s), fetch cluster questions from them
+            if session_doc:
                 try:
-                    prev_cluster_qs = []
-                    async for q in db.database.questions.find({
-                        "sessionId": cluster_source_session,
-                        "questionType": "cluster"
-                    }):
-                        q["id"] = str(q["_id"])
-                        prev_cluster_qs.append(q)
-                    if prev_cluster_qs:
-                        cluster_qs_all = prev_cluster_qs
-                        print(f"   📋 Auto-trigger: Using {len(cluster_qs_all)} cluster questions from previous session {cluster_source_session}")
+                    from ..routers.session import _normalize_cluster_sources, _fetch_cluster_questions_from_sources
+                    source_ids = _normalize_cluster_sources(
+                        session_doc.get("clusterQuestionSource"),
+                        session_doc.get("instructorId"),
+                    )
+                    if source_ids:
+                        prev_cluster_qs = await _fetch_cluster_questions_from_sources(
+                            source_ids, session_doc.get("instructorId"), session_id
+                        )
+                        if prev_cluster_qs:
+                            cluster_qs_all = prev_cluster_qs
+                            print(f"   📋 Auto-trigger: Using {len(cluster_qs_all)} cluster questions from source sessions {source_ids}")
                 except Exception as prev_err:
-                    print(f"   ⚠️ Auto-trigger: Failed to fetch cluster questions from previous session: {prev_err}")
+                    print(f"   ⚠️ Auto-trigger: Failed to fetch cluster questions from sources: {prev_err}")
 
             print(f"   Generic: {len(generic_qs)} | Cluster-specific: {len(cluster_qs_all)}")
 
@@ -309,6 +310,24 @@ class QuizScheduler:
             except Exception as e:
                 print(f"⚠️ Auto-trigger: cluster lookup error (non-fatal): {e}")
 
+            # If no clustering data yet, trigger clustering now so cluster
+            # questions can be sent on subsequent rounds.
+            if not student_cluster_map:
+                try:
+                    from ..services.clustering_service import ClusteringService
+                    clustering_svc = ClusteringService()
+                    for sid in session_ids_to_check:
+                        await clustering_svc.update_clusters(sid)
+                        cmap = await ClusterModel.get_student_cluster_map(sid)
+                        if cmap:
+                            student_cluster_map.update(cmap)
+                        if student_cluster_map:
+                            break
+                    if student_cluster_map:
+                        print(f"🔄 Auto-trigger: Triggered clustering → {len(student_cluster_map)} students mapped")
+                except Exception as e:
+                    print(f"⚠️ Auto-trigger: on-demand clustering failed (non-fatal): {e}")
+
             has_clustering = bool(student_cluster_map)
 
             # Determine if this is the first question for the session
@@ -321,7 +340,7 @@ class QuizScheduler:
             elif has_clustering:
                 print(f"🔵 Auto-trigger: Subsequent question, clustering active ({len(student_cluster_map)} mapped) → CLUSTER-WISE")
             else:
-                print(f"📋 Auto-trigger: Subsequent question, no clustering → generic questions only ({len(generic_qs)} available)")
+                print(f"📋 Auto-trigger: Subsequent question, no clustering → will distribute cluster questions randomly")
 
             # ── 4. Collect all joined students ──────────────────────────
             ids_to_try = [str(s) for s in session_ids_to_check]
@@ -348,6 +367,9 @@ class QuizScheduler:
             sent_ids = self.sent_questions.get(session_id, set())
             student_questions: Dict[str, dict] = {}
 
+            # Pre-build cluster label list for random assignment when clustering is unavailable
+            cluster_labels = ["active", "moderate", "passive"]
+
             for sid_val in students_to_send:
                 student_cluster = student_cluster_map.get(sid_val) if has_clustering else None
 
@@ -361,10 +383,23 @@ class QuizScheduler:
                 else:
                     # Subsequent questions → cluster-wise first, then generic fallback
                     if has_clustering and student_cluster:
+                        # Known cluster assignment → pick matching cluster questions
                         student_cluster_qs = [
                             q for q in cluster_qs_all
                             if q.get("category", "").lower() == student_cluster
                         ]
+                    elif cluster_qs_all:
+                        # No clustering data but cluster questions exist →
+                        # assign a random cluster label so the student still
+                        # receives a cluster question instead of always getting generic
+                        random_cluster = random.choice(cluster_labels)
+                        student_cluster_qs = [
+                            q for q in cluster_qs_all
+                            if q.get("category", "").lower() == random_cluster
+                        ]
+                        # If the random cluster has no questions, use all cluster questions
+                        if not student_cluster_qs:
+                            student_cluster_qs = list(cluster_qs_all)
                     else:
                         student_cluster_qs = []
 

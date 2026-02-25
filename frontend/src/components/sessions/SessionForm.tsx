@@ -26,7 +26,7 @@ export interface SessionFormData {
   description: string;
   materials: SessionMaterial[];
   isStandalone?: boolean;  // True for standalone sessions, false for course sessions
-  clusterQuestionSource?: string | null;  // null/none = only current session questions, or a previous session ID
+  clusterQuestionSource?: string | string[] | null;  // null = current session only, "all" = all previous, or array of session IDs
 }
 
 interface SessionFormProps {
@@ -71,6 +71,13 @@ export const SessionForm: React.FC<SessionFormProps> = ({
   const [previousSessions, setPreviousSessions] = useState<{sessionId: string; title: string; date: string; course: string; clusterQuestionCount: number}[]>([]);
   const [loadingPrevSessions, setLoadingPrevSessions] = useState(false);
   const [useClusterFromPrevious, setUseClusterFromPrevious] = useState(!!initialData?.clusterQuestionSource);
+  const [selectAllSessions, setSelectAllSessions] = useState(initialData?.clusterQuestionSource === 'all');
+  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>(() => {
+    const src = initialData?.clusterQuestionSource;
+    if (!src || src === 'all') return [];
+    if (Array.isArray(src)) return src;
+    return typeof src === 'string' ? [src] : [];
+  });
 
   const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
   const API_BASE = API_URL?.endsWith('/api') ? API_URL.slice(0, -4) : API_URL;
@@ -121,10 +128,18 @@ export const SessionForm: React.FC<SessionFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
+      let source: string | string[] | null = null;
+      if (useClusterFromPrevious) {
+        if (selectAllSessions) {
+          source = 'all';
+        } else if (selectedSessionIds.length > 0) {
+          source = selectedSessionIds.length === 1 ? selectedSessionIds[0] : selectedSessionIds;
+        }
+      }
       onSubmit({
         ...formData,
         isStandalone: mode === 'standalone',
-        clusterQuestionSource: useClusterFromPrevious ? (formData.clusterQuestionSource || null) : null,
+        clusterQuestionSource: source,
       });
     }
   };
@@ -311,6 +326,8 @@ export const SessionForm: React.FC<SessionFormProps> = ({
                   checked={!useClusterFromPrevious}
                   onChange={() => {
                     setUseClusterFromPrevious(false);
+                    setSelectAllSessions(false);
+                    setSelectedSessionIds([]);
                     setFormData({ ...formData, clusterQuestionSource: null });
                   }}
                   className="mt-1 h-4 w-4 text-blue-600"
@@ -338,9 +355,9 @@ export const SessionForm: React.FC<SessionFormProps> = ({
                   className="mt-1 h-4 w-4 text-blue-600"
                 />
                 <div className="flex-1">
-                  <p className="font-medium text-gray-900 dark:text-white text-sm">Copy from a previous session</p>
+                  <p className="font-medium text-gray-900 dark:text-white text-sm">Copy from previous sessions</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Cluster-wise questions from a previous session will be automatically copied and used in this session.
+                    Cluster-wise questions from previous sessions will be pooled together and used in this session.
                   </p>
                 </div>
               </label>
@@ -350,8 +367,8 @@ export const SessionForm: React.FC<SessionFormProps> = ({
           {/* Previous session selector */}
           {useClusterFromPrevious && (
             <div className="ml-7">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Select Previous Session
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Select Previous Sessions
               </label>
               {loadingPrevSessions ? (
                 <p className="text-sm text-gray-500 dark:text-gray-400">Loading previous sessions...</p>
@@ -362,22 +379,87 @@ export const SessionForm: React.FC<SessionFormProps> = ({
                   </p>
                 </div>
               ) : (
-                <select
-                  value={formData.clusterQuestionSource || ''}
-                  onChange={(e) => setFormData({ ...formData, clusterQuestionSource: e.target.value || null })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                >
-                  <option value="">-- Select a session --</option>
-                  {previousSessions.map((s) => (
-                    <option key={s.sessionId} value={s.sessionId}>
-                      {s.title} — {s.date} ({s.clusterQuestionCount} cluster questions)
-                    </option>
-                  ))}
-                </select>
+                <div className="space-y-2">
+                  {/* Select All option */}
+                  <label className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${
+                    selectAllSessions
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-500'
+                      : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={selectAllSessions}
+                      onChange={(e) => {
+                        setSelectAllSessions(e.target.checked);
+                        if (e.target.checked) {
+                          setSelectedSessionIds(previousSessions.map(s => s.sessionId));
+                        } else {
+                          setSelectedSessionIds([]);
+                        }
+                      }}
+                      className="h-4 w-4 text-blue-600 rounded"
+                    />
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white text-sm">All previous sessions</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Pool cluster questions from every previous session ({previousSessions.reduce((sum, s) => sum + s.clusterQuestionCount, 0)} total)
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Divider */}
+                  <div className="flex items-center gap-2 py-1">
+                    <div className="flex-1 border-t border-gray-200 dark:border-gray-600" />
+                    <span className="text-xs text-gray-400 dark:text-gray-500">or select specific sessions</span>
+                    <div className="flex-1 border-t border-gray-200 dark:border-gray-600" />
+                  </div>
+
+                  {/* Individual session checkboxes */}
+                  <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                    {previousSessions.map((s) => {
+                      const isChecked = selectAllSessions || selectedSessionIds.includes(s.sessionId);
+                      return (
+                        <label
+                          key={s.sessionId}
+                          className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-all ${
+                            isChecked
+                              ? 'border-blue-400 bg-blue-50/50 dark:bg-blue-900/10 dark:border-blue-600'
+                              : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            disabled={selectAllSessions}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedSessionIds(prev => [...prev, s.sessionId]);
+                              } else {
+                                setSelectedSessionIds(prev => prev.filter(id => id !== s.sessionId));
+                              }
+                            }}
+                            className="h-4 w-4 text-blue-600 rounded"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-900 dark:text-white truncate">{s.title}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {s.date} · {s.clusterQuestionCount} cluster questions
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
-              {formData.clusterQuestionSource && (
-                <p className="mt-1 text-xs text-green-600 dark:text-green-400">
-                  Cluster questions from the selected session will be copied when the quiz is triggered.
+
+              {/* Summary */}
+              {(selectAllSessions || selectedSessionIds.length > 0) && (
+                <p className="mt-2 text-xs text-green-600 dark:text-green-400">
+                  {selectAllSessions
+                    ? `Cluster questions from all ${previousSessions.length} previous sessions will be used.`
+                    : `Cluster questions from ${selectedSessionIds.length} selected session${selectedSessionIds.length > 1 ? 's' : ''} will be used.`
+                  }
                 </p>
               )}
             </div>

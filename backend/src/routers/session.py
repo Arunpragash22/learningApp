@@ -1,10 +1,11 @@
 # src/routers/session.py
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Union
 from bson import ObjectId
 from datetime import datetime
 import math
+import json
 
 from src.database.connection import db
 from src.middleware.auth import get_current_user, require_instructor
@@ -16,6 +17,65 @@ from src.services.ws_manager import ws_manager
 from src.services.quiz_scheduler import quiz_scheduler
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
+
+
+def _normalize_cluster_sources(raw_value, instructor_id: str = None) -> List[str]:
+    """
+    Normalize clusterQuestionSource stored in a session document into a list of session IDs.
+    Handles: None, "none", "", a single session ID string, a JSON-encoded list, a Python list, or "all".
+    When "all" is used, it returns ["all"] — the caller should query all instructor sessions.
+    """
+    if not raw_value or raw_value in ("none", ""):
+        return []
+    if raw_value == "all":
+        return ["all"]
+    if isinstance(raw_value, list):
+        return [s for s in raw_value if s and s not in ("none", "")]
+    if isinstance(raw_value, str):
+        # Could be a JSON-encoded list or a single session ID
+        if raw_value.startswith("["):
+            try:
+                parsed = json.loads(raw_value)
+                if isinstance(parsed, list):
+                    return [s for s in parsed if s and s not in ("none", "")]
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return [raw_value]
+    return []
+
+
+async def _fetch_cluster_questions_from_sources(
+    source_ids: List[str],
+    instructor_id: str = None,
+    current_session_id: str = None,
+) -> List[dict]:
+    """
+    Fetch cluster questions from the given source session IDs.
+    If source_ids is ["all"], fetches from all instructor sessions (except the current one).
+    Returns a list of question dicts.
+    """
+    query_sids = []
+    if source_ids == ["all"]:
+        if instructor_id:
+            cursor = db.database.sessions.find({"instructorId": instructor_id}, {"_id": 1})
+            all_sessions = await cursor.to_list(length=500)
+            query_sids = [str(s["_id"]) for s in all_sessions if str(s["_id"]) != current_session_id]
+        if not query_sids:
+            return []
+    else:
+        query_sids = [s for s in source_ids if s != current_session_id]
+
+    if not query_sids:
+        return []
+
+    cluster_qs = []
+    async for q in db.database.questions.find({
+        "sessionId": {"$in": query_sids},
+        "questionType": "cluster",
+    }):
+        q["id"] = str(q["_id"])
+        cluster_qs.append(q)
+    return cluster_qs
 
 
 class SessionCreate(BaseModel):
@@ -33,7 +93,7 @@ class SessionCreate(BaseModel):
     materials: Optional[List[str]] = []
     isStandalone: Optional[bool] = False  # True for standalone sessions
     enrollmentKey: Optional[str] = None  # Enrollment key for standalone sessions
-    clusterQuestionSource: Optional[str] = None  # "none" or a previous session ID to copy cluster questions from
+    clusterQuestionSource: Optional[Union[str, List[str]]] = None  # "all", a session ID, or list of session IDs
 
 
 class SessionOut(BaseModel):
@@ -543,30 +603,40 @@ async def get_question_readiness(
 
         req = _compute_question_requirements(start_time, end_time, firstDelayMinutes, intervalMinutes)
 
-        # Count questions for this session (or from clusterQuestionSource)
-        cluster_source = session.get("clusterQuestionSource")
-        cluster_sid = cluster_source if cluster_source and cluster_source not in ("none", "") else session_id
-
+        # Count generic questions from current session
         generic_count = await db.database.questions.count_documents({
             "sessionId": session_id,
             "questionType": {"$in": ["generic", None]},
         })
-        # Also count questions without questionType as generic
         generic_no_type = await db.database.questions.count_documents({
             "sessionId": session_id,
             "questionType": {"$exists": False},
         })
         generic_count += generic_no_type
 
+        # Resolve cluster question source sessions
+        source_ids = _normalize_cluster_sources(
+            session.get("clusterQuestionSource"), session.get("instructorId")
+        )
+        # Fetch all cluster questions from sources (or current session if no sources)
+        if source_ids:
+            cluster_qs = await _fetch_cluster_questions_from_sources(
+                source_ids, session.get("instructorId"), session_id
+            )
+        else:
+            cluster_qs = []
+            async for q in db.database.questions.find({
+                "sessionId": session_id, "questionType": "cluster"
+            }):
+                q["id"] = str(q["_id"])
+                cluster_qs.append(q)
+
         clusters = ["Passive", "Moderate", "Active"]
         cluster_counts = {}
         for c in clusters:
-            cnt = await db.database.questions.count_documents({
-                "sessionId": cluster_sid,
-                "questionType": "cluster",
-                "category": c,
-            })
-            cluster_counts[c.lower()] = cnt
+            cluster_counts[c.lower()] = sum(
+                1 for q in cluster_qs if q.get("category") == c
+            )
 
         needed_per_cluster = req["clusterNeededPerGroup"]
         ready = (
@@ -847,9 +917,6 @@ async def start_session(
                 needed_per_cluster = req["clusterNeededPerGroup"]
 
                 if req["totalRounds"] > 0:
-                    cluster_source = session.get("clusterQuestionSource")
-                    cluster_sid = cluster_source if cluster_source and cluster_source not in ("none", "") else session_id
-
                     generic_count = await db.database.questions.count_documents({
                         "sessionId": session_id,
                         "questionType": {"$in": ["generic", None]},
@@ -859,14 +926,25 @@ async def start_session(
                         "questionType": {"$exists": False},
                     })
 
+                    source_ids = _normalize_cluster_sources(
+                        session.get("clusterQuestionSource"), session.get("instructorId")
+                    )
+                    if source_ids:
+                        cluster_qs = await _fetch_cluster_questions_from_sources(
+                            source_ids, session.get("instructorId"), session_id
+                        )
+                    else:
+                        cluster_qs = []
+                        async for q in db.database.questions.find({
+                            "sessionId": session_id, "questionType": "cluster"
+                        }):
+                            q["id"] = str(q["_id"])
+                            cluster_qs.append(q)
+
                     cluster_labels = ["Passive", "Moderate", "Active"]
                     missing = []
                     for c in cluster_labels:
-                        cnt = await db.database.questions.count_documents({
-                            "sessionId": cluster_sid,
-                            "questionType": "cluster",
-                            "category": c,
-                        })
+                        cnt = sum(1 for q in cluster_qs if q.get("category") == c)
                         if cnt < needed_per_cluster:
                             missing.append(f"{c}: {cnt}/{needed_per_cluster}")
 
