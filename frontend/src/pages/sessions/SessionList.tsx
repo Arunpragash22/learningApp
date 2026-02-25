@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSessionConnection } from '../../context/SessionConnectionContext';
@@ -25,7 +25,8 @@ import {
   ZapIcon,
   ZapOffIcon,
   SettingsIcon,
-  BarChart3Icon
+  BarChart3Icon,
+  AlertTriangleIcon
 } from 'lucide-react';
 
 import { Card } from '../../components/ui/Card';
@@ -61,6 +62,18 @@ export const SessionList = () => {
   const [firstDelayMinutes, setFirstDelayMinutes] = useState(2);   // 2 minutes default
   const [intervalMinutes, setIntervalMinutes] = useState(10);       // 10 minutes default
   const [maxQuestions, setMaxQuestions] = useState<number | null>(null);
+
+  // Question readiness state
+  const [questionReadiness, setQuestionReadiness] = useState<{
+    durationMinutes: number;
+    totalRounds: number;
+    genericNeeded: number;
+    genericCount: number;
+    clusterNeededPerGroup: number;
+    clusterCounts: { passive: number; moderate: number; active: number };
+    ready: boolean;
+  } | null>(null);
+  const [loadingReadiness, setLoadingReadiness] = useState(false);
 
   const {
     connectedSessionId: contextConnectedSessionId,
@@ -364,8 +377,42 @@ export const SessionList = () => {
     setFirstDelayMinutes(2);
     setIntervalMinutes(10);
     setMaxQuestions(null);
+    setQuestionReadiness(null);
     setShowStartModal(true);
   };
+
+  // Fetch question readiness whenever modal params change
+  useEffect(() => {
+    if (!showStartModal || !startingSession || !realTimeAnalyticsEnabled || !automationEnabled) {
+      setQuestionReadiness(null);
+      return;
+    }
+    let cancelled = false;
+    const fetchReadiness = async () => {
+      setLoadingReadiness(true);
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL;
+        const params = new URLSearchParams({
+          intervalMinutes: String(intervalMinutes),
+          firstDelayMinutes: String(firstDelayMinutes),
+        });
+        const res = await fetch(
+          `${apiUrl}/api/sessions/${startingSession.id}/question-readiness?${params}`,
+          { headers: { Authorization: `Bearer ${sessionStorage.getItem('access_token') || ''}` } }
+        );
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          setQuestionReadiness(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch question readiness:', err);
+      } finally {
+        if (!cancelled) setLoadingReadiness(false);
+      }
+    };
+    fetchReadiness();
+    return () => { cancelled = true; };
+  }, [showStartModal, startingSession?.id, realTimeAnalyticsEnabled, automationEnabled, intervalMinutes, firstDelayMinutes]);
 
   const handleStartSession = async () => {
     if (!startingSession) return;
@@ -650,8 +697,10 @@ export const SessionList = () => {
                           {automationEnabled ? (
                             <>
                               <li>• First Q: {firstDelayMinutes} min</li>
-                              <li>• Interval: {intervalMinutes} min</li>
-                              <li>• {maxQuestions ? `Max ${maxQuestions} Q` : 'Unlimited'}</li>
+                              <li>• Gap: {intervalMinutes} min</li>
+                              {questionReadiness && (
+                                <li>• {questionReadiness.totalRounds} question round{questionReadiness.totalRounds !== 1 ? 's' : ''}</li>
+                              )}
                             </>
                           ) : (
                             <li>• Manual triggering</li>
@@ -677,38 +726,26 @@ export const SessionList = () => {
                           min="1"
                           max="60"
                           value={firstDelayMinutes}
-                          onChange={(e) => setFirstDelayMinutes(Number(e.target.value))}
+                          onChange={(e) => setFirstDelayMinutes(Math.max(1, Number(e.target.value)))}
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                         />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Question Interval (min)
+                          Time Gap Between Questions (min) *
                         </label>
                         <input
                           type="number"
                           min="1"
-                          max="60"
+                          max="120"
                           value={intervalMinutes}
-                          onChange={(e) => setIntervalMinutes(Number(e.target.value))}
+                          onChange={(e) => setIntervalMinutes(Math.max(1, Number(e.target.value)))}
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                         />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Max Questions (optional)
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="100"
-                          value={maxQuestions || ''}
-                          onChange={(e) => setMaxQuestions(e.target.value ? Number(e.target.value) : null)}
-                          placeholder="Unlimited"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Students receive a question every {intervalMinutes} min
+                        </p>
                       </div>
                     </>
                   ) : (
@@ -721,6 +758,79 @@ export const SessionList = () => {
                   )}
                 </div>
               </div>
+
+              {/* Question Readiness Panel */}
+              {realTimeAnalyticsEnabled && automationEnabled && (
+                <div className="mt-4">
+                  {loadingReadiness ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 p-3">
+                      <Loader2Icon className="h-4 w-4 animate-spin" />
+                      Checking question readiness...
+                    </div>
+                  ) : questionReadiness ? (
+                    <div className={`rounded-lg border p-4 ${
+                      questionReadiness.ready
+                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                        : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-3">
+                        {questionReadiness.ready ? (
+                          <CheckCircleIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <AlertTriangleIcon className="h-5 w-5 text-red-600 dark:text-red-400" />
+                        )}
+                        <span className={`font-medium text-sm ${
+                          questionReadiness.ready
+                            ? 'text-green-800 dark:text-green-200'
+                            : 'text-red-800 dark:text-red-200'
+                        }`}>
+                          {questionReadiness.ready
+                            ? 'Ready to start — enough questions for all rounds'
+                            : 'Not enough questions to start'}
+                        </span>
+                      </div>
+
+                      <div className="text-xs space-y-1.5">
+                        <p className="text-gray-600 dark:text-gray-400">
+                          Session: <strong>{questionReadiness.durationMinutes} min</strong> duration
+                          &nbsp;→&nbsp;<strong>{questionReadiness.totalRounds}</strong> question round{questionReadiness.totalRounds !== 1 ? 's' : ''}
+                          &nbsp;(1 generic + {Math.max(0, questionReadiness.totalRounds - 1)} cluster-wise)
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
+                          {/* Generic */}
+                          <span className="text-gray-700 dark:text-gray-300">Generic questions</span>
+                          <span className={questionReadiness.genericCount >= questionReadiness.genericNeeded
+                            ? 'text-green-700 dark:text-green-400 font-medium'
+                            : 'text-red-700 dark:text-red-400 font-medium'
+                          }>
+                            {questionReadiness.genericCount} / {questionReadiness.genericNeeded} needed
+                          </span>
+
+                          {/* Clusters */}
+                          {(['passive', 'moderate', 'active'] as const).map((cluster) => {
+                            const count = questionReadiness.clusterCounts[cluster] || 0;
+                            const needed = questionReadiness.clusterNeededPerGroup;
+                            const ok = count >= needed;
+                            const label = cluster.charAt(0).toUpperCase() + cluster.slice(1);
+                            return (
+                              <React.Fragment key={cluster}>
+                                <span className="text-gray-700 dark:text-gray-300">{label} cluster</span>
+                                <span className={ok
+                                  ? 'text-green-700 dark:text-green-400 font-medium'
+                                  : 'text-red-700 dark:text-red-400 font-medium'
+                                }>
+                                  {count} / {needed} needed
+                                </span>
+                              </React.Fragment>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
 
               {/* Buttons */}
               <div className="flex gap-3 mt-4">
@@ -738,7 +848,10 @@ export const SessionList = () => {
                   variant="primary"
                   onClick={handleStartSession}
                   leftIcon={startingSessionId ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <PlayIcon className="h-4 w-4" />}
-                  disabled={!!startingSessionId}
+                  disabled={
+                    !!startingSessionId ||
+                    (realTimeAnalyticsEnabled && automationEnabled && questionReadiness !== null && !questionReadiness.ready)
+                  }
                   className="flex-1"
                 >
                   {startingSessionId ? 'Starting...' : 'Start Meeting'}

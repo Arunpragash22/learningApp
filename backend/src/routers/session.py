@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from bson import ObjectId
 from datetime import datetime
+import math
 
 from src.database.connection import db
 from src.middleware.auth import get_current_user, require_instructor
@@ -482,6 +483,115 @@ async def get_previous_sessions_with_cluster_questions(
         raise HTTPException(status_code=500, detail="Failed to fetch previous sessions")
 
 
+def _compute_question_requirements(
+    start_time: str,
+    end_time: str,
+    first_delay_minutes: int,
+    interval_minutes: int,
+) -> dict:
+    """
+    Compute how many question rounds fit and how many questions
+    are needed per cluster based on session duration and time gap.
+
+    Returns dict with totalRounds, genericNeeded, clusterNeededPerGroup.
+    """
+    try:
+        sh, sm = map(int, start_time.split(":"))
+        eh, em = map(int, end_time.split(":"))
+        duration_minutes = (eh * 60 + em) - (sh * 60 + sm)
+        if duration_minutes <= 0:
+            duration_minutes += 24 * 60  # crosses midnight
+    except Exception:
+        duration_minutes = 0
+
+    if duration_minutes <= 0 or interval_minutes <= 0:
+        return {
+            "durationMinutes": duration_minutes,
+            "totalRounds": 0,
+            "genericNeeded": 0,
+            "clusterNeededPerGroup": 0,
+        }
+
+    total_rounds = 1 + max(0, math.floor((duration_minutes - first_delay_minutes) / interval_minutes))
+
+    return {
+        "durationMinutes": duration_minutes,
+        "totalRounds": total_rounds,
+        "genericNeeded": 1,
+        "clusterNeededPerGroup": max(0, total_rounds - 1),
+    }
+
+
+@router.get("/{session_id}/question-readiness")
+async def get_question_readiness(
+    session_id: str,
+    intervalMinutes: int = 10,
+    firstDelayMinutes: int = 2,
+    user: dict = Depends(require_instructor),
+):
+    """
+    Check whether a session has enough questions to start automation.
+    Returns the required vs actual question counts per cluster.
+    """
+    try:
+        session = await db.database.sessions.find_one({"_id": ObjectId(session_id)})
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        start_time = session.get("startTime", "")
+        end_time = session.get("endTime", "")
+
+        req = _compute_question_requirements(start_time, end_time, firstDelayMinutes, intervalMinutes)
+
+        # Count questions for this session (or from clusterQuestionSource)
+        cluster_source = session.get("clusterQuestionSource")
+        cluster_sid = cluster_source if cluster_source and cluster_source not in ("none", "") else session_id
+
+        generic_count = await db.database.questions.count_documents({
+            "sessionId": session_id,
+            "questionType": {"$in": ["generic", None]},
+        })
+        # Also count questions without questionType as generic
+        generic_no_type = await db.database.questions.count_documents({
+            "sessionId": session_id,
+            "questionType": {"$exists": False},
+        })
+        generic_count += generic_no_type
+
+        clusters = ["Passive", "Moderate", "Active"]
+        cluster_counts = {}
+        for c in clusters:
+            cnt = await db.database.questions.count_documents({
+                "sessionId": cluster_sid,
+                "questionType": "cluster",
+                "category": c,
+            })
+            cluster_counts[c.lower()] = cnt
+
+        needed_per_cluster = req["clusterNeededPerGroup"]
+        ready = (
+            generic_count >= req["genericNeeded"]
+            and all(cnt >= needed_per_cluster for cnt in cluster_counts.values())
+        ) if req["totalRounds"] > 0 else False
+
+        return {
+            "success": True,
+            "durationMinutes": req["durationMinutes"],
+            "totalRounds": req["totalRounds"],
+            "genericNeeded": req["genericNeeded"],
+            "genericCount": generic_count,
+            "clusterNeededPerGroup": needed_per_cluster,
+            "clusterCounts": cluster_counts,
+            "ready": ready,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error checking question readiness: {e}")
+        raise HTTPException(status_code=500, detail="Failed to check question readiness")
+
+
 @router.get("/{session_id}", response_model=SessionOut)
 async def get_session(session_id: str, user: dict = Depends(get_current_user)):
     """Get a specific session - access controlled based on enrollment"""
@@ -724,6 +834,52 @@ async def start_session(
         
         # Only enable automation if real-time analytics is also enabled
         effective_automation = request.enableRealTimeAnalytics and request.enableAutomation
+
+        # Validate question readiness when automation is enabled
+        if effective_automation:
+            start_time = session.get("startTime", "")
+            end_time = session.get("endTime", "")
+            interval_minutes = (request.intervalSeconds or 600) // 60
+            first_delay_minutes = (request.firstDelaySeconds or 120) // 60
+
+            if start_time and end_time:
+                req = _compute_question_requirements(start_time, end_time, first_delay_minutes, interval_minutes)
+                needed_per_cluster = req["clusterNeededPerGroup"]
+
+                if req["totalRounds"] > 0:
+                    cluster_source = session.get("clusterQuestionSource")
+                    cluster_sid = cluster_source if cluster_source and cluster_source not in ("none", "") else session_id
+
+                    generic_count = await db.database.questions.count_documents({
+                        "sessionId": session_id,
+                        "questionType": {"$in": ["generic", None]},
+                    })
+                    generic_count += await db.database.questions.count_documents({
+                        "sessionId": session_id,
+                        "questionType": {"$exists": False},
+                    })
+
+                    cluster_labels = ["Passive", "Moderate", "Active"]
+                    missing = []
+                    for c in cluster_labels:
+                        cnt = await db.database.questions.count_documents({
+                            "sessionId": cluster_sid,
+                            "questionType": "cluster",
+                            "category": c,
+                        })
+                        if cnt < needed_per_cluster:
+                            missing.append(f"{c}: {cnt}/{needed_per_cluster}")
+
+                    if generic_count < req["genericNeeded"]:
+                        missing.insert(0, f"Generic: {generic_count}/{req['genericNeeded']}")
+
+                    if missing:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Not enough questions to cover {req['totalRounds']} rounds "
+                                   f"({req['durationMinutes']} min session, {interval_minutes} min gap). "
+                                   f"Missing: {', '.join(missing)}"
+                        )
         
         await db.database.sessions.update_one(
             {"_id": ObjectId(session_id)},

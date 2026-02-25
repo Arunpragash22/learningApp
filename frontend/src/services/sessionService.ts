@@ -7,6 +7,8 @@ export interface Session {
   instructor: string;
   date: string;
   time: string;
+  startTime?: string;            // HH:MM format
+  endTime?: string;              // HH:MM format
   duration: string;
   status: 'live' | 'upcoming' | 'completed';
   participants?: number;
@@ -366,7 +368,8 @@ export const sessionService = {
       });
 
       if (!res.ok) {
-        return { success: false, message: "Failed to start session" };
+        const err = await res.json().catch(() => ({ detail: "Failed to start session" }));
+        return { success: false, message: err.detail || "Failed to start session" };
       }
 
       return await res.json();
