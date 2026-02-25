@@ -303,7 +303,7 @@ export const Footer = () => {
       {/* Main Footer Content */}
       <div className="bg-[#0f172a]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Brand & Social */}
             <div>
               <div className="flex items-center gap-3 mb-4">
@@ -350,25 +350,15 @@ export const Footer = () => {
               </ul>
             </div>
 
-            {/* About */}
-            <div>
-              <h4 className="text-white font-semibold mb-4 border-b border-blue-500/50 pb-2">ABOUT</h4>
-              <ul className="space-y-2">
-                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">About ClassPulse</a></li>
-                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">About TechSnatchers</a></li>
-                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Our Team</a></li>
-              </ul>
-            </div>
-
             {/* Features */}
             <div>
               <h4 className="text-white font-semibold mb-4 border-b border-blue-500/50 pb-2">FEATURES</h4>
               <ul className="space-y-2">
-                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Live Sessions</a></li>
-                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Real-time Quizzes</a></li>
-                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Student Analytics</a></li>
-                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Engagement Tracking</a></li>
-                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Session Reports</a></li>
+                <li><Link to="/dashboard/sessions" className="text-blue-200/70 hover:text-white transition-colors text-sm">Live Sessions</Link></li>
+                <li><Link to="/dashboard/instructor/questions" className="text-blue-200/70 hover:text-white transition-colors text-sm">Real-time Quizzes</Link></li>
+                <li><Link to="/dashboard/instructor/analytics" className="text-blue-200/70 hover:text-white transition-colors text-sm">Student Analytics</Link></li>
+                <li><Link to="/dashboard/instructor/analytics" className="text-blue-200/70 hover:text-white transition-colors text-sm">Engagement Tracking</Link></li>
+                <li><Link to="/dashboard/reports" className="text-blue-200/70 hover:text-white transition-colors text-sm">Session Reports</Link></li>
               </ul>
             </div>
           </div>
