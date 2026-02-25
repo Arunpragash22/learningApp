@@ -271,6 +271,24 @@ class QuizScheduler:
                 return {"success": False, "message": "No questions found for this session"}
 
             generic_qs, cluster_qs_all = Question.split_generic_and_cluster(questions)
+
+            # If session has a clusterQuestionSource (previous session), fetch cluster questions from there
+            cluster_source_session = session_doc.get("clusterQuestionSource") if session_doc else None
+            if cluster_source_session and cluster_source_session not in ("none", ""):
+                try:
+                    prev_cluster_qs = []
+                    async for q in db.database.questions.find({
+                        "sessionId": cluster_source_session,
+                        "questionType": "cluster"
+                    }):
+                        q["id"] = str(q["_id"])
+                        prev_cluster_qs.append(q)
+                    if prev_cluster_qs:
+                        cluster_qs_all = prev_cluster_qs
+                        print(f"   📋 Auto-trigger: Using {len(cluster_qs_all)} cluster questions from previous session {cluster_source_session}")
+                except Exception as prev_err:
+                    print(f"   ⚠️ Auto-trigger: Failed to fetch cluster questions from previous session: {prev_err}")
+
             print(f"   Generic: {len(generic_qs)} | Cluster-specific: {len(cluster_qs_all)}")
 
             # ── 3. Build cluster map ────────────────────────────────────

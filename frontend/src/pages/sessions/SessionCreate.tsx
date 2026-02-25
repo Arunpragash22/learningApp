@@ -76,7 +76,8 @@ export const SessionCreate = () => {
         description: data.description || '',
         materials: data.materials || [],
         isStandalone: true,                 // Mark as standalone session
-        enrollmentKey: sessionEnrollmentKey // Enrollment key for this session
+        enrollmentKey: sessionEnrollmentKey, // Enrollment key for this session
+        clusterQuestionSource: data.clusterQuestionSource || null,
       };
   
       console.log("📤 Sending session create payload:", payload);

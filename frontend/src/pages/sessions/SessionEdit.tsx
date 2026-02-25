@@ -142,6 +142,7 @@ export const SessionEdit = () => {
         durationMinutes: durationMinutes,
         description: data.description,
         materials: data.materials,
+        clusterQuestionSource: data.clusterQuestionSource || null,
       };
 
       const apiUrl = `${API_BASE}/api/sessions/${sessionId}`;

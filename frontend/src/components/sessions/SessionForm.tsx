@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
-import { CalendarIcon, ClockIcon, FileTextIcon, PlusIcon, XIcon, UploadIcon, BookOpenIcon } from 'lucide-react';
+import { CalendarIcon, ClockIcon, FileTextIcon, PlusIcon, XIcon, UploadIcon, BookOpenIcon, HelpCircleIcon } from 'lucide-react';
 
 export interface SessionMaterial {
   id: string;
@@ -26,6 +26,7 @@ export interface SessionFormData {
   description: string;
   materials: SessionMaterial[];
   isStandalone?: boolean;  // True for standalone sessions, false for course sessions
+  clusterQuestionSource?: string | null;  // null/none = only current session questions, or a previous session ID
 }
 
 interface SessionFormProps {
@@ -60,12 +61,39 @@ export const SessionForm: React.FC<SessionFormProps> = ({
     duration: initialData?.duration || '90 min',
     description: initialData?.description || '',
     materials: initialData?.materials || [],
-    isStandalone: mode === 'standalone'
+    isStandalone: mode === 'standalone',
+    clusterQuestionSource: initialData?.clusterQuestionSource || null,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // No need to fetch courses for standalone mode anymore
+  // Cluster question source: previous sessions
+  const [previousSessions, setPreviousSessions] = useState<{sessionId: string; title: string; date: string; course: string; clusterQuestionCount: number}[]>([]);
+  const [loadingPrevSessions, setLoadingPrevSessions] = useState(false);
+  const [useClusterFromPrevious, setUseClusterFromPrevious] = useState(!!initialData?.clusterQuestionSource);
+
+  const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
+  const API_BASE = API_URL?.endsWith('/api') ? API_URL.slice(0, -4) : API_URL;
+
+  useEffect(() => {
+    const fetchPreviousSessions = async () => {
+      setLoadingPrevSessions(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/sessions/previous-with-cluster-questions`, {
+          headers: { Authorization: `Bearer ${sessionStorage.getItem('access_token') || ''}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPreviousSessions(data.sessions || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch previous sessions:', err);
+      } finally {
+        setLoadingPrevSessions(false);
+      }
+    };
+    fetchPreviousSessions();
+  }, []);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -95,7 +123,8 @@ export const SessionForm: React.FC<SessionFormProps> = ({
     if (validate()) {
       onSubmit({
         ...formData,
-        isStandalone: mode === 'standalone'
+        isStandalone: mode === 'standalone',
+        clusterQuestionSource: useClusterFromPrevious ? (formData.clusterQuestionSource || null) : null,
       });
     }
   };
@@ -240,6 +269,119 @@ export const SessionForm: React.FC<SessionFormProps> = ({
             </div>
           </div>
 
+        </CardContent>
+      </Card>
+
+      {/* Question Handling Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <HelpCircleIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Question Handling</h2>
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Generic questions are always sent first. Configure how cluster-wise questions should be handled.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Default behaviour info */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              <strong>Default:</strong> Generic questions are sent to all students first (no previous session needed).
+              After clustering runs, cluster-wise questions target students by their engagement level.
+            </p>
+          </div>
+
+          {/* Cluster question source toggle */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Where should cluster-wise questions come from?
+            </label>
+            <div className="space-y-3">
+              <label
+                className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-all ${
+                  !useClusterFromPrevious
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-500'
+                    : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="clusterSource"
+                  checked={!useClusterFromPrevious}
+                  onChange={() => {
+                    setUseClusterFromPrevious(false);
+                    setFormData({ ...formData, clusterQuestionSource: null });
+                  }}
+                  className="mt-1 h-4 w-4 text-blue-600"
+                />
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white text-sm">Current session only</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Only questions created for this session will be used. Create cluster-wise questions in the Question Bank after creating this session.
+                  </p>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-all ${
+                  useClusterFromPrevious
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-500'
+                    : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="clusterSource"
+                  checked={useClusterFromPrevious}
+                  onChange={() => setUseClusterFromPrevious(true)}
+                  className="mt-1 h-4 w-4 text-blue-600"
+                />
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900 dark:text-white text-sm">Copy from a previous session</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Cluster-wise questions from a previous session will be automatically copied and used in this session.
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Previous session selector */}
+          {useClusterFromPrevious && (
+            <div className="ml-7">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Select Previous Session
+              </label>
+              {loadingPrevSessions ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">Loading previous sessions...</p>
+              ) : previousSessions.length === 0 ? (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    No previous sessions with cluster questions found. Create cluster-wise questions in the Question Bank first.
+                  </p>
+                </div>
+              ) : (
+                <select
+                  value={formData.clusterQuestionSource || ''}
+                  onChange={(e) => setFormData({ ...formData, clusterQuestionSource: e.target.value || null })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                >
+                  <option value="">-- Select a session --</option>
+                  {previousSessions.map((s) => (
+                    <option key={s.sessionId} value={s.sessionId}>
+                      {s.title} — {s.date} ({s.clusterQuestionCount} cluster questions)
+                    </option>
+                  ))}
+                </select>
+              )}
+              {formData.clusterQuestionSource && (
+                <p className="mt-1 text-xs text-green-600 dark:text-green-400">
+                  Cluster questions from the selected session will be copied when the quiz is triggered.
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

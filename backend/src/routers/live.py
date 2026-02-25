@@ -146,6 +146,24 @@ async def trigger_question(meeting_id: str):
             return {"success": False, "message": "No questions found for this session"}
 
         generic_qs, cluster_qs = Question.split_generic_and_cluster(questions)
+
+        # If session has a clusterQuestionSource (previous session), fetch cluster questions from there
+        cluster_source_session = session_doc.get("clusterQuestionSource") if session_doc else None
+        if cluster_source_session and cluster_source_session not in ("none", ""):
+            try:
+                prev_cluster_qs = []
+                async for q in db.database.questions.find({
+                    "sessionId": cluster_source_session,
+                    "questionType": "cluster"
+                }):
+                    q["id"] = str(q["_id"])
+                    prev_cluster_qs.append(q)
+                if prev_cluster_qs:
+                    cluster_qs = prev_cluster_qs
+                    print(f"   📋 Using {len(cluster_qs)} cluster questions from previous session {cluster_source_session}")
+            except Exception as prev_err:
+                print(f"   ⚠️ Failed to fetch cluster questions from previous session: {prev_err}")
+
         print(f"   Generic: {len(generic_qs)} | Cluster-specific: {len(cluster_qs)}")
 
         # 2) Get all participants in this session
@@ -360,6 +378,24 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
             return {"success": False, "message": "No questions found for this session", "sentTo": 0}
 
         generic_qs, cluster_qs = Question.split_generic_and_cluster(questions)
+
+        # If session has a clusterQuestionSource (previous session), fetch cluster questions from there
+        cluster_source_session = session_doc.get("clusterQuestionSource") if session_doc else None
+        if cluster_source_session and cluster_source_session not in ("none", ""):
+            try:
+                prev_cluster_qs = []
+                async for q in db.database.questions.find({
+                    "sessionId": cluster_source_session,
+                    "questionType": "cluster"
+                }):
+                    q["id"] = str(q["_id"])
+                    prev_cluster_qs.append(q)
+                if prev_cluster_qs:
+                    cluster_qs = prev_cluster_qs
+                    print(f"   📋 Using {len(cluster_qs)} cluster questions from previous session {cluster_source_session}")
+            except Exception as prev_err:
+                print(f"   ⚠️ Failed to fetch cluster questions from previous session: {prev_err}")
+
         print(f"   Generic: {len(generic_qs)} | Cluster-specific: {len(cluster_qs)}")
 
         participants = ws_manager.get_session_participants(meeting_id)

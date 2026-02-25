@@ -41,9 +41,13 @@ export const CourseDetail = () => {
     startTime: '',
     endTime: '',
     duration: '90 min',
-    description: ''
+    description: '',
+    clusterQuestionSource: null as string | null,
   });
   const [sessionErrors, setSessionErrors] = useState<Record<string, string>>({});
+  const [useClusterFromPrevious, setUseClusterFromPrevious] = useState(false);
+  const [previousSessions, setPreviousSessions] = useState<{sessionId: string; title: string; date: string; course: string; clusterQuestionCount: number}[]>([]);
+  const [loadingPrevSessions, setLoadingPrevSessions] = useState(false);
 
   const [showAddMaterial, setShowAddMaterial] = useState(false);
   const [newMaterial, setNewMaterial] = useState<{ title: string; description: string; file: File | null }>({ title: '', description: '', file: null });
@@ -157,6 +161,27 @@ export const CourseDetail = () => {
     { id: 'materials', label: 'Learning Materials', icon: FileTextIcon },
   ];
 
+  useEffect(() => {
+    if (!showCreateSession) return;
+    const fetchPreviousSessions = async () => {
+      setLoadingPrevSessions(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/sessions/previous-with-cluster-questions`, {
+          headers: { Authorization: `Bearer ${sessionStorage.getItem('access_token') || ''}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPreviousSessions(data.sessions || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch previous sessions:', err);
+      } finally {
+        setLoadingPrevSessions(false);
+      }
+    };
+    fetchPreviousSessions();
+  }, [showCreateSession]);
+
   const isInstructor = user?.role === 'instructor' || user?.role === 'admin';
 
   const validateSession = (): boolean => {
@@ -204,7 +229,8 @@ export const CourseDetail = () => {
         timezone: "Asia/Colombo",
         description: newSession.description,
         materials: [],
-        isStandalone: false  // Course session - no enrollment key needed
+        isStandalone: false,  // Course session - no enrollment key needed
+        clusterQuestionSource: useClusterFromPrevious ? newSession.clusterQuestionSource : null,
       };
 
       console.log("📤 Creating course session:", payload);
@@ -543,6 +569,48 @@ export const CourseDetail = () => {
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-100"
                       />
                     </div>
+                  </div>
+
+                  {/* Cluster Question Source */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                    <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                      Question Handling
+                    </p>
+                    <p className="text-xs text-blue-600 dark:text-blue-300 mb-3">
+                      Generic questions are sent first. Choose where cluster-wise questions come from.
+                    </p>
+                    <div className="space-y-2">
+                      <label className={`flex items-center gap-2 p-2 rounded-md cursor-pointer text-sm ${!useClusterFromPrevious ? 'bg-blue-100 dark:bg-blue-800/40' : ''}`}>
+                        <input type="radio" checked={!useClusterFromPrevious} onChange={() => { setUseClusterFromPrevious(false); setNewSession({ ...newSession, clusterQuestionSource: null }); }} className="h-4 w-4 text-blue-600" />
+                        <span className="text-gray-800 dark:text-gray-200">Current session only</span>
+                      </label>
+                      <label className={`flex items-center gap-2 p-2 rounded-md cursor-pointer text-sm ${useClusterFromPrevious ? 'bg-blue-100 dark:bg-blue-800/40' : ''}`}>
+                        <input type="radio" checked={useClusterFromPrevious} onChange={() => setUseClusterFromPrevious(true)} className="h-4 w-4 text-blue-600" />
+                        <span className="text-gray-800 dark:text-gray-200">Copy from a previous session</span>
+                      </label>
+                    </div>
+                    {useClusterFromPrevious && (
+                      <div className="mt-3">
+                        {loadingPrevSessions ? (
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Loading...</p>
+                        ) : previousSessions.length === 0 ? (
+                          <p className="text-xs text-amber-700 dark:text-amber-300">No previous sessions with cluster questions found.</p>
+                        ) : (
+                          <select
+                            value={newSession.clusterQuestionSource || ''}
+                            onChange={(e) => setNewSession({ ...newSession, clusterQuestionSource: e.target.value || null })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          >
+                            <option value="">-- Select a session --</option>
+                            {previousSessions.map((s) => (
+                              <option key={s.sessionId} value={s.sessionId}>
+                                {s.title} — {s.date} ({s.clusterQuestionCount} cluster Qs)
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-end space-x-3">
