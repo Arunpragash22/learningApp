@@ -66,8 +66,8 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
       {/* Header and Actions */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Question Bank</h3>
-          <p className="text-sm text-gray-500">Manage and organize your questions</p>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Question Bank</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Manage and organize your questions</p>
         </div>
         <Button
           variant="primary"
@@ -90,7 +90,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search questions..."
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             />
           </div>
           <select
@@ -101,7 +101,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
                 setSelectedTargetCluster('all');
               }
             }}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           >
             <option value="all">All Questions</option>
             <option value="generic">Generic</option>
@@ -111,7 +111,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
             <select
               value={selectedTargetCluster}
               onChange={(e) => setSelectedTargetCluster(e.target.value)}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             >
               <option value="all">All Clusters</option>
               <option value="passive">Passive (At-Risk)</option>
@@ -119,7 +119,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
               <option value="active">Active (Highly Engaged)</option>
             </select>
           ) : (
-            <div className="block w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-400 sm:text-sm">
+            <div className="block w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500 sm:text-sm">
               Select "Cluster-wise" to filter by cluster
             </div>
           )}
@@ -130,8 +130,8 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
       {filteredQuestions.length === 0 ? (
         <Card className="p-12 text-center">
           <Target className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No questions found</h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No questions found</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {questions.length === 0 
               ? 'Get started by adding your first question.'
               : 'Try adjusting your search or filter criteria.'}
@@ -172,14 +172,14 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
                       </Badge>
                     )}
                   </div>
-                  <h4 className="font-semibold text-gray-900 mb-2">{question.question}</h4>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">{question.question}</h4>
                   <div className="space-y-1">
                     {question.options.map((option, index) => (
-                      <div key={index} className="flex items-center text-sm text-gray-600">
+                      <div key={index} className="flex items-center text-sm text-gray-600 dark:text-gray-300">
                         <span className="mr-2 font-medium">
                           {String.fromCharCode(65 + index)}.
                         </span>
-                        <span className={index === question.correctAnswer ? 'text-blue-600 font-medium' : ''}>
+                        <span className={index === question.correctAnswer ? 'text-blue-600 dark:text-blue-400 font-medium' : ''}>
                           {option}
                           {index === question.correctAnswer && ' ✓'}
                         </span>
@@ -189,7 +189,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
                   {question.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-3">
                       {question.tags.map((tag, index) => (
-                        <span key={index} className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
+                        <span key={index} className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
                           {tag}
                         </span>
                       ))}
@@ -197,8 +197,8 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
                   )}
                 </div>
               </div>
-              <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-                <div className="flex items-center space-x-2 text-xs text-gray-500">
+              <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
                   {question.timeLimit && (
                     <div className="flex items-center">
                       <Clock className="h-3 w-3 mr-1" />
