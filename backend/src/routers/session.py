@@ -440,6 +440,48 @@ async def get_sessions_by_course(course_id: str, user: dict = Depends(get_curren
     return [_session_doc_to_out(doc) for doc in sessions]
 
 
+@router.get("/previous-with-cluster-questions")
+async def get_previous_sessions_with_cluster_questions(
+    user: dict = Depends(require_instructor)
+):
+    """
+    Return the instructor's previous sessions that contain at least one cluster question.
+    Used in session creation to let the instructor pick a source for cluster-wise questions.
+    """
+    try:
+        instructor_id = user.get("id")
+
+        # Get all sessions by this instructor
+        sessions_cursor = db.database.sessions.find(
+            {"instructorId": instructor_id}
+        ).sort("date", -1)
+        sessions_list = await sessions_cursor.to_list(length=200)
+
+        result = []
+        for s in sessions_list:
+            sid = str(s["_id"])
+            # Count cluster questions linked to this session
+            cluster_count = await db.database.questions.count_documents({
+                "sessionId": sid,
+                "questionType": "cluster"
+            })
+            if cluster_count > 0:
+                result.append({
+                    "sessionId": sid,
+                    "title": s.get("title", "Untitled"),
+                    "date": s.get("date", ""),
+                    "course": s.get("course", ""),
+                    "status": s.get("status", ""),
+                    "clusterQuestionCount": cluster_count
+                })
+
+        return {"success": True, "sessions": result}
+
+    except Exception as e:
+        print(f"Error fetching previous sessions with cluster questions: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch previous sessions")
+
+
 @router.get("/{session_id}", response_model=SessionOut)
 async def get_session(session_id: str, user: dict = Depends(get_current_user)):
     """Get a specific session - access controlled based on enrollment"""
@@ -898,48 +940,6 @@ async def leave_session(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Failed to leave session")
-
-
-@router.get("/previous-with-cluster-questions")
-async def get_previous_sessions_with_cluster_questions(
-    user: dict = Depends(require_instructor)
-):
-    """
-    Return the instructor's previous sessions that contain at least one cluster question.
-    Used in session creation to let the instructor pick a source for cluster-wise questions.
-    """
-    try:
-        instructor_id = user.get("id")
-
-        # Get all sessions by this instructor
-        sessions_cursor = db.database.sessions.find(
-            {"instructorId": instructor_id}
-        ).sort("date", -1)
-        sessions_list = await sessions_cursor.to_list(length=200)
-
-        result = []
-        for s in sessions_list:
-            sid = str(s["_id"])
-            # Count cluster questions linked to this session
-            cluster_count = await db.database.questions.count_documents({
-                "sessionId": sid,
-                "questionType": "cluster"
-            })
-            if cluster_count > 0:
-                result.append({
-                    "sessionId": sid,
-                    "title": s.get("title", "Untitled"),
-                    "date": s.get("date", ""),
-                    "course": s.get("course", ""),
-                    "status": s.get("status", ""),
-                    "clusterQuestionCount": cluster_count
-                })
-
-        return {"success": True, "sessions": result}
-
-    except Exception as e:
-        print(f"Error fetching previous sessions with cluster questions: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch previous sessions")
 
 
 @router.post("/sync-zoom-meetings")
