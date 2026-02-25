@@ -29,6 +29,7 @@ import { SessionReports } from './pages/reports/SessionReports';
 import { UserManagement } from './pages/admin/UserManagement';
 import { InstructorReports } from './pages/instructor/InstructorReports';
 import { StudentReports } from './pages/student/StudentReports';
+import { ContactUs } from './pages/ContactUs';
 
 export function App() {
   return (
@@ -98,6 +99,7 @@ export function App() {
           {/* Common routes */}
           <Route path="profile" element={<UserProfile />} />
           <Route path="reports" element={<SessionReports />} />
+          <Route path="contact" element={<ContactUs />} />
         </Route>
       </Routes>
     </BrowserRouter>

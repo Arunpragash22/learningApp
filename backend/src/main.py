@@ -144,8 +144,9 @@ app.include_router(session_report.reports_router)  # 📊 All reports API
 app.include_router(preprocessing.router)  # 📊 Preprocessing engagement data
 app.include_router(feedback.router)  # 🎯 Personalized student feedback (Model-2)
 
-from src.routers import profile
+from src.routers import profile, contact
 app.include_router(profile.router)
+app.include_router(contact.router)
 
 # 📊 Role-based Reports
 from src.routers import instructor_reports, student_reports
