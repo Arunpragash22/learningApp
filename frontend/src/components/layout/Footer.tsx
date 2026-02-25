@@ -12,8 +12,153 @@ import {
   TwitterIcon,
   XIcon,
   ShieldCheckIcon,
-  CookieIcon
+  CookieIcon,
+  MessageSquareIcon,
+  StarIcon,
+  SendIcon
 } from 'lucide-react';
+import { toast } from 'sonner';
+
+const RATING_LABELS = ['Poor', 'Fair', 'Good', 'Very Good', 'Excellent'];
+
+const FeedbackModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [category, setCategory] = useState('general');
+  const [sending, setSending] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (rating === 0) { toast.error('Please select a rating'); return; }
+    if (!comment.trim()) { toast.error('Please write your feedback'); return; }
+
+    setSending(true);
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${apiUrl}/api/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `Website Feedback (${category})`,
+          email: 'feedback@classpulse.app',
+          message: `Rating: ${rating}/5 (${RATING_LABELS[rating - 1]})\nCategory: ${category}\n\n${comment}`,
+        }),
+      });
+      if (res.ok) {
+        toast.success('Thank you for your feedback!');
+        setRating(0); setComment(''); setCategory('general');
+        onClose();
+      } else {
+        toast.error('Failed to send feedback. Please try again.');
+      }
+    } catch {
+      toast.error('Network error. Please try again later.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (!open) return null;
+  const activeRating = hoverRating || rating;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
+      <div className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 to-blue-700">
+          <div className="flex items-center gap-2 text-white">
+            <MessageSquareIcon className="h-5 w-5" />
+            <h2 className="text-lg font-bold">Website Feedback</h2>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-full hover:bg-white/20 transition-colors text-white">
+            <XIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
+          <p className="text-sm text-gray-500 dark:text-gray-400">We'd love to hear how your experience with ClassPulse has been. Your feedback helps us improve!</p>
+
+          {/* Star Rating */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">How would you rate ClassPulse?</label>
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map(star => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setRating(star)}
+                  onMouseEnter={() => setHoverRating(star)}
+                  onMouseLeave={() => setHoverRating(0)}
+                  className="p-0.5 transition-transform hover:scale-110"
+                >
+                  <StarIcon
+                    className={`h-8 w-8 transition-colors ${
+                      star <= activeRating
+                        ? 'text-yellow-400 fill-yellow-400'
+                        : 'text-gray-300 dark:text-gray-600'
+                    }`}
+                  />
+                </button>
+              ))}
+              {activeRating > 0 && (
+                <span className="ml-2 text-sm font-medium text-gray-600 dark:text-gray-400">{RATING_LABELS[activeRating - 1]}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Feedback Category</label>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: 'general', label: 'General' },
+                { value: 'ui-design', label: 'UI / Design' },
+                { value: 'quizzes', label: 'Quizzes & Sessions' },
+                { value: 'performance', label: 'Performance' },
+                { value: 'feature-request', label: 'Feature Request' },
+                { value: 'bug', label: 'Bug Report' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setCategory(opt.value)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    category === opt.value
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-blue-400'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Comment */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Your Feedback</label>
+            <textarea
+              value={comment}
+              onChange={e => setComment(e.target.value)}
+              placeholder="What did you like? What can we improve?"
+              rows={4}
+              className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-y text-sm"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={sending}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-colors shadow-md"
+          >
+            <SendIcon className="h-4 w-4" />
+            {sending ? 'Sending...' : 'Submit Feedback'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 const PrivacyPolicyModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
   if (!open) return null;
@@ -128,6 +273,7 @@ export const Footer = () => {
   const currentYear = new Date().getFullYear();
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [cookieOpen, setCookieOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   return (
     <footer className="mt-auto">
@@ -199,7 +345,7 @@ export const Footer = () => {
                 <li><Link to="/dashboard/courses" className="text-blue-200/70 hover:text-white transition-colors text-sm">All Courses</Link></li>
                 <li><Link to="/dashboard/sessions" className="text-blue-200/70 hover:text-white transition-colors text-sm">Meetings</Link></li>
                 <li><Link to="/dashboard/profile" className="text-blue-200/70 hover:text-white transition-colors text-sm">My Profile</Link></li>
-                <li><a href="#" className="text-blue-200/70 hover:text-white transition-colors text-sm">Help & Support</a></li>
+                <li><button onClick={() => setFeedbackOpen(true)} className="text-blue-200/70 hover:text-white transition-colors text-sm">Feedback</button></li>
                 <li><Link to="/dashboard/contact" className="text-blue-200/70 hover:text-white transition-colors text-sm">Contact Us</Link></li>
               </ul>
             </div>
@@ -245,6 +391,7 @@ export const Footer = () => {
         </div>
       </div>
 
+      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
       <PrivacyPolicyModal open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
       <CookiePolicyModal open={cookieOpen} onClose={() => setCookieOpen(false)} />
     </footer>
