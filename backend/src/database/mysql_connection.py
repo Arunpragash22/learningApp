@@ -73,12 +73,26 @@ class MySQLBackupConnection:
                 return self.is_connected
             
             try:
-                # Read credentials from environment variables
-                host = os.getenv("MYSQL_HOST", "localhost")
-                port = int(os.getenv("MYSQL_PORT", "3306"))
-                user = os.getenv("MYSQL_USER", "root")
-                password = os.getenv("MYSQL_PASSWORD", "")
-                database = os.getenv("MYSQL_DATABASE", "learning_platform_backup")
+                # Check for MYSQL_URL / MYSQL_PUBLIC_URL first (Railway provides these)
+                mysql_url = os.getenv("MYSQL_URL") or os.getenv("MYSQL_PUBLIC_URL")
+
+                if mysql_url:
+                    # Parse connection URL: mysql://user:password@host:port/database
+                    from urllib.parse import urlparse
+                    parsed = urlparse(mysql_url)
+                    host = parsed.hostname or "localhost"
+                    port = parsed.port or 3306
+                    user = parsed.username or "root"
+                    password = parsed.password or ""
+                    database = (parsed.path or "").lstrip("/") or "learning_platform_backup"
+                    print(f"📡 Using MySQL URL: {host}:{port}/{database}")
+                else:
+                    # Fallback: individual env vars (Railway uses MYSQLHOST, code also checks MYSQL_HOST)
+                    host = os.getenv("MYSQLHOST") or os.getenv("MYSQL_HOST", "localhost")
+                    port = int(os.getenv("MYSQLPORT") or os.getenv("MYSQL_PORT", "3306"))
+                    user = os.getenv("MYSQLUSER") or os.getenv("MYSQL_USER", "root")
+                    password = os.getenv("MYSQLPASSWORD") or os.getenv("MYSQL_PASSWORD", "")
+                    database = os.getenv("MYSQLDATABASE") or os.getenv("MYSQL_DATABASE", "learning_platform_backup")
                 
                 # Create connection pool with conservative settings
                 self.pool = await aiomysql.create_pool(
