@@ -258,15 +258,6 @@ export const StudentEngagement = () => {
               View report
             </Button>
             <Button
-              variant="outline"
-              size="sm"
-              leftIcon={downloadingFeedback ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              onClick={handleDownloadFeedbackCsv}
-              disabled={downloadingFeedback}
-            >
-              {downloadingFeedback ? 'Downloading...' : 'Feedback CSV'}
-            </Button>
-            <Button
               variant="primary"
               size="sm"
               leftIcon={downloadingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
