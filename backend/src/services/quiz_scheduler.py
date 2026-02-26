@@ -379,12 +379,14 @@ class QuizScheduler:
                 student_cluster = student_cluster_map.get(sid_val) if has_clustering else None
 
                 if is_first_question:
-                    # First question → ONLY generic
                     unsent_generic = [q for q in generic_qs if str(q["_id"]) not in sent_ids]
                     if unsent_generic:
                         q = random.choice(unsent_generic)
+                    elif generic_qs:
+                        q = random.choice(generic_qs)
                     else:
-                        q = random.choice(generic_qs) if generic_qs else (random.choice(questions) if questions else None)
+                        q = None
+                        print(f"   ⚠️ No generic questions available for first round — skipping student {sid_val}")
                 else:
                     # Subsequent questions → cluster-wise first, then generic fallback
                     if has_clustering and student_cluster:

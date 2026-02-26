@@ -240,11 +240,15 @@ async def trigger_question(meeting_id: str):
         has_clustering = bool(student_cluster_map)
 
         # 4) Determine if this is the first question for the session
+        #    Only count answers submitted AFTER the session was started (current run),
+        #    so previous session runs don't cause cluster questions on the first round.
         is_first_question = True
         try:
-            existing_answers = await db.database.quiz_answers.count_documents(
-                {"sessionId": {"$in": session_ids_to_check}}
-            )
+            started_at = session_doc.get("startedAt") or session_doc.get("actualStartTime") if session_doc else None
+            answer_filter = {"sessionId": {"$in": session_ids_to_check}}
+            if started_at:
+                answer_filter["timestamp"] = {"$gte": started_at}
+            existing_answers = await db.database.quiz_answers.count_documents(answer_filter)
             if existing_answers > 0:
                 is_first_question = False
         except Exception:
@@ -492,11 +496,15 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
         has_clustering = bool(student_cluster_map)
 
         # Determine if this is the first question for the session
+        #    Only count answers submitted AFTER the session was started (current run),
+        #    so previous session runs don't cause cluster questions on the first round.
         is_first_question = True
         try:
-            existing_answers = await db.database.quiz_answers.count_documents(
-                {"sessionId": {"$in": session_ids_to_check}}
-            )
+            started_at = session_doc.get("startedAt") or session_doc.get("actualStartTime") if session_doc else None
+            answer_filter = {"sessionId": {"$in": session_ids_to_check}}
+            if started_at:
+                answer_filter["timestamp"] = {"$gte": started_at}
+            existing_answers = await db.database.quiz_answers.count_documents(answer_filter)
             if existing_answers > 0:
                 is_first_question = False
         except Exception:
