@@ -147,7 +147,7 @@ async def trigger_question(meeting_id: str):
 
         generic_qs, cluster_qs = Question.split_generic_and_cluster(questions)
 
-        # Fetch cluster questions from configured source sessions
+        # Merge cluster questions from configured source sessions
         if session_doc:
             try:
                 from src.routers.session import _normalize_cluster_sources, _fetch_cluster_questions_from_sources
@@ -160,8 +160,13 @@ async def trigger_question(meeting_id: str):
                         source_ids, session_doc.get("instructorId"), str(session_doc["_id"])
                     )
                     if prev_cluster_qs:
-                        cluster_qs = prev_cluster_qs
-                        print(f"   📋 Using {len(cluster_qs)} cluster questions from source sessions {source_ids}")
+                        seen_ids = {q.get("id") or str(q.get("_id")) for q in cluster_qs}
+                        for q in prev_cluster_qs:
+                            qid = q.get("id") or str(q.get("_id"))
+                            if qid not in seen_ids:
+                                cluster_qs.append(q)
+                                seen_ids.add(qid)
+                        print(f"   📋 Merged to {len(cluster_qs)} cluster questions (current + source sessions {source_ids})")
             except Exception as prev_err:
                 print(f"   ⚠️ Failed to fetch cluster questions from sources: {prev_err}")
 
@@ -407,7 +412,7 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
 
         generic_qs, cluster_qs = Question.split_generic_and_cluster(questions)
 
-        # Fetch cluster questions from configured source sessions
+        # Merge cluster questions from configured source sessions
         if session_doc:
             try:
                 from src.routers.session import _normalize_cluster_sources, _fetch_cluster_questions_from_sources
@@ -420,8 +425,13 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
                         source_ids, session_doc.get("instructorId"), str(session_doc["_id"])
                     )
                     if prev_cluster_qs:
-                        cluster_qs = prev_cluster_qs
-                        print(f"   📋 Using {len(cluster_qs)} cluster questions from source sessions {source_ids}")
+                        seen_ids = {q.get("id") or str(q.get("_id")) for q in cluster_qs}
+                        for q in prev_cluster_qs:
+                            qid = q.get("id") or str(q.get("_id"))
+                            if qid not in seen_ids:
+                                cluster_qs.append(q)
+                                seen_ids.add(qid)
+                        print(f"   📋 Merged to {len(cluster_qs)} cluster questions (current + source sessions {source_ids})")
             except Exception as prev_err:
                 print(f"   ⚠️ Failed to fetch cluster questions from sources: {prev_err}")
 

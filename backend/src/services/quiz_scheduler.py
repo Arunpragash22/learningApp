@@ -272,7 +272,7 @@ class QuizScheduler:
 
             generic_qs, cluster_qs_all = Question.split_generic_and_cluster(questions)
 
-            # If session has clusterQuestionSource(s), fetch cluster questions from them
+            # Merge cluster questions from selected source sessions
             if session_doc:
                 try:
                     from ..routers.session import _normalize_cluster_sources, _fetch_cluster_questions_from_sources
@@ -285,8 +285,13 @@ class QuizScheduler:
                             source_ids, session_doc.get("instructorId"), session_id
                         )
                         if prev_cluster_qs:
-                            cluster_qs_all = prev_cluster_qs
-                            print(f"   📋 Auto-trigger: Using {len(cluster_qs_all)} cluster questions from source sessions {source_ids}")
+                            seen_ids = {q.get("id") or str(q.get("_id")) for q in cluster_qs_all}
+                            for q in prev_cluster_qs:
+                                qid = q.get("id") or str(q.get("_id"))
+                                if qid not in seen_ids:
+                                    cluster_qs_all.append(q)
+                                    seen_ids.add(qid)
+                            print(f"   📋 Auto-trigger: Merged to {len(cluster_qs_all)} cluster questions (current + source sessions {source_ids})")
                 except Exception as prev_err:
                     print(f"   ⚠️ Auto-trigger: Failed to fetch cluster questions from sources: {prev_err}")
 

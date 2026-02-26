@@ -614,22 +614,26 @@ async def get_question_readiness(
         })
         generic_count += generic_no_type
 
-        # Resolve cluster question source sessions
+        # Always include cluster questions from the current session
+        cluster_qs = []
+        async for q in db.database.questions.find({
+            "sessionId": session_id, "questionType": "cluster"
+        }):
+            q["id"] = str(q["_id"])
+            cluster_qs.append(q)
+
+        # Also include cluster questions from selected source sessions
         source_ids = _normalize_cluster_sources(
             session.get("clusterQuestionSource"), session.get("instructorId")
         )
-        # Fetch all cluster questions from sources (or current session if no sources)
         if source_ids:
-            cluster_qs = await _fetch_cluster_questions_from_sources(
+            source_qs = await _fetch_cluster_questions_from_sources(
                 source_ids, session.get("instructorId"), session_id
             )
-        else:
-            cluster_qs = []
-            async for q in db.database.questions.find({
-                "sessionId": session_id, "questionType": "cluster"
-            }):
-                q["id"] = str(q["_id"])
-                cluster_qs.append(q)
+            seen_ids = {q["id"] for q in cluster_qs}
+            for q in source_qs:
+                if q["id"] not in seen_ids:
+                    cluster_qs.append(q)
 
         clusters = ["Passive", "Moderate", "Active"]
         cluster_counts = {}
@@ -926,20 +930,24 @@ async def start_session(
                         "questionType": {"$exists": False},
                     })
 
+                    cluster_qs = []
+                    async for q in db.database.questions.find({
+                        "sessionId": session_id, "questionType": "cluster"
+                    }):
+                        q["id"] = str(q["_id"])
+                        cluster_qs.append(q)
+
                     source_ids = _normalize_cluster_sources(
                         session.get("clusterQuestionSource"), session.get("instructorId")
                     )
                     if source_ids:
-                        cluster_qs = await _fetch_cluster_questions_from_sources(
+                        source_qs = await _fetch_cluster_questions_from_sources(
                             source_ids, session.get("instructorId"), session_id
                         )
-                    else:
-                        cluster_qs = []
-                        async for q in db.database.questions.find({
-                            "sessionId": session_id, "questionType": "cluster"
-                        }):
-                            q["id"] = str(q["_id"])
-                            cluster_qs.append(q)
+                        seen_ids = {q["id"] for q in cluster_qs}
+                        for q in source_qs:
+                            if q["id"] not in seen_ids:
+                                cluster_qs.append(q)
 
                     cluster_labels = ["Passive", "Moderate", "Active"]
                     missing = []
