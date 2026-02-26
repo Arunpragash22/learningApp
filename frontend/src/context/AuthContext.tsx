@@ -170,8 +170,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const markGuideSeen = async () => {
     try {
       const storedToken = sessionStorage.getItem("access_token");
+      const apiUrl = import.meta.env.VITE_API_URL || "";
       if (storedToken) {
-        await fetch("/api/auth/guide-seen", {
+        await fetch(`${apiUrl}/api/auth/guide-seen`, {
           method: "PATCH",
           headers: { Authorization: `Bearer ${storedToken}` },
         });
