@@ -51,11 +51,7 @@ export const QuestionManagement = () => {
     if (!isInstructor) return;
     
     sessionService.getAllSessions().then((allSessions) => {
-      // Filter to only upcoming and live sessions
-      const upcomingSessions = allSessions.filter(
-        s => s.status === 'upcoming' || s.status === 'live'
-      );
-      setSessions(upcomingSessions);
+      setSessions(allSessions);
     }).catch(() => {});
   }, [isInstructor]);
 
