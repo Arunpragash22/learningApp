@@ -26,7 +26,10 @@ import {
   ZapOffIcon,
   SettingsIcon,
   BarChart3Icon,
-  AlertTriangleIcon
+  AlertTriangleIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  ListIcon,
 } from 'lucide-react';
 
 import { Card } from '../../components/ui/Card';
@@ -34,6 +37,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 
 import { sessionService, Session } from '../../services/sessionService';
+import { questionService, Question } from '../../services/questionService';
 
 // Quiz popup is rendered globally in DashboardLayout so students receive questions on any page.
 
@@ -62,6 +66,11 @@ export const SessionList = () => {
   const [firstDelayMinutes, setFirstDelayMinutes] = useState(2);   // 2 minutes default
   const [intervalMinutes, setIntervalMinutes] = useState(10);       // 10 minutes default
   const [maxQuestions, setMaxQuestions] = useState<number | null>(null);
+
+  // View questions state (expandable per session)
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+  const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
 
   // Question readiness state
   const [questionReadiness, setQuestionReadiness] = useState<{
@@ -368,6 +377,27 @@ export const SessionList = () => {
   };
 
   // ---------------------------------------------------
+  // ---------------------------------------------------
+  // 📋 VIEW SESSION QUESTIONS (Instructor only)
+  // ---------------------------------------------------
+  const handleToggleQuestions = async (sessionId: string) => {
+    if (expandedSessionId === sessionId) {
+      setExpandedSessionId(null);
+      setSessionQuestions([]);
+      return;
+    }
+    setExpandedSessionId(sessionId);
+    setLoadingQuestions(true);
+    try {
+      const qs = await questionService.getAllQuestions(sessionId);
+      setSessionQuestions(qs);
+    } catch {
+      toast.error('Failed to load questions');
+      setSessionQuestions([]);
+    }
+    setLoadingQuestions(false);
+  };
+
   // ⭐ START SESSION (Instructor only) - Opens Zoom directly
   // ---------------------------------------------------
   const handleOpenStartModal = (session: Session) => {
@@ -1177,6 +1207,67 @@ export const SessionList = () => {
                         )}
                       </div>
                     </div>
+
+                    {/* View Questions toggle (Instructor only) */}
+                    {isInstructor && (
+                      <div className="mt-4 border-t border-gray-100 dark:border-gray-700 pt-3">
+                        <button
+                          onClick={() => handleToggleQuestions(session.id)}
+                          className="flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                        >
+                          <ListIcon className="h-4 w-4" />
+                          {expandedSessionId === session.id ? 'Hide Questions' : 'View Questions'}
+                          {expandedSessionId === session.id
+                            ? <ChevronUpIcon className="h-4 w-4" />
+                            : <ChevronDownIcon className="h-4 w-4" />}
+                        </button>
+
+                        {expandedSessionId === session.id && (
+                          <div className="mt-3">
+                            {loadingQuestions ? (
+                              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 py-3">
+                                <Loader2Icon className="h-4 w-4 animate-spin" /> Loading questions...
+                              </div>
+                            ) : sessionQuestions.length === 0 ? (
+                              <p className="text-sm text-gray-500 dark:text-gray-400 py-3">No questions added to this session yet.</p>
+                            ) : (
+                              <div className="space-y-2 max-h-80 overflow-y-auto">
+                                {sessionQuestions.map((q, idx) => (
+                                  <div key={q.id} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                                        {idx + 1}. {q.question}
+                                      </p>
+                                      <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${
+                                        q.questionType === 'cluster'
+                                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                          : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                                      }`}>
+                                        {q.questionType === 'cluster' ? q.targetCluster || 'Cluster' : 'Generic'}
+                                      </span>
+                                    </div>
+                                    <div className="mt-2 grid grid-cols-2 gap-1">
+                                      {q.options.map((opt, oi) => (
+                                        <p key={oi} className={`text-xs px-2 py-1 rounded ${
+                                          oi === q.correctAnswer
+                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-medium'
+                                            : 'text-gray-600 dark:text-gray-400'
+                                        }`}>
+                                          {String.fromCharCode(65 + oi)}. {opt}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                                <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">
+                                  {sessionQuestions.filter(q => q.questionType !== 'cluster').length} generic, {sessionQuestions.filter(q => q.questionType === 'cluster').length} cluster-wise
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </Card>
                 ))}
               </div>
@@ -1336,6 +1427,67 @@ export const SessionList = () => {
                         )}
                       </div>
                     </div>
+
+                    {/* View Questions toggle (Instructor only) */}
+                    {isInstructor && (
+                      <div className="mt-4 border-t border-gray-100 dark:border-gray-700 pt-3">
+                        <button
+                          onClick={() => handleToggleQuestions(session.id)}
+                          className="flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                        >
+                          <ListIcon className="h-4 w-4" />
+                          {expandedSessionId === session.id ? 'Hide Questions' : 'View Questions'}
+                          {expandedSessionId === session.id
+                            ? <ChevronUpIcon className="h-4 w-4" />
+                            : <ChevronDownIcon className="h-4 w-4" />}
+                        </button>
+
+                        {expandedSessionId === session.id && (
+                          <div className="mt-3">
+                            {loadingQuestions ? (
+                              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 py-3">
+                                <Loader2Icon className="h-4 w-4 animate-spin" /> Loading questions...
+                              </div>
+                            ) : sessionQuestions.length === 0 ? (
+                              <p className="text-sm text-gray-500 dark:text-gray-400 py-3">No questions added to this session yet.</p>
+                            ) : (
+                              <div className="space-y-2 max-h-80 overflow-y-auto">
+                                {sessionQuestions.map((q, idx) => (
+                                  <div key={q.id} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                                        {idx + 1}. {q.question}
+                                      </p>
+                                      <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${
+                                        q.questionType === 'cluster'
+                                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                          : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                                      }`}>
+                                        {q.questionType === 'cluster' ? q.targetCluster || 'Cluster' : 'Generic'}
+                                      </span>
+                                    </div>
+                                    <div className="mt-2 grid grid-cols-2 gap-1">
+                                      {q.options.map((opt, oi) => (
+                                        <p key={oi} className={`text-xs px-2 py-1 rounded ${
+                                          oi === q.correctAnswer
+                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-medium'
+                                            : 'text-gray-600 dark:text-gray-400'
+                                        }`}>
+                                          {String.fromCharCode(65 + oi)}. {opt}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                                <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">
+                                  {sessionQuestions.filter(q => q.questionType !== 'cluster').length} generic, {sessionQuestions.filter(q => q.questionType === 'cluster').length} cluster-wise
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                   </Card>
                 ))}
