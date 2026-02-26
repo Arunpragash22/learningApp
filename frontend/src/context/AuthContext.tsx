@@ -14,6 +14,7 @@ interface User {
   email: string;
   role: "student" | "instructor" | "admin";
   status: number;
+  hasSeenGuide?: boolean;
 }
 
 interface RegisterData {
@@ -35,6 +36,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   register: (userData: RegisterData) => Promise<boolean>;
   logout: () => void;
+  markGuideSeen: () => Promise<void>;
 }
 
 // ---------------------------
@@ -162,6 +164,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     toast.success("Logged out successfully");
   };
 
+  // ---------------------------
+  // MARK GUIDE SEEN
+  // ---------------------------
+  const markGuideSeen = async () => {
+    try {
+      const storedToken = sessionStorage.getItem("access_token");
+      if (storedToken) {
+        await fetch("/api/auth/guide-seen", {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${storedToken}` },
+        });
+      }
+      if (user) {
+        const updated = { ...user, hasSeenGuide: true };
+        setUser(updated);
+        sessionStorage.setItem("user", JSON.stringify(updated));
+      }
+    } catch (err) {
+      console.error("Failed to mark guide seen:", err);
+    }
+  };
+
   // User is only authenticated if both user AND token exist
   const isAuthenticated = !!(user && token);
 
@@ -176,6 +200,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         login,
         register,
         logout,
+        markGuideSeen,
       }}
     >
       {children}

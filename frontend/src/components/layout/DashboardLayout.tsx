@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-d
 import { useAuth } from '../../context/AuthContext';
 import { useSessionConnection } from '../../context/SessionConnectionContext';
 import { QuizPopup } from '../quiz/QuizPopup';
+import { WelcomeGuide } from '../onboarding/WelcomeGuide';
 import { Footer } from './Footer';
 import { BookOpenIcon, CalendarIcon, MenuIcon, XIcon, HomeIcon, GraduationCapIcon, LogOutIcon, BarChart3Icon, ActivityIcon, TargetIcon, KeyIcon, ChevronDownIcon } from 'lucide-react';
 import { ThemeToggle } from '../ui/ThemeToggle';
@@ -10,7 +11,7 @@ import { ThemeToggle } from '../ui/ThemeToggle';
 export const DashboardLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, isAuthenticated, isLoading } = useAuth();
+  const { user, logout, isAuthenticated, isLoading, markGuideSeen } = useAuth();
   const { incomingQuiz, clearIncomingQuiz, markQuestionAnswered } = useSessionConnection();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -321,6 +322,15 @@ export const DashboardLayout = () => {
             const qid = incomingQuiz?.questionId ?? incomingQuiz?.question_id;
             if (qid) markQuestionAnswered(qid);
           }}
+        />
+      )}
+
+      {/* Welcome Guide for first-time users */}
+      {user && !user.hasSeenGuide && (
+        <WelcomeGuide
+          role={user.role}
+          firstName={user.firstName}
+          onComplete={markGuideSeen}
         />
       )}
 

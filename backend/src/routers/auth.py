@@ -417,6 +417,26 @@ async def login(request_data: LoginRequest):
         )
 
 
+@router.patch("/guide-seen")
+async def mark_guide_seen(user: dict = Depends(get_current_user)):
+    """Mark the onboarding guide as seen for the current user"""
+    try:
+        database = get_database()
+        if database is None:
+            raise HTTPException(status_code=500, detail="Database not connected")
+        from bson import ObjectId
+        await database.users.update_one(
+            {"_id": ObjectId(user["id"])},
+            {"$set": {"hasSeenGuide": True, "updatedAt": datetime.utcnow()}}
+        )
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error marking guide seen: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update guide status")
+
+
 @router.get("/users")
 async def get_all_users(user: dict = Depends(require_instructor)):
     """Get all registered users (instructor/admin only)"""
