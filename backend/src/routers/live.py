@@ -147,7 +147,7 @@ async def trigger_question(meeting_id: str):
 
         generic_qs, cluster_qs = Question.split_generic_and_cluster(questions)
 
-        # Merge cluster questions from configured source sessions
+        # Merge generic + cluster questions from configured source sessions
         if session_doc:
             try:
                 from src.routers.session import _normalize_cluster_sources, _fetch_cluster_questions_from_sources
@@ -156,16 +156,35 @@ async def trigger_question(meeting_id: str):
                     session_doc.get("instructorId"),
                 )
                 if source_ids:
-                    prev_cluster_qs = await _fetch_cluster_questions_from_sources(
-                        source_ids, session_doc.get("instructorId"), str(session_doc["_id"])
+                    prev_generic_qs = await _fetch_cluster_questions_from_sources(
+                        source_ids,
+                        session_doc.get("instructorId"),
+                        str(session_doc["_id"]),
+                        question_type=None,
                     )
+                    prev_cluster_qs = await _fetch_cluster_questions_from_sources(
+                        source_ids,
+                        session_doc.get("instructorId"),
+                        str(session_doc["_id"]),
+                        question_type="cluster",
+                    )
+
+                    if prev_generic_qs:
+                        seen_generic_ids = {q.get("id") or str(q.get("_id")) for q in generic_qs}
+                        for q in prev_generic_qs:
+                            qid = q.get("id") or str(q.get("_id"))
+                            if qid not in seen_generic_ids:
+                                generic_qs.append(q)
+                                seen_generic_ids.add(qid)
+                        print(f"   📋 Merged to {len(generic_qs)} generic questions (current + source sessions {source_ids})")
+
                     if prev_cluster_qs:
-                        seen_ids = {q.get("id") or str(q.get("_id")) for q in cluster_qs}
+                        seen_cluster_ids = {q.get("id") or str(q.get("_id")) for q in cluster_qs}
                         for q in prev_cluster_qs:
                             qid = q.get("id") or str(q.get("_id"))
-                            if qid not in seen_ids:
+                            if qid not in seen_cluster_ids:
                                 cluster_qs.append(q)
-                                seen_ids.add(qid)
+                                seen_cluster_ids.add(qid)
                         print(f"   📋 Merged to {len(cluster_qs)} cluster questions (current + source sessions {source_ids})")
             except Exception as prev_err:
                 print(f"   ⚠️ Failed to fetch cluster questions from sources: {prev_err}")
@@ -416,7 +435,7 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
 
         generic_qs, cluster_qs = Question.split_generic_and_cluster(questions)
 
-        # Merge cluster questions from configured source sessions
+        # Merge generic + cluster questions from configured source sessions
         if session_doc:
             try:
                 from src.routers.session import _normalize_cluster_sources, _fetch_cluster_questions_from_sources
@@ -425,16 +444,35 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
                     session_doc.get("instructorId"),
                 )
                 if source_ids:
-                    prev_cluster_qs = await _fetch_cluster_questions_from_sources(
-                        source_ids, session_doc.get("instructorId"), str(session_doc["_id"])
+                    prev_generic_qs = await _fetch_cluster_questions_from_sources(
+                        source_ids,
+                        session_doc.get("instructorId"),
+                        str(session_doc["_id"]),
+                        question_type=None,
                     )
+                    prev_cluster_qs = await _fetch_cluster_questions_from_sources(
+                        source_ids,
+                        session_doc.get("instructorId"),
+                        str(session_doc["_id"]),
+                        question_type="cluster",
+                    )
+
+                    if prev_generic_qs:
+                        seen_generic_ids = {q.get("id") or str(q.get("_id")) for q in generic_qs}
+                        for q in prev_generic_qs:
+                            qid = q.get("id") or str(q.get("_id"))
+                            if qid not in seen_generic_ids:
+                                generic_qs.append(q)
+                                seen_generic_ids.add(qid)
+                        print(f"   📋 Merged to {len(generic_qs)} generic questions (current + source sessions {source_ids})")
+
                     if prev_cluster_qs:
-                        seen_ids = {q.get("id") or str(q.get("_id")) for q in cluster_qs}
+                        seen_cluster_ids = {q.get("id") or str(q.get("_id")) for q in cluster_qs}
                         for q in prev_cluster_qs:
                             qid = q.get("id") or str(q.get("_id"))
-                            if qid not in seen_ids:
+                            if qid not in seen_cluster_ids:
                                 cluster_qs.append(q)
-                                seen_ids.add(qid)
+                                seen_cluster_ids.add(qid)
                         print(f"   📋 Merged to {len(cluster_qs)} cluster questions (current + source sessions {source_ids})")
             except Exception as prev_err:
                 print(f"   ⚠️ Failed to fetch cluster questions from sources: {prev_err}")

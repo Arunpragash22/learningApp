@@ -272,7 +272,7 @@ class QuizScheduler:
 
             generic_qs, cluster_qs_all = Question.split_generic_and_cluster(questions)
 
-            # Merge cluster questions from selected source sessions
+            # Merge generic + cluster questions from selected source sessions
             if session_doc:
                 try:
                     from ..routers.session import _normalize_cluster_sources, _fetch_cluster_questions_from_sources
@@ -281,9 +281,27 @@ class QuizScheduler:
                         session_doc.get("instructorId"),
                     )
                     if source_ids:
-                        prev_cluster_qs = await _fetch_cluster_questions_from_sources(
-                            source_ids, session_doc.get("instructorId"), session_id
+                        prev_generic_qs = await _fetch_cluster_questions_from_sources(
+                            source_ids,
+                            session_doc.get("instructorId"),
+                            session_id,
+                            question_type=None,
                         )
+                        prev_cluster_qs = await _fetch_cluster_questions_from_sources(
+                            source_ids,
+                            session_doc.get("instructorId"),
+                            session_id,
+                            question_type="cluster",
+                        )
+                        if prev_generic_qs:
+                            seen_generic_ids = {q.get("id") or str(q.get("_id")) for q in generic_qs}
+                            for q in prev_generic_qs:
+                                qid = q.get("id") or str(q.get("_id"))
+                                if qid not in seen_generic_ids:
+                                    generic_qs.append(q)
+                                    seen_generic_ids.add(qid)
+                            print(f"   📋 Auto-trigger: Merged to {len(generic_qs)} generic questions (current + source sessions {source_ids})")
+
                         if prev_cluster_qs:
                             seen_ids = {q.get("id") or str(q.get("_id")) for q in cluster_qs_all}
                             for q in prev_cluster_qs:

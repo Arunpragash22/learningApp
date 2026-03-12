@@ -48,6 +48,7 @@ async def _fetch_cluster_questions_from_sources(
     source_ids: List[str],
     instructor_id: str = None,
     current_session_id: str = None,
+    question_type: Optional[str] = "cluster",
 ) -> List[dict]:
     """
     Fetch cluster questions from the given source session IDs.
@@ -68,11 +69,22 @@ async def _fetch_cluster_questions_from_sources(
     if not query_sids:
         return []
 
-    cluster_qs = []
-    async for q in db.database.questions.find({
+    question_query: Dict[str, Any] = {
         "sessionId": {"$in": query_sids},
-        "questionType": "cluster",
-    }):
+    }
+    if question_type is None:
+        # Generic = explicit generic OR missing/empty questionType
+        question_query["$or"] = [
+            {"questionType": "generic"},
+            {"questionType": {"$exists": False}},
+            {"questionType": None},
+            {"questionType": ""},
+        ]
+    else:
+        question_query["questionType"] = question_type
+
+    cluster_qs = []
+    async for q in db.database.questions.find(question_query):
         q["id"] = str(q["_id"])
         cluster_qs.append(q)
     return cluster_qs
@@ -605,15 +617,18 @@ async def get_question_readiness(
         req = _compute_question_requirements(start_time, end_time, firstDelayMinutes, intervalMinutes)
 
         # Count generic questions from current session
-        generic_count = await db.database.questions.count_documents({
+        generic_qs = []
+        async for q in db.database.questions.find({
             "sessionId": session_id,
-            "questionType": {"$in": ["generic", None]},
-        })
-        generic_no_type = await db.database.questions.count_documents({
-            "sessionId": session_id,
-            "questionType": {"$exists": False},
-        })
-        generic_count += generic_no_type
+            "$or": [
+                {"questionType": "generic"},
+                {"questionType": {"$exists": False}},
+                {"questionType": None},
+                {"questionType": ""},
+            ],
+        }):
+            q["id"] = str(q["_id"])
+            generic_qs.append(q)
 
         # Always include cluster questions from the current session
         cluster_qs = []
@@ -628,14 +643,25 @@ async def get_question_readiness(
             session.get("clusterQuestionSource"), session.get("instructorId")
         )
         if source_ids:
-            source_qs = await _fetch_cluster_questions_from_sources(
-                source_ids, session.get("instructorId"), session_id
+            source_generic_qs = await _fetch_cluster_questions_from_sources(
+                source_ids, session.get("instructorId"), session_id, question_type=None
             )
+            source_qs = await _fetch_cluster_questions_from_sources(
+                source_ids, session.get("instructorId"), session_id, question_type="cluster"
+            )
+            seen_generic_ids = {q["id"] for q in generic_qs}
+            for q in source_generic_qs:
+                if q["id"] not in seen_generic_ids:
+                    generic_qs.append(q)
+                    seen_generic_ids.add(q["id"])
+
             seen_ids = {q["id"] for q in cluster_qs}
             for q in source_qs:
                 if q["id"] not in seen_ids:
                     cluster_qs.append(q)
+                    seen_ids.add(q["id"])
 
+        generic_count = len(generic_qs)
         clusters = ["Passive", "Moderate", "Active"]
         cluster_counts = {}
         for c in clusters:
@@ -922,14 +948,18 @@ async def start_session(
                 needed_per_cluster = req["clusterNeededPerGroup"]
 
                 if req["totalRounds"] > 0:
-                    generic_count = await db.database.questions.count_documents({
+                    generic_qs = []
+                    async for q in db.database.questions.find({
                         "sessionId": session_id,
-                        "questionType": {"$in": ["generic", None]},
-                    })
-                    generic_count += await db.database.questions.count_documents({
-                        "sessionId": session_id,
-                        "questionType": {"$exists": False},
-                    })
+                        "$or": [
+                            {"questionType": "generic"},
+                            {"questionType": {"$exists": False}},
+                            {"questionType": None},
+                            {"questionType": ""},
+                        ],
+                    }):
+                        q["id"] = str(q["_id"])
+                        generic_qs.append(q)
 
                     cluster_qs = []
                     async for q in db.database.questions.find({
@@ -942,13 +972,25 @@ async def start_session(
                         session.get("clusterQuestionSource"), session.get("instructorId")
                     )
                     if source_ids:
-                        source_qs = await _fetch_cluster_questions_from_sources(
-                            source_ids, session.get("instructorId"), session_id
+                        source_generic_qs = await _fetch_cluster_questions_from_sources(
+                            source_ids, session.get("instructorId"), session_id, question_type=None
                         )
+                        source_qs = await _fetch_cluster_questions_from_sources(
+                            source_ids, session.get("instructorId"), session_id, question_type="cluster"
+                        )
+                        seen_generic_ids = {q["id"] for q in generic_qs}
+                        for q in source_generic_qs:
+                            if q["id"] not in seen_generic_ids:
+                                generic_qs.append(q)
+                                seen_generic_ids.add(q["id"])
+
                         seen_ids = {q["id"] for q in cluster_qs}
                         for q in source_qs:
                             if q["id"] not in seen_ids:
                                 cluster_qs.append(q)
+                                seen_ids.add(q["id"])
+
+                    generic_count = len(generic_qs)
 
                     cluster_labels = ["Passive", "Moderate", "Active"]
                     missing = []
