@@ -22,6 +22,7 @@ export interface Session {
   enrollmentKey?: string;        // Enrollment key for standalone sessions
   enrolledStudents?: string[];   // Array of enrolled student IDs
   courseId?: string;             // Link to course for course-based sessions
+  clusterQuestionSource?: string | string[] | null;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;

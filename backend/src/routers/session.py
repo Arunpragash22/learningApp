@@ -134,6 +134,7 @@ class SessionOut(BaseModel):
     enrollmentKey: Optional[str] = None
     description: Optional[str] = None
     materials: Optional[List[Union[str, Dict[str, Any]]]] = []
+    clusterQuestionSource: Optional[Union[str, List[str]]] = None
 
 
 def _session_doc_to_out(doc, include_urls: bool = True) -> SessionOut:
@@ -162,6 +163,7 @@ def _session_doc_to_out(doc, include_urls: bool = True) -> SessionOut:
         enrollmentKey=doc.get("enrollmentKey"),
         description=doc.get("description"),
         materials=doc.get("materials", []),
+        clusterQuestionSource=doc.get("clusterQuestionSource"),
     )
 
 
@@ -255,6 +257,7 @@ class SessionUpdate(BaseModel):
     durationMinutes: Optional[int] = None
     description: Optional[str] = None
     materials: Optional[List[Union[str, Dict[str, Any]]]] = None
+    clusterQuestionSource: Optional[Union[str, List[str], None]] = None
 
 
 @router.put("/{session_id}", response_model=SessionOut)
@@ -299,6 +302,8 @@ async def update_session(
             update_data["description"] = payload.description
         if payload.materials is not None:
             update_data["materials"] = payload.materials
+        if "clusterQuestionSource" in payload.model_fields_set:
+            update_data["clusterQuestionSource"] = payload.clusterQuestionSource
         
         update_data["updatedAt"] = datetime.utcnow()
         

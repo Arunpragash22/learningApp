@@ -64,6 +64,7 @@ export const SessionEdit = () => {
           duration: data.duration || '',
           description: data.description || '',
           materials: Array.isArray(data.materials) ? data.materials : [],
+          clusterQuestionSource: data.clusterQuestionSource ?? null,
         });
       } catch (err) {
         console.error('Error fetching session:', err);
