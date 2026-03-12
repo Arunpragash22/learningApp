@@ -140,9 +140,11 @@ class QuizService:
             self._clustering_locks[session_id] = asyncio.Lock()
         lock = self._clustering_locks[session_id]
 
+        # Do not skip recalculation requests. When multiple answers arrive quickly,
+        # each task waits for the lock and runs in sequence so the latest answer
+        # is always reflected in the final cluster assignment.
         if lock.locked():
-            print(f"⏭️  [BG] Skipping for {session_id} — already in progress")
-            return
+            print(f"⏳ [BG] Queued for {session_id} — waiting for current run")
 
         async with lock:
             try:
