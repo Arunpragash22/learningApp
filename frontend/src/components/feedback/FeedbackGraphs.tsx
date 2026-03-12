@@ -25,6 +25,11 @@ const CLUSTER_NUMERIC: Record<string, number> = {
   passive: 1,
   moderate: 2,
   active: 3,
+  "at-risk students": 1,
+  "at risk students": 1,
+  "at-risk": 1,
+  "at risk": 1,
+  "low engagement": 1,
 };
 
 const CLUSTER_LABELS: Record<number, string> = {

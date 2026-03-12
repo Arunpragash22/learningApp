@@ -202,25 +202,37 @@ class QuizAnswerModel:
             pass
 
         student_filter = {"studentId": student_id, "sessionId": {"$in": session_ids}}
-        session_filter = {"sessionId": {"$in": session_ids}}
         cursor = database.quiz_answers.find(student_filter)
         questions_answered = 0
         correct_answers = 0
-        answered_question_ids = []
+        answered_question_ids = set()
         async for doc in cursor:
             questions_answered += 1
             if doc.get("isCorrect") is True:
                 correct_answers += 1
             qid = doc.get("questionId")
-            if qid and qid not in answered_question_ids:
-                answered_question_ids.append(qid)
+            if qid:
+                answered_question_ids.add(qid)
 
-        distinct = await database.quiz_answers.distinct("questionId", session_filter)
-        questions_received = len(distinct)
+        # Count only this student's received questions (not session-wide),
+        # so cluster-wise delivery to other students does not inflate counts.
+        assigned_question_ids = set()
+        try:
+            assigned_distinct = await database.question_assignments.distinct(
+                "questionId",
+                {"studentId": student_id, "sessionId": {"$in": session_ids}},
+            )
+            assigned_question_ids = {qid for qid in assigned_distinct if qid}
+        except Exception:
+            assigned_question_ids = set()
+
+        questions_received_ids = answered_question_ids | assigned_question_ids
+        questions_received = len(questions_received_ids)
+        answered_question_ids_list = list(answered_question_ids)
 
         return {
             "questionsAnswered": questions_answered,
             "correctAnswers": correct_answers,
             "questionsReceived": max(questions_received, questions_answered),
-            "answeredQuestionIds": answered_question_ids,
+            "answeredQuestionIds": answered_question_ids_list,
         }

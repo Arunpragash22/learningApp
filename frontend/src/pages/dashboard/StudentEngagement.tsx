@@ -171,6 +171,14 @@ export const StudentEngagement = () => {
 
   // Merge WebSocket real-time stats with polled engagement data.
   // WS sends cluster_label ("Active"/"Moderate"/"Passive"), map to display names.
+  const normalizeClusterLevel = (raw?: string | null): 'active' | 'moderate' | 'passive' => {
+    const value = (raw || '').toString().trim().toLowerCase();
+    if (value.includes('active') && !value.includes('risk')) return 'active';
+    if (value.includes('passive') || value.includes('at-risk') || value.includes('at risk')) return 'passive';
+    if (value.includes('moderate')) return 'moderate';
+    return 'moderate';
+  };
+
   const studentData = useMemo(() => {
     const CLUSTER_DISPLAY: Record<string, { name: string; level: 'active' | 'moderate' | 'passive' }> = {
       active:   { name: 'Active Participants',   level: 'active' },
@@ -180,26 +188,27 @@ export const StudentEngagement = () => {
 
     const ws = latestFeedback?.stats;
     if (ws && ws.totalAttempts > 0) {
-      const rawLabel = (ws.cluster || 'moderate').toLowerCase();
-      const mapped = CLUSTER_DISPLAY[rawLabel] ?? CLUSTER_DISPLAY['moderate'];
+      const wsLevel = normalizeClusterLevel(ws.cluster);
+      const mapped = CLUSTER_DISPLAY[wsLevel] ?? CLUSTER_DISPLAY['moderate'];
       // If polled data has a more specific cluster name, prefer it
       const clusterName = engagementData?.cluster && engagementData.cluster !== 'Not Assigned'
         ? engagementData.cluster
         : mapped.name;
-      const clusterLevel = engagementData?.engagementLevel || mapped.level;
+      const clusterLevel = normalizeClusterLevel(engagementData?.engagementLevel || ws.cluster || mapped.level);
 
       return {
-        engagementLevel: clusterLevel as 'active' | 'moderate' | 'passive',
+        engagementLevel: clusterLevel,
         engagementScore: engagementData?.engagementScore ?? 0,
         cluster: clusterName,
-        questionsAnswered: ws.totalAttempts,
-        correctAnswers: ws.correctAnswers,
+        // Prefer student-specific polled counts when available.
+        questionsAnswered: engagementData?.questionsAnswered ?? ws.totalAttempts,
+        correctAnswers: engagementData?.correctAnswers ?? ws.correctAnswers,
         averageResponseTime: ws.responseTime ?? engagementData?.averageResponseTime ?? 0,
       };
     }
     if (engagementData) {
       return {
-        engagementLevel: engagementData.engagementLevel as 'active' | 'moderate' | 'passive',
+        engagementLevel: normalizeClusterLevel(engagementData.engagementLevel),
         engagementScore: engagementData.engagementScore,
         cluster: engagementData.cluster,
         questionsAnswered: engagementData.questionsAnswered,
@@ -217,11 +226,27 @@ export const StudentEngagement = () => {
     };
   }, [engagementData, latestFeedback]);
 
-  // Graph history from WebSocket (primary) or polled feedback (fallback)
+  // Graph history from WebSocket (primary), normalized to canonical cluster labels.
   const feedbackHistory = useMemo(() => {
-    if (latestFeedback?.stats?.history?.length) return latestFeedback.stats.history;
-    return [];
-  }, [latestFeedback]);
+    if (!latestFeedback?.stats?.history?.length) return [];
+    const normalizedHistory = latestFeedback.stats.history.map((entry) => ({
+      ...entry,
+      cluster: normalizeClusterLevel(entry.cluster),
+    }));
+    const currentLevel = normalizeClusterLevel(
+      engagementData?.engagementLevel ||
+      latestFeedback?.stats?.cluster ||
+      latestFeedback?.feedback?.cluster_label
+    );
+    const lastIndex = normalizedHistory.length - 1;
+    if (lastIndex >= 0) {
+      normalizedHistory[lastIndex] = {
+        ...normalizedHistory[lastIndex],
+        cluster: currentLevel,
+      };
+    }
+    return normalizedHistory;
+  }, [engagementData?.engagementLevel, latestFeedback]);
 
   // Prefer WebSocket feedback, fall back to polled feedback
   const activeFeedback = latestFeedback?.feedback ?? realFeedback;
