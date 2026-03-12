@@ -1,7 +1,7 @@
 # src/routers/session.py
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from bson import ObjectId
 from datetime import datetime
 import math
@@ -90,7 +90,8 @@ class SessionCreate(BaseModel):
     durationMinutes: int
     timezone: str = "Asia/Colombo"
     description: Optional[str] = None
-    materials: Optional[List[str]] = []
+    # Support both legacy string materials and newer structured objects.
+    materials: Optional[List[Union[str, Dict[str, Any]]]] = []
     isStandalone: Optional[bool] = False  # True for standalone sessions
     enrollmentKey: Optional[str] = None  # Enrollment key for standalone sessions
     clusterQuestionSource: Optional[Union[str, List[str]]] = None  # "all", a session ID, or list of session IDs
@@ -120,7 +121,7 @@ class SessionOut(BaseModel):
     isStandalone: Optional[bool] = False
     enrollmentKey: Optional[str] = None
     description: Optional[str] = None
-    materials: Optional[List[str]] = []
+    materials: Optional[List[Union[str, Dict[str, Any]]]] = []
 
 
 def _session_doc_to_out(doc, include_urls: bool = True) -> SessionOut:
@@ -241,7 +242,7 @@ class SessionUpdate(BaseModel):
     endTime: Optional[str] = None
     durationMinutes: Optional[int] = None
     description: Optional[str] = None
-    materials: Optional[List[str]] = None
+    materials: Optional[List[Union[str, Dict[str, Any]]]] = None
 
 
 @router.put("/{session_id}", response_model=SessionOut)

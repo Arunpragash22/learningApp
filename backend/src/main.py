@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from contextlib import asynccontextmanager
+import os
 
 from src.middleware.auth import AuthMiddleware
 from src.database.connection import connect_to_mongo, close_mongo_connection
@@ -52,9 +53,23 @@ app = FastAPI(lifespan=lifespan)
 # --------------------------------------------------------
 # CORS (Frontend + Zoom)
 # --------------------------------------------------------
+raw_cors_origins = os.getenv("CORS_ORIGINS", "")
+if raw_cors_origins.strip():
+    cors_origins = [origin.strip() for origin in raw_cors_origins.split(",") if origin.strip()]
+else:
+    frontend_url = os.getenv("FRONTEND_URL", "").strip()
+    cors_origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://zoomlearningapp.de",
+        "https://www.zoomlearningapp.de",
+    ]
+    if frontend_url and frontend_url not in cors_origins:
+        cors_origins.append(frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
