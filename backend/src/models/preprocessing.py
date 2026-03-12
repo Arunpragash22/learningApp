@@ -13,6 +13,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from typing import List, Dict, Optional
+from bson import ObjectId
 from ..database.connection import get_database
 
 
@@ -56,22 +57,34 @@ class PreprocessingService:
 
             raise Exception("Database not connected")
 
+        # Collect from both MongoDB session _id and zoomMeetingId variants.
+        # This avoids fragmented datasets when different collections store
+        # either identifier for the same live session.
+        all_session_ids = await self._resolve_session_ids(db, session_id)
+
         # ── 1. gather raw data ──────────────────────────────────────────
-        quiz_answers = await self._fetch_quiz_answers(db, session_id)
-        participant_ids = await self._fetch_participant_ids(db, session_id)
+        quiz_answers = await self._fetch_quiz_answers(db, all_session_ids)
+        participant_ids = await self._fetch_participant_ids(db, all_session_ids)
+        assigned_question_map = await self._fetch_assigned_question_map(
+            db, all_session_ids
+        )
         triggered_question_ids = await self._fetch_triggered_question_ids(
-            
+
             db, session_id, quiz_answers
         )
-        latency_map = await self._fetch_latency_map(db, session_id)
+        latency_map = await self._fetch_latency_map(db, all_session_ids)
 
-        if not triggered_question_ids:
+        if not triggered_question_ids and not assigned_question_map:
             # Nothing to preprocess – no questions were triggered yet
             return []
 
         # ── 2. build rows (attempted + not-attempted) ───────────────────
         rows = self._build_rows(
-            quiz_answers, participant_ids, triggered_question_ids, latency_map
+            quiz_answers,
+            participant_ids,
+            triggered_question_ids,
+            latency_map,
+            assigned_question_map,
         )
 
         if not rows:
@@ -98,19 +111,19 @@ class PreprocessingService:
         return docs
 
     # ── data fetching helpers ───────────────────────────────────────────
-    async def _fetch_quiz_answers(self, db, session_id: str) -> List[dict]:
-        """Get all quiz_answers for this session."""
+    async def _fetch_quiz_answers(self, db, session_ids: List[str]) -> List[dict]:
+        """Get all quiz_answers for the resolved session IDs."""
         answers: List[dict] = []
-        async for doc in db.quiz_answers.find({"sessionId": session_id}):
+        async for doc in db.quiz_answers.find({"sessionId": {"$in": session_ids}}):
             doc["_id"] = str(doc["_id"])
             answers.append(doc)
         return answers
 
-    async def _fetch_participant_ids(self, db, session_id: str) -> List[str]:
+    async def _fetch_participant_ids(self, db, session_ids: List[str]) -> List[str]:
         """Get student IDs of all participants (active or left) in the session."""
         ids: List[str] = []
         async for p in db.session_participants.find(
-            {"sessionId": session_id}, {"studentId": 1}
+            {"sessionId": {"$in": session_ids}}, {"studentId": 1}
         ):
             sid = p.get("studentId")
             if sid and sid not in ids:
@@ -119,7 +132,15 @@ class PreprocessingService:
         # Also include students who submitted answers but may not be
         # recorded as session_participants (edge-case safety net).
         async for a in db.quiz_answers.find(
-            {"sessionId": session_id}, {"studentId": 1}
+            {"sessionId": {"$in": session_ids}}, {"studentId": 1}
+        ):
+            sid = a.get("studentId")
+            if sid and sid not in ids:
+                ids.append(sid)
+
+        # Include students who were assigned at least one question.
+        async for a in db.question_assignments.find(
+            {"sessionId": {"$in": session_ids}}, {"studentId": 1}
         ):
             sid = a.get("studentId")
             if sid and sid not in ids:
@@ -141,15 +162,41 @@ class PreprocessingService:
                 qids.append(qid)
         return qids
 
+    async def _fetch_assigned_question_map(
+        self, db, session_ids: List[str]
+    ) -> Dict[str, List[str]]:
+        """
+        Build per-student expected question IDs from question_assignments:
+          { studentId: [questionId, ...] }
+
+        This is the primary source for "not attempted" rows so students are
+        evaluated only against questions actually assigned to them.
+        """
+        assigned_map: Dict[str, List[str]] = {}
+        async for doc in db.question_assignments.find(
+            {"sessionId": {"$in": session_ids}},
+            {"studentId": 1, "questionId": 1},
+        ):
+            sid = doc.get("studentId")
+            qid = doc.get("questionId")
+            if not sid or not qid:
+                continue
+            qid_str = str(qid)
+            if sid not in assigned_map:
+                assigned_map[sid] = []
+            if qid_str not in assigned_map[sid]:
+                assigned_map[sid].append(qid_str)
+        return assigned_map
+
     async def _fetch_latency_map(
-        self, db, session_id: str
+        self, db, session_ids: List[str]
     ) -> Dict[str, dict]:
         """
         Build { studentId: { avg_rtt_ms, avg_jitter_ms } } from the
         latency_metrics collection for this session.
         """
         latency: Dict[str, dict] = {}
-        async for doc in db.latency_metrics.find({"session_id": session_id}):
+        async for doc in db.latency_metrics.find({"session_id": {"$in": session_ids}}):
             sid = doc.get("student_id")
             if sid:
                 latency[sid] = {
@@ -158,6 +205,43 @@ class PreprocessingService:
                 }
         return latency
 
+    async def _resolve_session_ids(self, db, session_id: str) -> List[str]:
+        """
+        Resolve all known IDs for a session (MongoDB _id + zoomMeetingId).
+        """
+        ids: List[str] = [session_id]
+        try:
+            if len(session_id) == 24:
+                try:
+                    doc = await db.sessions.find_one(
+                        {"_id": ObjectId(session_id)},
+                        {"zoomMeetingId": 1},
+                    )
+                    if doc and doc.get("zoomMeetingId"):
+                        zoom_id = str(doc["zoomMeetingId"])
+                        if zoom_id not in ids:
+                            ids.append(zoom_id)
+                except Exception:
+                    pass
+
+            for variant in ([session_id] + ([int(session_id)] if session_id.isdigit() else [])):
+                doc = await db.sessions.find_one(
+                    {"zoomMeetingId": variant},
+                    {"_id": 1, "zoomMeetingId": 1},
+                )
+                if not doc:
+                    continue
+                mongo_id = str(doc["_id"])
+                if mongo_id not in ids:
+                    ids.append(mongo_id)
+                if doc.get("zoomMeetingId") is not None:
+                    zoom_id = str(doc["zoomMeetingId"])
+                    if zoom_id not in ids:
+                        ids.append(zoom_id)
+        except Exception:
+            pass
+        return ids
+
     # ── row construction ────────────────────────────────────────────────
     def _build_rows(
         self,
@@ -165,6 +249,7 @@ class PreprocessingService:
         participant_ids: List[str],
         question_ids: List[str],
         latency_map: Dict[str, dict],
+        assigned_question_map: Optional[Dict[str, List[str]]] = None,
     ) -> List[dict]:
         """
         One row per (student, question).
@@ -181,8 +266,13 @@ class PreprocessingService:
 
         for student_id in participant_ids:
             student_latency = latency_map.get(student_id, {})
+            # Prefer per-student assigned questions. Fallback to global list
+            # if assignments are unavailable (legacy sessions).
+            student_question_ids = (assigned_question_map or {}).get(student_id) or question_ids
+            if not student_question_ids:
+                continue
 
-            for question_id in question_ids:
+            for question_id in student_question_ids:
                 answer = answer_index.get((student_id, question_id))
 
                 if answer:
