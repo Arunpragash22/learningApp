@@ -454,6 +454,8 @@ class QuizScheduler:
                 student_delays[sid_val] = random.uniform(0, stagger_window) if stagger_window > 0 else 0.0
 
             sorted_students = sorted(student_delays.items(), key=lambda x: x[1])
+            # One round id per trigger cycle so analytics counts this as +1
+            round_id = f"{session_id}:{datetime.utcnow().isoformat()}"
             print(f"🎯 Staggered delivery plan for {len(sorted_students)} students "
                   f"(window: {stagger_window}s):")
             for sid_val, delay in sorted_students:
@@ -497,7 +499,9 @@ class QuizScheduler:
                         "message": msg, "sent_at": datetime.now()
                     }
                     try:
-                        await QuestionAssignmentModel.create(room_id, sid_val, str(q["_id"]), 0)
+                        await QuestionAssignmentModel.create(
+                            room_id, sid_val, str(q["_id"]), 0, round_id=round_id
+                        )
                     except Exception:
                         pass
                     print(f"   ✅ Sent to {sid_val[:12]}...")

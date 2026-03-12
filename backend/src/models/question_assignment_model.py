@@ -6,7 +6,13 @@ from ..database.connection import get_database
 
 class QuestionAssignmentModel:
     @staticmethod
-    async def create(session_id: str, student_id: str, question_id: str, activation_version: int) -> Optional[dict]:
+    async def create(
+        session_id: str,
+        student_id: str,
+        question_id: str,
+        activation_version: int,
+        round_id: Optional[str] = None,
+    ) -> Optional[dict]:
         """Create a question assignment for a student"""
         database = get_database()
         if database is None:
@@ -19,6 +25,7 @@ class QuestionAssignmentModel:
             "assignedAt": datetime.utcnow(),
             "answered": False,
             "activationVersion": activation_version,
+            "roundId": round_id,
         }
 
         result = await database.question_assignments.insert_one(assignment)

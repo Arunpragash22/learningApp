@@ -19,6 +19,7 @@ from src.database.connection import db
 from src.middleware.auth import get_current_user, require_instructor
 from src.models.cluster_model import ClusterModel
 from src.models.question import Question
+from src.models.question_assignment_model import QuestionAssignmentModel
 import random
 from datetime import datetime
 
@@ -285,6 +286,7 @@ async def trigger_question(meeting_id: str):
         sent_questions = []
         sent_generic_ids: set = set()
         sent_cluster_ids: set = set()
+        round_id = f"{meeting_id}:{datetime.now().isoformat()}"
 
         for participant in student_participants:
             student_id = participant.get("studentId")
@@ -341,6 +343,12 @@ async def trigger_question(meeting_id: str):
                 sent = await ws_manager.send_to_student_in_session(meeting_id, student_id, message)
             if sent:
                 ws_sent_count += 1
+                try:
+                    await QuestionAssignmentModel.create(
+                        student_session_id, student_id, qid, 0, round_id=round_id
+                    )
+                except Exception:
+                    pass
                 sent_questions.append({
                     "studentId": student_id,
                     "studentName": participant.get("studentName"),
@@ -559,6 +567,7 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
         ws_sent_count = 0
         sent_generic_ids: set = set()
         sent_cluster_ids: set = set()
+        round_id = f"{effective_meeting_id}:{datetime.now().isoformat()}"
 
         for participant in participants:
             student_id = participant.get("studentId")
@@ -610,6 +619,12 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
                 sent = await ws_manager.send_to_student_in_session(effective_meeting_id, student_id, message)
             if sent:
                 ws_sent_count += 1
+                try:
+                    await QuestionAssignmentModel.create(
+                        student_session_id, student_id, qid, 0, round_id=round_id
+                    )
+                except Exception:
+                    pass
                 print(f"   ✅ {participant.get('studentName', student_id)} "
                       f"(cluster={student_cluster or 'none'}) → [{q.get('questionType', 'generic')}]")
 

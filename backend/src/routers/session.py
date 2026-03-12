@@ -1053,6 +1053,9 @@ async def start_session(
             await ws_manager.broadcast_to_session(str(zoom_meeting_id), session_started_event)
         # Also broadcast using MongoDB session_id
         await ws_manager.broadcast_to_session(session_id, session_started_event)
+        # Broadcast globally so students who are not yet in the session room
+        # can immediately update UI (e.g., "Join" -> "Join Live") without refresh.
+        await ws_manager.broadcast_global(session_started_event)
         
         print(f"📢 Session started event broadcasted: session={session_id}, zoom={zoom_meeting_id}, analytics={request.enableRealTimeAnalytics}")
         

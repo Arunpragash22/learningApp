@@ -361,10 +361,20 @@ async def _compute_realtime_stats(session_id: str) -> dict:
         # Fall back to session_participants active, then total
         active_students = len(ws_student_ids) if ws_student_ids else (len(active_sids) if active_sids else total_students)
 
-        # ── Questions SENT ───────────────────────────────────────────
-        questions_from_assignments = set(await db.question_assignments.distinct("questionId", id_filter))
-        questions_from_answers = set(await db.quiz_answers.distinct("questionId", id_filter))
-        total_questions = len(questions_from_assignments | questions_from_answers)
+        # ── Questions SENT (count by rounds, not per-cluster question IDs) ──
+        # One trigger round can assign different questionIds to different clusters,
+        # but analytics should increase by +1 for that round.
+        round_ids = set(await db.question_assignments.distinct("roundId", {
+            **id_filter,
+            "roundId": {"$exists": True, "$ne": None},
+        }))
+        if round_ids:
+            total_questions = len(round_ids)
+        else:
+            # Backward compatibility for legacy assignments without roundId
+            questions_from_assignments = set(await db.question_assignments.distinct("questionId", id_filter))
+            questions_from_answers = set(await db.quiz_answers.distinct("questionId", id_filter))
+            total_questions = len(questions_from_assignments | questions_from_answers)
 
         # Total answer submissions
         total_answers = await db.quiz_answers.count_documents(id_filter)
@@ -432,7 +442,7 @@ async def get_realtime_stats(
       - totalStudents  : unique students across session_participants,
                          question_assignments, and quiz_answers
       - activeStudents : currently active (from session_participants)
-      - totalQuestions  : distinct questions SENT (assigned or answered)
+      - totalQuestions  : question rounds sent (generic round + cluster round = +1 each)
       - totalAnswers   : total quiz answer submissions
     """
     try:
@@ -472,22 +482,23 @@ async def get_realtime_stats(
         # Active = from session_participants; fall back to all known students
         active_students = len(active_sids) if active_sids else total_students
 
-        # ── Questions SENT ───────────────────────────────────────────
-        # Distinct questionIds from question_assignments (questions pushed
-        # to students) — this increments the moment a question is sent,
-        # even before any student answers.
-        questions_from_assignments = set(
-            await db.question_assignments.distinct("questionId", id_filter)
-        )
-
-        # Also check quiz_answers in case some answers were recorded
-        # without an assignment entry.
-        questions_from_answers = set(
-            await db.quiz_answers.distinct("questionId", id_filter)
-        )
-
-        all_question_ids = questions_from_assignments | questions_from_answers
-        total_questions = len(all_question_ids)
+        # ── Questions SENT (count by rounds, not per-cluster question IDs) ──
+        round_ids = set(await db.question_assignments.distinct("roundId", {
+            **id_filter,
+            "roundId": {"$exists": True, "$ne": None},
+        }))
+        if round_ids:
+            total_questions = len(round_ids)
+        else:
+            # Backward compatibility for legacy assignments without roundId
+            questions_from_assignments = set(
+                await db.question_assignments.distinct("questionId", id_filter)
+            )
+            questions_from_answers = set(
+                await db.quiz_answers.distinct("questionId", id_filter)
+            )
+            all_question_ids = questions_from_assignments | questions_from_answers
+            total_questions = len(all_question_ids)
 
         # Total answer submissions
         total_answers = await db.quiz_answers.count_documents(id_filter)

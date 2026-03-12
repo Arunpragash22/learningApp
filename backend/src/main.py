@@ -437,6 +437,7 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
         # ── 4a. Phase 1: No clustering → broadcast instructor's question ──
         if not has_clustering:
             print(f"📋 Trigger Phase 1: No clusters → broadcasting to all {len(all_participants)} students")
+            round_id = f"{session_id}:{datetime.now().isoformat()}"
             message = {
                 "type": "quiz",
                 "sessionId": session_id,
@@ -458,7 +459,9 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
                     sent_count += 1
                     if q_id:
                         try:
-                            await QuestionAssignmentModel.create(data["room_id"], student_id, q_id, 0)
+                            await QuestionAssignmentModel.create(
+                                data["room_id"], student_id, q_id, 0, round_id=round_id
+                            )
                         except Exception:
                             pass
             return {"success": True, "sessionId": session_id, "sentTo": sent_count,
@@ -486,6 +489,7 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
         sent_count = 0
         sent_generic_ids: set = set()
         sent_cluster_ids: set = set()
+        round_id = f"{session_id}:{datetime.now().isoformat()}"
 
         for student_id, data in all_participants.items():
             student_cluster = student_cluster_map.get(student_id)
@@ -545,7 +549,9 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
             if ok:
                 sent_count += 1
                 try:
-                    await QuestionAssignmentModel.create(room_id, student_id, qid, 0)
+                    await QuestionAssignmentModel.create(
+                        room_id, student_id, qid, 0, round_id=round_id
+                    )
                 except Exception:
                     pass
                 print(f"   ✅ {name} (cluster={student_cluster}) → [{q.get('questionType')}]")
