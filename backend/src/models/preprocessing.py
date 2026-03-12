@@ -53,12 +53,14 @@ class PreprocessingService:
         """
         db = get_database()
         if db is None:
+
             raise Exception("Database not connected")
 
         # ── 1. gather raw data ──────────────────────────────────────────
         quiz_answers = await self._fetch_quiz_answers(db, session_id)
         participant_ids = await self._fetch_participant_ids(db, session_id)
         triggered_question_ids = await self._fetch_triggered_question_ids(
+            
             db, session_id, quiz_answers
         )
         latency_map = await self._fetch_latency_map(db, session_id)
