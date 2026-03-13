@@ -90,6 +90,7 @@ export const StudentDashboard = () => {
   const { connectedSessionId, incomingQuiz, receiveQuizFromPoll, sessionStatsInvalidated, leaveSession } = useSessionConnection();
   const [sessions, setSessions] = useState<Session[]>([]);
   const lastCountedQuestionIdRef = useRef<string | null>(null);
+  const lastCountedRoundIdRef = useRef<string | null>(null);
 
   const [sessionQuizStats, setSessionQuizStats] = useState({
     questionsReceived: 0,
@@ -173,14 +174,21 @@ export const StudentDashboard = () => {
   }, [connectedSessionId, user?.id, sessionStatsInvalidated]);
 
   // ===========================================================
-  // 📊 REAL-TIME: Increment "Questions Given" when new quiz arrives (no refresh)
+  // 📊 REAL-TIME: Increment "Questions Given" per round (no refresh)
   // ===========================================================
   useEffect(() => {
     const qid = incomingQuiz?.questionId ?? incomingQuiz?.question_id ?? null;
+    const rid = incomingQuiz?.roundId ?? incomingQuiz?.round_id ?? null;
+    if (rid) {
+      if (lastCountedRoundIdRef.current === rid) return;
+      lastCountedRoundIdRef.current = rid;
+      setSessionQuizStats(prev => ({ ...prev, questionsReceived: prev.questionsReceived + 1 }));
+      return;
+    }
     if (!qid || lastCountedQuestionIdRef.current === qid) return;
     lastCountedQuestionIdRef.current = qid;
     setSessionQuizStats(prev => ({ ...prev, questionsReceived: prev.questionsReceived + 1 }));
-  }, [incomingQuiz?.questionId, incomingQuiz?.question_id]);
+  }, [incomingQuiz?.questionId, incomingQuiz?.question_id, incomingQuiz?.roundId, incomingQuiz?.round_id]);
 
   // ===========================================================
   // 📬 FETCH MISSED QUIZ WHEN DASHBOARD LOADS (e.g. after clicking push notification)

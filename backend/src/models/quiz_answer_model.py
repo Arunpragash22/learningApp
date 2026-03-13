@@ -214,20 +214,36 @@ class QuizAnswerModel:
             if qid:
                 answered_question_ids.add(qid)
 
-        # Count only this student's received questions (not session-wide),
-        # so cluster-wise delivery to other students does not inflate counts.
+        # Count questions received by round (one trigger round = +1),
+        # so cluster-wise multi-question delivery in same round does not inflate totals.
+        round_ids = set()
         assigned_question_ids = set()
         try:
+            round_ids_distinct = await database.question_assignments.distinct(
+                "roundId",
+                {
+                    "studentId": student_id,
+                    "sessionId": {"$in": session_ids},
+                    "roundId": {"$exists": True, "$ne": None},
+                },
+            )
+            round_ids = {rid for rid in round_ids_distinct if rid}
+
             assigned_distinct = await database.question_assignments.distinct(
                 "questionId",
                 {"studentId": student_id, "sessionId": {"$in": session_ids}},
             )
             assigned_question_ids = {qid for qid in assigned_distinct if qid}
         except Exception:
+            round_ids = set()
             assigned_question_ids = set()
 
-        questions_received_ids = answered_question_ids | assigned_question_ids
-        questions_received = len(questions_received_ids)
+        if round_ids:
+            questions_received = len(round_ids)
+        else:
+            # Backward compatibility for legacy assignments without roundId.
+            questions_received_ids = answered_question_ids | assigned_question_ids
+            questions_received = len(questions_received_ids)
         answered_question_ids_list = list(answered_question_ids)
 
         return {
