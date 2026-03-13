@@ -13,7 +13,6 @@ from pydantic import BaseModel
 from typing import Dict, List, Optional
 from bson import ObjectId
 from src.services.ws_manager import ws_manager
-from src.services.push_service import push_service
 from src.services.quiz_scheduler import quiz_scheduler
 from src.database.connection import db
 from src.middleware.auth import get_current_user, require_instructor
@@ -21,9 +20,41 @@ from src.models.cluster_model import ClusterModel
 from src.models.question import Question
 from src.models.question_assignment_model import QuestionAssignmentModel
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/api/live", tags=["Live Learning"])
+RECENT_ROUND_GUARD_SECONDS = 3
+
+
+def _dedupe_participants(participants: List[dict]) -> List[dict]:
+    """Keep one participant record per student ID to avoid duplicate sends."""
+    deduped: List[dict] = []
+    seen: set = set()
+    for p in participants or []:
+        sid = p.get("studentId")
+        if not sid or sid in seen:
+            continue
+        seen.add(sid)
+        deduped.append(p)
+    return deduped
+
+
+async def _has_recent_round(
+    session_ids: List[str],
+    guard_seconds: int = RECENT_ROUND_GUARD_SECONDS,
+) -> bool:
+    """Prevent accidental double-trigger within a very short time window."""
+    if not session_ids:
+        return False
+    try:
+        cutoff = datetime.utcnow() - timedelta(seconds=guard_seconds)
+        recent = await db.database.question_assignments.count_documents({
+            "sessionId": {"$in": session_ids},
+            "assignedAt": {"$gte": cutoff},
+        })
+        return recent > 0
+    except Exception:
+        return False
 
 
 def _get_eligible_questions(
@@ -215,10 +246,18 @@ async def trigger_question(meeting_id: str):
             return {"success": False, "message": "No students connected to this session. Make sure students have joined the meeting from the dashboard."}
 
         meeting_id = effective_meeting_id
-        student_participants = participants
+        student_participants = _dedupe_participants(participants)
 
         if not student_participants:
             return {"success": False, "message": "No students found in session (only instructor connected)"}
+
+        # Guard against accidental back-to-back duplicate trigger requests.
+        if await _has_recent_round(session_ids_to_check):
+            return {
+                "success": False,
+                "sentTo": 0,
+                "message": "A question round was just sent. Please wait a moment before triggering again.",
+            }
 
         # 3) Build student → cluster mapping
         student_cluster_map: Dict[str, str] = {}
@@ -274,8 +313,6 @@ async def trigger_question(meeting_id: str):
             print(f"   🔵 Subsequent question → sending CLUSTER-WISE questions")
 
         # 5) Send questions: first question = generic, after that = cluster-wise
-        import random as _random
-        _cluster_labels = ["active", "moderate", "passive"]
         ws_sent_count = 0
         sent_questions = []
         sent_generic_ids: set = set()
@@ -293,10 +330,10 @@ async def trigger_question(meeting_id: str):
                     if q.get("category", "").lower() == student_cluster
                 ]
             elif not is_first_question and cluster_qs:
-                rand_cluster = _random.choice(_cluster_labels)
+                # Deterministic fallback: unknown cluster defaults to moderate.
                 student_cluster_qs = [
                     q for q in cluster_qs
-                    if q.get("category", "").lower() == rand_cluster
+                    if q.get("category", "").lower() == "moderate"
                 ]
                 if not student_cluster_qs:
                     student_cluster_qs = list(cluster_qs)
@@ -352,12 +389,9 @@ async def trigger_question(meeting_id: str):
                     "questionType": q.get("questionType", "generic"),
                 })
 
+        # Push fallback is disabled during active WS delivery because it can
+        # re-open the same round via client-side fallback paths for some students.
         push_sent_count = 0
-        try:
-            if sent_questions:
-                push_sent_count = await push_service.send_quiz_notification(message)
-        except Exception as push_error:
-            print(f"⚠️ Push notification error (non-fatal): {push_error}")
 
         return {
             "success": True,
@@ -503,6 +537,14 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
                 "sentTo": 0,
             }
 
+        participants = _dedupe_participants(participants)
+        if await _has_recent_round(session_ids_to_check):
+            return {
+                "success": False,
+                "message": "A question round was just sent. Please wait a moment before triggering again.",
+                "sentTo": 0,
+            }
+
         # Build cluster mapping
         student_cluster_map: Dict[str, str] = {}
         try:
@@ -557,8 +599,6 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
             print(f"   🔵 Subsequent question → sending CLUSTER-WISE questions")
 
         # Send questions: first = generic, after that = cluster-wise
-        import random as _random
-        _cluster_labels = ["active", "moderate", "passive"]
         ws_sent_count = 0
         sent_generic_ids: set = set()
         sent_cluster_ids: set = set()
@@ -575,10 +615,9 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
                     if q.get("category", "").lower() == student_cluster
                 ]
             elif not is_first_question and cluster_qs:
-                rand_cluster = _random.choice(_cluster_labels)
                 student_cluster_qs = [
                     q for q in cluster_qs
-                    if q.get("category", "").lower() == rand_cluster
+                    if q.get("category", "").lower() == "moderate"
                 ]
                 if not student_cluster_qs:
                     student_cluster_qs = list(cluster_qs)

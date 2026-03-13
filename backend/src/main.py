@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
+from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 import os
 
@@ -422,6 +422,22 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
         if not all_participants:
             return {"success": False, "sentTo": 0, "message": "No students connected to this session."}
 
+        # Prevent accidental back-to-back duplicate trigger requests.
+        try:
+            cutoff = datetime.utcnow() - timedelta(seconds=3)
+            recent = await db_conn.question_assignments.count_documents({
+                "sessionId": {"$in": session_ids},
+                "assignedAt": {"$gte": cutoff},
+            })
+            if recent > 0:
+                return {
+                    "success": False,
+                    "sentTo": 0,
+                    "message": "A question round was just sent. Please wait a moment before triggering again.",
+                }
+        except Exception:
+            pass
+
         # ── 3. Check for cluster data ───────────────────────────────
         student_cluster_map = {}
         try:
@@ -503,7 +519,12 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
                     if q.get("category", "").lower() == student_cluster
                 ]
             else:
-                student_cluster_qs = []
+                student_cluster_qs = [
+                    q for q in cluster_qs_all
+                    if q.get("category", "").lower() == "moderate"
+                ]
+                if not student_cluster_qs:
+                    student_cluster_qs = list(cluster_qs_all)
 
             # After clustering exists, send cluster-specific only
             # (do not send additional generic questions).
