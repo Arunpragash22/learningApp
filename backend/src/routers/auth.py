@@ -16,6 +16,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 class RegisterRequest(BaseModel):
+
     firstName: str
     lastName: str
     email: EmailStr
@@ -24,6 +25,8 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
+
+    
     email: EmailStr
     password: str
 
