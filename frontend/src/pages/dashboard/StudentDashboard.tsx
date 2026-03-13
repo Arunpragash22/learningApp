@@ -311,9 +311,6 @@ export const StudentDashboard = () => {
       <div className="mb-8 text-white rounded-xl shadow-lg p-6" style={{ background: "linear-gradient(to right, #3B82F6, #2563eb)" }}>
         <div>
           <h2 className="text-xl font-bold">Your Learning Summary</h2>
-          <p className="mt-1" style={{ color: "#d1f5e8" }}>
-            You are in <span className="font-semibold">Active Participants</span>
-          </p>
         </div>
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="bg-white bg-opacity-10 rounded-lg p-4">
