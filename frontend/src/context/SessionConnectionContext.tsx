@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 const STORAGE_KEY = "connectedSessionId";
 const WS_PING_INTERVAL_MS = 15000;
+const QUIZ_REDIVERY_COOLDOWN_MS = 4000;
 
 export interface FeedbackHistoryEntry {
   questionNumber: number;
@@ -68,6 +69,8 @@ export function SessionConnectionProvider({ children }: { children: React.ReactN
   const wsRef = useRef<WebSocket | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastShownQuestionIdRef = useRef<string | null>(null);
+  const lastShownRoundIdRef = useRef<string | null>(null);
+  const lastAnswerAtRef = useRef<number>(0);
   const currentSessionKeyRef = useRef<string | null>(null);
   /** Rehydrated + local: question IDs already answered in this session (no re-deliver, no double-count). */
   const answeredQuestionIdsRef = useRef<Set<string>>(new Set());
@@ -77,6 +80,7 @@ export function SessionConnectionProvider({ children }: { children: React.ReactN
   const [sessionStatsInvalidated, setSessionStatsInvalidated] = useState(0);
   const markQuestionAnswered = useCallback((questionId: string) => {
     answeredQuestionIdsRef.current.add(questionId);
+    lastAnswerAtRef.current = Date.now();
     setSessionStatsInvalidated((n) => n + 1);
   }, []);
 
@@ -107,16 +111,24 @@ export function SessionConnectionProvider({ children }: { children: React.ReactN
     setConnectedSessionId(null);
     setIncomingQuizState(null);
     setLatestFeedback(null);
+    lastShownQuestionIdRef.current = null;
+    lastShownRoundIdRef.current = null;
+    lastAnswerAtRef.current = 0;
     answeredQuestionIdsRef.current.clear();
     toast.info("Disconnected from session");
   }, [closeWs, setConnectedSessionId]);
 
   const showQuizIfNew = useCallback((data: any) => {
     const qid = data?.questionId ?? data?.question_id ?? null;
+    const roundId = data?.roundId ?? data?.round_id ?? null;
     if (!qid) return;
     if (answeredQuestionIdsRef.current.has(qid)) return;
+    // Guard against immediate duplicate delivery caused by reconnect/poll overlap.
+    if (Date.now() - lastAnswerAtRef.current < QUIZ_REDIVERY_COOLDOWN_MS) return;
     if (lastShownQuestionIdRef.current === qid) return;
+    if (roundId && lastShownRoundIdRef.current === roundId) return;
     lastShownQuestionIdRef.current = qid;
+    if (roundId) lastShownRoundIdRef.current = roundId;
     setIncomingQuizState(data);
   }, []);
 

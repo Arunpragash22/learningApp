@@ -448,6 +448,7 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
                 "timeLimit": question_data.get("timeLimit", 30),
                 "category": question_data.get("category", "General"),
                 "questionType": "generic",
+                "roundId": round_id,
                 "triggeredAt": datetime.now().isoformat()
             }
             sent_count = 0
@@ -504,17 +505,13 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
             else:
                 student_cluster_qs = []
 
-            # Generic first, then cluster-specific
-            unsent_generic = [q for q in generic_qs if str(q["_id"]) not in sent_generic_ids]
-            if unsent_generic:
-                q = random.choice(unsent_generic)
+            # After clustering exists, send cluster-specific only
+            # (do not send additional generic questions).
+            unsent_cluster = [q for q in student_cluster_qs if str(q["_id"]) not in sent_cluster_ids]
+            if unsent_cluster:
+                q = random.choice(unsent_cluster)
             else:
-                unsent_cluster = [q for q in student_cluster_qs if str(q["_id"]) not in sent_cluster_ids]
-                if unsent_cluster:
-                    q = random.choice(unsent_cluster)
-                else:
-                    combined = generic_qs + student_cluster_qs
-                    q = random.choice(combined) if combined else None
+                q = random.choice(student_cluster_qs) if student_cluster_qs else None
 
             if not q:
                 print(f"   ⚠️ No questions for {name} — skipping")
@@ -543,6 +540,7 @@ async def trigger_quiz_to_session(session_id: str, request: Request):
                 "sessionId": room_id,
                 "studentId": student_id,
                 "questionSource": q_source,
+                "roundId": round_id,
                 "triggeredAt": datetime.now().isoformat()
             }
             ok = await ws_manager.send_to_student_in_session(room_id, student_id, msg)

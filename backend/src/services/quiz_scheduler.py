@@ -406,7 +406,7 @@ class QuizScheduler:
                         q = None
                         print(f"   ⚠️ No generic questions available for first round — skipping student {sid_val}")
                 else:
-                    # Subsequent questions → cluster-wise first, then generic fallback
+                    # Subsequent questions → cluster-wise only (no generic fallback)
                     if has_clustering and student_cluster:
                         # Known cluster assignment → pick matching cluster questions
                         student_cluster_qs = [
@@ -432,14 +432,8 @@ class QuizScheduler:
                     if unsent_cluster:
                         q = random.choice(unsent_cluster)
                     else:
-                        unsent_generic = [q for q in generic_qs if str(q["_id"]) not in sent_ids]
-                        if unsent_generic:
-                            q = random.choice(unsent_generic)
-                        else:
-                            pool = student_cluster_qs + generic_qs
-                            if not pool:
-                                pool = generic_qs if generic_qs else questions
-                            q = random.choice(pool) if pool else None
+                        # After first round, never send generic again.
+                        q = random.choice(student_cluster_qs) if student_cluster_qs else None
 
                 if q:
                     student_questions[sid_val] = q
@@ -490,6 +484,7 @@ class QuizScheduler:
                     "sessionId": room_id,
                     "studentId": sid_val,
                     "questionSource": q_source,
+                    "roundId": round_id,
                     "triggeredAt": datetime.utcnow().isoformat(),
                     "autoTriggered": True,
                 }

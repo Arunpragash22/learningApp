@@ -73,7 +73,7 @@ def _pick_question_ordered(
     """
     Pick the next question following the rule:
       - First question of session: ONLY from generic pool
-      - Subsequent questions: cluster-specific pool first, then generic fallback
+      - Subsequent questions: ONLY cluster-specific pool
     If all have been sent, reset and cycle again.
     """
     if is_first_question:
@@ -85,13 +85,7 @@ def _pick_question_ordered(
     unsent_cluster = [q for q in cluster_pool if str(q["_id"]) not in sent_cluster_ids]
     if unsent_cluster:
         return random.choice(unsent_cluster)
-
-    unsent_generic = [q for q in generic_pool if str(q["_id"]) not in sent_generic_ids]
-    if unsent_generic:
-        return random.choice(unsent_generic)
-
-    combined = generic_pool + cluster_pool
-    return random.choice(combined) if combined else None
+    return random.choice(cluster_pool) if cluster_pool else None
 
 
 # ================================================================
@@ -335,6 +329,7 @@ async def trigger_question(meeting_id: str):
                 "sessionId": student_session_id,
                 "studentId": student_id,
                 "questionSource": q_source,
+                "roundId": round_id,
                 "timestamp": datetime.now().isoformat()
             }
 
@@ -611,6 +606,7 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
                 "sessionId": student_session_id,
                 "studentId": student_id,
                 "questionSource": q_source,
+                "roundId": round_id,
                 "triggeredAt": datetime.now().isoformat(),
             }
 
