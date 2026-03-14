@@ -19,6 +19,7 @@ def generate_enrollment_key(length: int = 8) -> str:
 
 
 class Course(BaseModel):
+
     id: Optional[str] = None
     title: str
     description: str
@@ -39,6 +40,7 @@ class Course(BaseModel):
     startDate: Optional[datetime] = None
     endDate: Optional[datetime] = None
     createdAt: Optional[datetime] = None
+    
     updatedAt: Optional[datetime] = None
 
     class Config:
