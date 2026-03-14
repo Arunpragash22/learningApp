@@ -280,8 +280,6 @@ async def trigger_question(meeting_id: str):
             print(f"   🔵 Subsequent question → sending CLUSTER-WISE questions")
 
         # 5) Send questions: first question = generic, after that = cluster-wise
-        import random as _random
-        _cluster_labels = ["active", "moderate", "passive"]
         ws_sent_count = 0
         sent_questions = []
         sent_generic_ids: set = set()
@@ -298,15 +296,10 @@ async def trigger_question(meeting_id: str):
                     q for q in cluster_qs
                     if q.get("category", "").lower() == student_cluster
                 ]
-            elif not is_first_question and cluster_qs:
-                rand_cluster = _random.choice(_cluster_labels)
-                student_cluster_qs = [
-                    q for q in cluster_qs
-                    if q.get("category", "").lower() == rand_cluster
-                ]
-                if not student_cluster_qs:
-                    student_cluster_qs = list(cluster_qs)
             else:
+                # Late joiners may not have clustering yet.
+                # Do NOT force a random cluster (which can misclassify as passive);
+                # keep sending generic until their cluster is computed from answers.
                 student_cluster_qs = []
 
             q = _pick_question_ordered(generic_qs, student_cluster_qs, sent_generic_ids, sent_cluster_ids, is_first_question)
@@ -562,8 +555,6 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
             print(f"   🔵 Subsequent question → sending CLUSTER-WISE questions")
 
         # Send questions: first = generic, after that = cluster-wise
-        import random as _random
-        _cluster_labels = ["active", "moderate", "passive"]
         ws_sent_count = 0
         sent_generic_ids: set = set()
         sent_cluster_ids: set = set()
@@ -579,15 +570,9 @@ async def trigger_same_question_to_all(meeting_id: str, user: dict = Depends(req
                     q for q in cluster_qs
                     if q.get("category", "").lower() == student_cluster
                 ]
-            elif not is_first_question and cluster_qs:
-                rand_cluster = _random.choice(_cluster_labels)
-                student_cluster_qs = [
-                    q for q in cluster_qs
-                    if q.get("category", "").lower() == rand_cluster
-                ]
-                if not student_cluster_qs:
-                    student_cluster_qs = list(cluster_qs)
             else:
+                # Keep unmapped students on generic questions until clustering
+                # catches up (usually after they submit an answer).
                 student_cluster_qs = []
 
             q = _pick_question_ordered(generic_qs, student_cluster_qs, sent_generic_ids, sent_cluster_ids, is_first_question)
