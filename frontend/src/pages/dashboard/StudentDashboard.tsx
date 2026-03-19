@@ -90,6 +90,7 @@ export const StudentDashboard = () => {
   const { connectedSessionId, incomingQuiz, receiveQuizFromPoll, sessionStatsInvalidated, leaveSession } = useSessionConnection();
   const [sessions, setSessions] = useState<Session[]>([]);
   const lastCountedQuestionIdRef = useRef<string | null>(null);
+  const summaryCardRef = useRef<HTMLDivElement | null>(null);
 
   const [sessionQuizStats, setSessionQuizStats] = useState({
     questionsReceived: 0,
@@ -280,6 +281,19 @@ export const StudentDashboard = () => {
     return () => ws.close();
   }, [user?.id, loadSessions, leaveSession]);
 
+  // Defensive cleanup: never show "You are in ..." subtitle text in the blue summary card.
+  useEffect(() => {
+    const root = summaryCardRef.current;
+    if (!root) return;
+    const nodes = root.querySelectorAll("p, span, div");
+    nodes.forEach((node) => {
+      const text = (node.textContent || "").trim();
+      if (/^you are in\s+/i.test(text)) {
+        node.textContent = "";
+      }
+    });
+  }, [connectedSessionId, sessionQuizStats.questionsReceived, sessionQuizStats.correctAnswers, sessionQuizStats.questionsAnswered]);
+
   // ===========================================================
   // UI RENDER — Student dashboard: welcome + Learning Summary + meeting details
   // ===========================================================
@@ -308,7 +322,7 @@ export const StudentDashboard = () => {
       </div>
 
       {/* Your Learning Summary (blue card — Connection, Questions Given, Correct Answers) */}
-      <div className="mb-8 text-white rounded-xl shadow-lg p-6" style={{ background: "linear-gradient(to right, #3B82F6, #2563eb)" }}>
+      <div ref={summaryCardRef} className="mb-8 text-white rounded-xl shadow-lg p-6" style={{ background: "linear-gradient(to right, #3B82F6, #2563eb)" }}>
         <div>
           <h2 className="text-xl font-bold">Your Learning Summary</h2>
         </div>
