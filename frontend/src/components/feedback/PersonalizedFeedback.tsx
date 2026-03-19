@@ -27,6 +27,13 @@ function _detectCluster(clusterContext?: string): ClusterLevel {
   return 'moderate';
 }
 
+function stripClusterIntro(message: string): string {
+  const stripped = message
+    .replace(/^you are in\s+(active participants|moderate participants|at-risk students)\b[:,\-]?\s*/i, '')
+    .trim();
+  return stripped || message;
+}
+
 const CLUSTER_CARD_STYLES: Record<ClusterLevel, { border: string; bg: string }> = {
   active: {
     border: 'border-l-green-500 dark:border-l-green-400',
@@ -141,7 +148,7 @@ export const PersonalizedFeedback: React.FC<PersonalizedFeedbackProps> = ({
                     ? 'text-red-700 dark:text-red-300 font-semibold text-sm'
                     : 'text-yellow-700 dark:text-yellow-300 font-medium text-sm'
               }`}>
-                {item.message}
+                {stripClusterIntro(item.message)}
               </p>
 
               {item.suggestions && item.suggestions.length > 0 && (
