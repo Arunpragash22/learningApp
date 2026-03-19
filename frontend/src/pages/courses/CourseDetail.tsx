@@ -767,9 +767,11 @@ export const CourseDetail = () => {
                               </Button>
                             </Link>
                           )}
-                          <Link to={`/dashboard/sessions/${session.id}`}>
-                            <Button variant="outline">View Recording</Button>
-                          </Link>
+                          {isInstructor && (
+                            <Link to={`/dashboard/sessions/${session.id}`}>
+                              <Button variant="outline">View Recording</Button>
+                            </Link>
+                          )}
                         </div>
                       </div>
                     </Card>
