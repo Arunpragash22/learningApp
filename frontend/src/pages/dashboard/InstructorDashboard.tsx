@@ -286,7 +286,7 @@ export const InstructorDashboard = () => {
           <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Upcoming Meetings</h2>
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-          View-only. Go to <Link to="/dashboard/sessions" className="text-indigo-600 dark:text-indigo-400 hover:underline">Meetings</Link> to start or manage.
+          Go to <Link to="/dashboard/sessions" className="text-indigo-600 dark:text-indigo-400 hover:underline">Meetings</Link> to join.
         </p>
 
         {sessions.length === 0 ? (
