@@ -31,6 +31,9 @@ interface ProfileStats {
   [key: string]: number;
 }
 
+const PHONE_ALLOWED_REGEX = /^[0-9+\-()\s]*$/;
+const PHONE_ERROR_MESSAGE = 'Phone number can only contain digits, spaces, +, -, and parentheses.';
+
 export const UserProfile = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -41,6 +44,7 @@ export const UserProfile = () => {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [editForm, setEditForm] = useState({ firstName: '', lastName: '', bio: '', phone: '', department: '' });
   const [stats, setStats] = useState<ProfileStats>({});
+  const [phoneError, setPhoneError] = useState('');
 
   const getAuthHeaders = () => ({
     Authorization: `Bearer ${sessionStorage.getItem('access_token') || ''}`,
@@ -66,6 +70,7 @@ export const UserProfile = () => {
           phone: data.profile.phone || '',
           department: data.profile.department || '',
         });
+        setPhoneError('');
       }
     } catch (err) {
       console.error('Failed to fetch profile:', err);
@@ -75,20 +80,29 @@ export const UserProfile = () => {
   };
 
   const handleSave = async () => {
+    const normalizedPhone = editForm.phone.trim();
+    if (normalizedPhone && !PHONE_ALLOWED_REGEX.test(normalizedPhone)) {
+      setPhoneError(PHONE_ERROR_MESSAGE);
+      toast.error(PHONE_ERROR_MESSAGE);
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/profile`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({ ...editForm, phone: normalizedPhone }),
       });
       if (res.ok) {
         const data = await res.json();
         setProfile((prev) => (prev ? { ...prev, ...data.profile } : prev));
+        setPhoneError('');
         toast.success('Profile updated successfully');
         setIsEditing(false);
       } else {
-        toast.error('Failed to update profile');
+        const errorData = await res.json().catch(() => null);
+        toast.error(errorData?.detail || 'Failed to update profile');
       }
     } catch {
       toast.error('Failed to update profile');
@@ -107,6 +121,7 @@ export const UserProfile = () => {
         department: profile.department || '',
       });
     }
+    setPhoneError('');
     setIsEditing(false);
   };
 
@@ -275,14 +290,25 @@ export const UserProfile = () => {
                     <input
                       type="tel"
                       value={editForm.phone}
-                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setEditForm({ ...editForm, phone: value });
+                        setPhoneError(value && !PHONE_ALLOWED_REGEX.test(value) ? PHONE_ERROR_MESSAGE : '');
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 ${
+                        phoneError
+                          ? 'border-red-500 dark:border-red-500 focus:ring-red-500'
+                          : 'border-gray-300 dark:border-gray-600'
+                      }`}
                       placeholder="Enter your phone number"
                     />
                   ) : (
                     <p className="text-gray-900 dark:text-gray-100">
                       {profile?.phone || <span className="text-gray-400">Not provided</span>}
                     </p>
+                  )}
+                  {isEditing && phoneError && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{phoneError}</p>
                   )}
                 </div>
                 <div>

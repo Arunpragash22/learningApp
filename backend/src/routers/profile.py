@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 from bson import ObjectId
+import re
 
 from src.database.connection import db
 from src.middleware.auth import get_current_user
@@ -75,6 +76,15 @@ async def update_profile(
             value = getattr(body, field, None)
             if value is not None:
                 update_fields[field] = value
+
+        if "phone" in update_fields:
+            phone = update_fields["phone"].strip()
+            if phone and not re.fullmatch(r"[0-9+\-\s()]+", phone):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Phone number can only contain digits, spaces, +, -, and parentheses.",
+                )
+            update_fields["phone"] = phone
 
         if not update_fields:
             raise HTTPException(status_code=400, detail="No fields to update")
