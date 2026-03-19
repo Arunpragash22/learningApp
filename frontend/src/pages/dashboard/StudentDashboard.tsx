@@ -370,7 +370,7 @@ export const StudentDashboard = () => {
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Upcoming Meetings</h3>
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          View-only. Go to <Link to="/dashboard/sessions" className="text-blue-600 dark:text-blue-400 hover:underline">Meetings</Link> to join.
+          Go to <Link to="/dashboard/sessions" className="text-blue-600 dark:text-blue-400 hover:underline">Meetings</Link> to join.
         </p>
 
         {/* Meeting list or empty state */}
