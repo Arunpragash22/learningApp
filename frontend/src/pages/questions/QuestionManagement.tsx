@@ -55,8 +55,11 @@ export const QuestionManagement = () => {
     }).catch(() => {});
   }, [isInstructor]);
 
+  const isUpcomingSession = (status?: string) => (status || '').toLowerCase() === 'upcoming';
+
   // Get filtered sessions based on meeting type and selected course
   const filteredSessions = sessions.filter(session => {
+    if (!isUpcomingSession(session.status)) return false;
     if (meetingType === 'standalone') return session.isStandalone === true;
     if (meetingType === 'course') {
       // Must not be standalone and must match selected course
